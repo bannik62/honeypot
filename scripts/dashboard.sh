@@ -109,6 +109,18 @@ clear_screen
 show_stats
 echo ""
 
+# Parser l'historique complet d'abord
+echo "📜 Chargement de l'historique..."
+sudo journalctl -u "$SERVICE_NAME" -o cat --no-pager 2>/dev/null | grep "ACCEPT" | while IFS= read -r line; do
+    parse_and_display "$line"
+done
+
+clear_screen
+show_stats
+echo ""
+echo "🔄 Écoute en temps réel (nouvelles connexions)..."
+echo ""
+
 # Écouter en temps réel
 sudo journalctl -u "$SERVICE_NAME" -f -n 0 --no-pager 2>/dev/null | while IFS= read -r line; do
     parse_and_display "$line"

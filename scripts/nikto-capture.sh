@@ -25,14 +25,32 @@ fi
 echo "📸 Capture des interfaces web depuis le CSV..."
 # Lire le CSV et faire les captures
 tail -n +2 "$CSV_INPUT" | while IFS=',' read -r timestamp ip port protocol url; do
-    filename="${OUTPUT_DIR}/${ip}_${port}_${TIMESTAMP}.png"
+    ip_dir="${OUTPUT_DIR}/${ip}"
+    mkdir -p "$ip_dir"
+    filename="${ip_dir}/${ip}_${port}_${TIMESTAMP}.png"
     
     echo "  📷 Capture: $url"
+
+    # Vérifier si une capture existe déjà pour cette IP/port
+    existing_capture=$(find "$ip_dir" -name "${ip}_${port}_*.png" 2>/dev/null | head -1)
+    if [ -n "$existing_capture" ]; then
+        echo "  ⏭️  Capture déjà existante, skip: $url"
+        continue
+    fi
     
     # Capture avec chromium headless
-    timeout 15 chromium-browser --headless --disable-gpu --no-sandbox --window-size=1920,1080 --screenshot="$filename" "$url" 2>/dev/null
+    timeout 15 chromium-browser --headless --disable-gpu --no-sandbox --disable-web-security --ignore-certificate-errors --ignore-ssl-errors --window-size=1920,1080 --screenshot="$filename" "$url" 2>/dev/null
     
     # Si échec, essayer avec wkhtmltoimage
+
+    # Si HTTPS échoue (port 443/8443), réessayer en HTTP
+    if [ ! -f "$filename" ] || [ ! -s "$filename" ]; then
+        if [ "$port" = "443" ] || [ "$port" = "8443" ]; then
+            http_url="http://${ip}:${port}"
+            echo "  ⚠️  HTTPS échoué, tentative en HTTP: $http_url"
+            timeout 15 chromium-browser --headless --disable-gpu --no-sandbox --window-size=1920,1080 --screenshot="$filename" "$http_url" 2>/dev/null
+        fi
+    fi
     if [ ! -f "$filename" ] || [ ! -s "$filename" ]; then
         timeout 15 wkhtmltoimage --width 1920 "$url" "$filename" 2>/dev/null
     fi
