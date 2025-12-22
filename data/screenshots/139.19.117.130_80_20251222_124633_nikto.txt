@@ -1,0 +1,5 @@
+- Nikto v2.1.5/2.1.5
++ Target Host: inet-research-scan-6.mpi-inf.mpg.de
++ Target Port: 80
++ GET /: Server leaks inodes via ETags, header found with file /, fields: 0x67dfe648 0x1e94 
++ GET /: The anti-clickjacking X-Frame-Options header is not present.
