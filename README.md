@@ -20,49 +20,49 @@ Système de monitoring temps réel pour Endlessh (honeypot SSH) avec capture d'�
 
 Ce système nécessite Endlessh comme honeypot SSH. Assurez-vous que :
 
-- ✅ Endlessh est installé : \`sudo apt install endlessh\`
+- ✅ Endlessh est installé : `sudo apt install endlessh`
 - ✅ Endlessh est configuré pour écouter sur le port 22
-- ✅ Le service systemd endlessh.service est actif : \`sudo systemctl status endlessh\`
+- ✅ Le service systemd endlessh.service est actif : `sudo systemctl status endlessh`
 - ✅ Endlessh génère des logs avec le format ACCEPT host=IP port=PORT
 
-**Configuration Endlessh recommandée** (\`/etc/endlessh/config\`) :
-\`\`\`
+**Configuration Endlessh recommandée** (`/etc/endlessh/config`) :
+```
 Port 22
 Delay 10000
 MaxLineLength 32
 MaxClients 4096
 LogLevel 1
-\`\`\`
+```
 
-**Service systemd** (\`/usr/lib/systemd/system/endlessh.service\`) :
-- Doit avoir \`AmbientCapabilities=CAP_NET_BIND_SERVICE\` pour écouter sur port 22
-- \`PrivateUsers=true\` doit être commenté
+**Service systemd** (`/usr/lib/systemd/system/endlessh.service`) :
+- Doit avoir `AmbientCapabilities=CAP_NET_BIND_SERVICE` pour écouter sur port 22
+- `PrivateUsers=true` doit être commenté
 
 ### 2. Système et Dépendances
 
 - Ubuntu/Debian
-- \`sudo\` pour accéder aux logs systemd
-- \`geoip-bin\` et \`geoip-database\` (installés automatiquement)
-- \`jq\` pour parser JSON (installés automatiquement)
-- \`chromium-browser\` pour les captures d'écran (installé automatiquement)
-- \`nmap\` pour scanner les ports (installé automatiquement)
-- \`nikto\` pour scanner les vulnérabilités (optionnel, installé manuellement)
+- `sudo` pour accéder aux logs systemd
+- `geoip-bin` et `geoip-database` (installés automatiquement)
+- `jq` pour parser JSON (installés automatiquement)
+- `chromium-browser` pour les captures d'écran (installé automatiquement)
+- `nmap` pour scanner les ports (installé automatiquement)
+- `nikto` pour scanner les vulnérabilités (optionnel, installé manuellement)
 
 ## 🚀 Installation
 
-\`\`\`bash
+```bash
 git clone https://github.com/bannik62/honeypot.git
 cd honeypot
 sudo ./install.sh
 cp config/config.example config/config
 nano config/config
-\`\`\`
+```
 
 ## 📊 Utilisation
 
 ### Commandes de Monitoring
 
-\`\`\`bash
+```bash
 # Stats rapides
 ./scripts/stats.sh
 
@@ -73,31 +73,31 @@ nano config/config
 ./scripts/monitor.sh start
 ./scripts/monitor.sh stop
 ./scripts/monitor.sh status
-\`\`\`
+```
 
 ### Scan et Capture des Interfaces Web
 
-\`\`\`bash
+```bash
 # Scanne les IPs avec nmap et crée un CSV avec les interfaces web
 scan-web
 
 # Capture les interfaces web + scan nikto (lance scan-web si nécessaire)
 capture-web
-\`\`\`
+```
 
 ### Alias Disponibles
 
-\`\`\`bash
+```bash
 honeypot-stats      # Affiche les statistiques
 honeypot-dashboard  # Lance le dashboard temps réel
 honeypot-monitor    # Gère le monitoring (start/stop/status)
 scan-web           # Scan nmap des interfaces web
 capture-web        # Capture d'écran + scan nikto
-\`\`\`
+```
 
 ## 📂 Structure du Projet
 
-\`\`\`
+```
 honeypot-monitor/
 ├── data/
 │   ├── logs/
@@ -120,63 +120,63 @@ honeypot-monitor/
 │   └── config             # Configuration
 ├── install.sh             # Script d'installation
 └── README.md
-\`\`\`
+```
 
 ## 🔄 Workflow Complet
 
 ### 1. Endlessh capture les bots
 
-Les bots se connectent au port 22. Endlessh les piège et génère des logs \`ACCEPT host=IP port=PORT\`.
+Les bots se connectent au port 22. Endlessh les piège et génère des logs `ACCEPT host=IP port=PORT`.
 
 ### 2. Monitoring et logs
 
-- \`dashboard.sh\` écoute \`journalctl -f\` en temps réel
-- Les connexions sont enregistrées dans \`connections.csv\`
+- `dashboard.sh` écoute `journalctl -f` en temps réel
+- Les connexions sont enregistrées dans `connections.csv`
 - Chaque IP est géolocalisée (avec cache pour optimisation)
 
 ### 3. Scan des interfaces web (optionnel)
 
-- \`scan-web\` : nmap scanne les IPs capturées
+- `scan-web` : nmap scanne les IPs capturées
 - Détecte les ports HTTP ouverts (80, 443, 8080, 8443, 8000, 8888)
-- Crée \`web_interfaces.csv\` avec les IPs qui ont des interfaces web
+- Crée `web_interfaces.csv` avec les IPs qui ont des interfaces web
 
 ### 4. Capture d'écran et analyse (optionnel)
 
-- \`capture-web\` : lit \`web_interfaces.csv\`
-- Prend des captures PNG avec \`chromium-browser --headless\`
+- `capture-web` : lit `web_interfaces.csv`
+- Prend des captures PNG avec `chromium-browser --headless`
 - Scanne les vulnérabilités avec nikto (si installé)
-- Sauvegarde dans \`data/screenshots/\`
+- Sauvegarde dans `data/screenshots/`
 
 ## 🌍 Géolocalisation
 
 Utilise la base de données GeoIP locale (gratuite) :
 - Pas de limite de requêtes
 - Lookup < 1ms
-- Cache intelligent : les IPs déjà géolocalisées sont mises en cache dans \`data/cache/geoip-cache.json\` pour éviter les requêtes répétées
+- Cache intelligent : les IPs déjà géolocalisées sont mises en cache dans `data/cache/geoip-cache.json` pour éviter les requêtes répétées
 
 ## 📈 Format des Logs
 
 ### connections.csv (Endlessh)
 
-\`\`\`csv
+```csv
 timestamp,ip,port,country
 2025-12-22 10:30:45,192.168.1.100,56954,FR
 2025-12-22 10:31:12,10.0.0.50,52341,US
-\`\`\`
+```
 
 ### web_interfaces.csv (nmap)
 
-\`\`\`csv
+```csv
 timestamp,ip,port,protocol,url
 2025-12-22 12:00:00,192.168.1.100,80,http,http://192.168.1.100:80
 2025-12-22 12:00:01,192.168.1.100,443,https,https://192.168.1.100:443
-\`\`\`
+```
 
 ## 🔧 Configuration
 
-Fichier \`config/config\` :
+Fichier `config/config` :
 
-\`\`\`bash
+```bash
 # Répertoire des données (logs, cache)
 DATA_DIR="/home/ubuntu/honeypot-monitor/data"
 
@@ -188,13 +188,13 @@ REFRESH_INTERVAL=5
 
 # Activer les notifications (true/false)
 ENABLE_NOTIFICATIONS=false
-\`\`\`
+```
 
 ## 📊 Exemple de Sortie
 
-### Stats Rapides (\`stats.sh\`)
+### Stats Rapides (`stats.sh`)
 
-\`\`\`
+```
 🍯 HONEYPOT STATISTICS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -212,16 +212,16 @@ ENABLE_NOTIFICATIONS=false
   10:45:23 - 192.168.1.100 (US) - port 52341
   10:44:12 - 10.0.0.50 (CN) - port 38080
   10:43:05 - 172.16.0.25 (FR) - port 56954
-\`\`\`
+```
 
-### Dashboard Temps Réel (\`dashboard.sh\`)
+### Dashboard Temps Réel (`dashboard.sh`)
 
 Le dashboard affiche les stats en continu et montre immédiatement chaque nouvelle connexion avec le message "✨ NOUVELLE CONNEXION".
 
 ## 📸 Captures d'Écran
 
-Les captures sont sauvegardées dans \`data/screenshots/\` :
-- **Fichiers PNG** : captures d'écran des interfaces web (format : \`{IP}_{PORT}_{TIMESTAMP}.png\`)
+Les captures sont sauvegardées dans `data/screenshots/` :
+- **Fichiers PNG** : captures d'écran des interfaces web (format : `{IP}_{PORT}_{TIMESTAMP}.png`)
 - **Fichiers .txt** : métadonnées (IP, port, URL, timestamp)
 - **Fichiers _nikto.txt** : rapports de vulnérabilités (si nikto est installé)
 
@@ -230,7 +230,7 @@ Les captures sont sauvegardées dans \`data/screenshots/\` :
 Le système utilise un cache pour optimiser les lookups GeoIP :
 - Première connexion d'une IP → lookup GeoIP + sauvegarde dans le cache
 - Connexions suivantes de la même IP → lecture instantanée depuis le cache
-- Fichier : \`data/cache/geoip-cache.json\`
+- Fichier : `data/cache/geoip-cache.json`
 
 ## 📝 Licence
 
