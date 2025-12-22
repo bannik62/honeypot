@@ -33,7 +33,7 @@ echo ""
 
 # Top pays
 echo "🌎 TOP 5 COUNTRIES:"
-cut -d',' -f4 "$LOG_FILE" | sort | uniq -c | sort -rn | head -5 | \
+tail -n +2 "$LOG_FILE" | cut -d',' -f4 | sort | uniq -c | sort -rn | head -5 | \
     while read count country; do
         percentage=$((count * 100 / total))
         echo "  $country: $count ($percentage%)"

@@ -48,7 +48,7 @@ show_stats() {
     
     # Top pays
     echo "🌎 TOP 10 COUNTRIES:"
-    cut -d',' -f4 "$LOG_FILE" 2>/dev/null | sort | uniq -c | sort -rn | head -10 | \
+    tail -n +2 "$LOG_FILE" 2>/dev/null | cut -d',' -f4 | sort | uniq -c | sort -rn | head -10 | \
         while read count country; do
             bar_length=$((count * 50 / total))
             bar=$(printf '█%.0s' $(seq 1 $bar_length))
