@@ -176,7 +176,6 @@ timestamp,ip,port,protocol,url
 
 Fichier `config/config` :
 
-```bash
 # Répertoire des données (logs, cache)
 DATA_DIR="/home/ubuntu/honeypot-monitor/data"
 
@@ -187,8 +186,23 @@ SERVICE_NAME="endlessh"
 REFRESH_INTERVAL=5
 
 # Activer les notifications (true/false)
-ENABLE_NOTIFICATIONS=false
-```
+ENABLE_NOTIFICATIONS=false### Explication des Paramètres
+
+**DATA_DIR** : Chemin vers le répertoire qui contient les logs, cache et captures d'écran.
+- **Par défaut** : `/home/ubuntu/honeypot-monitor/data`
+- **Modifier si** : Vous voulez stocker les données ailleurs (ex: `/var/log/honeypot`)
+
+**SERVICE_NAME** : Nom du service systemd à monitorer.
+- **Par défaut** : `endlessh`
+- **Modifier si** : Vous utilisez un autre nom de service pour Endlessh
+
+**REFRESH_INTERVAL** : Délai (en secondes) entre chaque rafraîchissement du dashboard.
+- **Par défaut** : `5` secondes
+- **Modifier si** : Vous voulez un rafraîchissement plus rapide (1-2s) ou plus lent (10s+)
+
+**ENABLE_NOTIFICATIONS** : Active les notifications (fonctionnalité future).
+- **Par défaut** : `false`
+- **Modifier si** : Cette fonctionnalité est implémentée plus tard
 
 ## 📊 Exemple de Sortie
 
