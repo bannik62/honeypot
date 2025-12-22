@@ -1,0 +1,15 @@
+# Données générées
+data/logs/*.csv
+data/logs/daily/
+data/cache/*.json
+
+# Config personnelle (garder seulement .example)
+config/config
+
+# PID files
+*.pid
+/tmp/honeypot-monitor.pid
+
+# Logs système
+*.log
+

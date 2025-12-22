@@ -1,0 +1,14 @@
+# Configuration Honeypot Monitor
+
+# Répertoire des données (logs, cache)
+DATA_DIR="/home/ubuntu/honeypot-monitor/data"
+
+# Nom du service systemd à monitorer
+SERVICE_NAME="endlessh"
+
+# Intervalle de rafraîchissement du dashboard (secondes)
+REFRESH_INTERVAL=5
+
+# Activer les notifications (true/false)
+ENABLE_NOTIFICATIONS=false
+

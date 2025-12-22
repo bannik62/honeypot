@@ -1,0 +1,70 @@
+#!/bin/bash
+# Script d'installation du système de monitoring honeypot
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DATA_DIR="$SCRIPT_DIR/data"
+
+echo "🍯 Installation du Honeypot Monitor..."
+echo ""
+
+# Vérifier si root
+if [ "$EUID" -ne 0 ]; then 
+    echo "⚠️  Cette installation nécessite sudo. Utilisez: sudo ./install.sh"
+    exit 1
+fi
+
+# Installer les dépendances
+echo "📦 Installation des dépendances..."
+apt-get update -qq
+apt-get install -y geoip-bin geoip-database jq > /dev/null 2>&1
+
+# Créer la structure de répertoires
+echo "📁 Création de la structure..."
+mkdir -p "$DATA_DIR/logs" "$DATA_DIR/cache" "$SCRIPT_DIR/config"
+
+# Créer le fichier de log CSV avec en-têtes si nécessaire
+LOG_FILE="$DATA_DIR/logs/connections.csv"
+if [ ! -f "$LOG_FILE" ]; then
+    echo "timestamp,ip,port,country" > "$LOG_FILE"
+    chown "$SUDO_USER:$SUDO_USER" "$LOG_FILE"
+fi
+
+# Créer le cache GeoIP si nécessaire
+CACHE_FILE="$DATA_DIR/cache/geoip-cache.json"
+if [ ! -f "$CACHE_FILE" ]; then
+    echo "{}" > "$CACHE_FILE"
+    chown "$SUDO_USER:$SUDO_USER" "$CACHE_FILE"
+fi
+
+# Rendre les scripts exécutables
+chmod +x "$SCRIPT_DIR/scripts/"*.sh
+chown -R "$SUDO_USER:$SUDO_USER" "$SCRIPT_DIR"
+
+# Ajouter les alias dans .bashrc
+BASHRC="/home/$SUDO_USER/.bashrc"
+if [ -f "$BASHRC" ]; then
+    if ! grep -q "honeypot-stats" "$BASHRC"; then
+        echo "" >> "$BASHRC"
+        echo "# Honeypot Monitor Aliases" >> "$BASHRC"
+        echo "alias honeypot-stats='cd $SCRIPT_DIR && ./scripts/stats.sh'" >> "$BASHRC"
+        echo "alias honeypot-dashboard='cd $SCRIPT_DIR && ./scripts/dashboard.sh'" >> "$BASHRC"
+        echo "alias honeypot-monitor='cd $SCRIPT_DIR && ./scripts/monitor.sh'" >> "$BASHRC"
+        echo "✅ Aliases ajoutés à $BASHRC"
+    else
+        echo "ℹ️  Aliases déjà présents dans $BASHRC"
+    fi
+fi
+
+echo ""
+echo "✅ Installation terminée !"
+echo ""
+echo "📋 Prochaines étapes:"
+echo "   1. Créer le fichier de config: cp config/config.example config/config"
+echo "   2. Éditer si nécessaire: nano config/config"
+echo "   3. Lancer le monitoring: ./scripts/monitor.sh start"
+echo "   4. Voir les stats: ./scripts/stats.sh"
+echo "   5. Dashboard live: ./scripts/dashboard.sh"
+echo ""
+echo "💡 Ou utilisez les alias: honeypot-stats, honeypot-dashboard, honeypot-monitor"
