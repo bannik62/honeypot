@@ -1,5 +1,0 @@
-IP: 139.19.117.130
-Port: 80
-Protocol: http
-URL: http://139.19.117.130:80
-Timestamp: 2025-12-22 12:46:35

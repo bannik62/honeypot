@@ -46,11 +46,11 @@ tail -n +2 "$CSV_INPUT" | while IFS=',' read -r timestamp ip port protocol url; 
         echo "Timestamp: $(date '+%Y-%m-%d %H:%M:%S')" >> "${filename%.png}.txt"
         echo "✅ Capture réussie: $filename"
         
-        # Scan nikto
-        if command -v nikto &> /dev/null; then
-            echo "  🔍 Scan nikto: $url"
-            nikto -h "$url" -output "${filename%.png}_nikto.txt" -Format txt 2>/dev/null
-        fi
+#         # Scan nikto
+#         if command -v nikto &> /dev/null; then
+#             echo "  🔍 Scan nikto: $url"
+#             nikto -h "$url" -output "${filename%.png}_nikto.txt" -Format txt 2>/dev/null
+#         fi
     else
         echo "  ❌ Échec capture: $url"
         rm -f "$filename"

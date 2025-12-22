@@ -9,6 +9,7 @@ NMAP_LOG="/tmp/nmap_scan.txt"
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 
 # Créer le CSV de sortie avec en-têtes si nécessaire
+if [ -f "$CSV_OUTPUT" ]; then rm "$CSV_OUTPUT"; fi
 if [ ! -f "$CSV_OUTPUT" ]; then
     echo "timestamp,ip,port,protocol,url" > "$CSV_OUTPUT"
 fi
