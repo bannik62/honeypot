@@ -51,7 +51,7 @@ rm -f /tmp/honeypot-monitor.pid
 rm -f /tmp/honeypot-monitor.lock
 echo "   ✅ Fichiers temporaires supprimés"
 
-# 4. Supprimer les alias du .bashrc
+# 4. Supprimer les alias du .bashrc avec sed (méthode fiable)
 echo ""
 echo "4️⃣  Suppression des alias dans ~/.bashrc..."
 
@@ -59,23 +59,23 @@ if [ -f "$BASHRC" ]; then
     # Créer une backup
     cp "$BASHRC" "$BASHRC.backup.$(date +%Y%m%d_%H%M%S)"
     
-    # Utiliser grep -v en chaîne pour filtrer toutes les lignes problématiques
-    # C'est la méthode la plus robuste qui fonctionne
-    grep -v "alias honeypot-stats" "$BASHRC" | \
-    grep -v "alias honeypot-dashboard" | \
-    grep -v "alias honeypot-monitor" | \
-    grep -v "alias scan-web" | \
-    grep -v "alias capture-web" | \
-    grep -v "# Honeypot Monitor Aliases" > "$BASHRC.tmp" 2>/dev/null
+    # Utiliser sed pour supprimer les lignes (une par une, plus fiable)
+    sed -i '/^alias honeypot-stats/d' "$BASHRC"
+    sed -i '/^alias honeypot-dashboard/d' "$BASHRC"
+    sed -i '/^alias honeypot-monitor/d' "$BASHRC"
+    sed -i '/^alias scan-web/d' "$BASHRC"
+    sed -i '/^alias capture-web/d' "$BASHRC"
+    sed -i '/# Honeypot Monitor Aliases/d' "$BASHRC"
     
-    # Remplacer le fichier original seulement si le tmp n'est pas vide
-    if [ -s "$BASHRC.tmp" ]; then
-        mv "$BASHRC.tmp" "$BASHRC"
-        echo "   ✅ Alias supprimés de ~/.bashrc"
-        echo "   💾 Backup créé automatiquement"
-    else
-        echo "   ⚠️  Erreur lors de la suppression (fichier tmp vide), backup conservé"
-        rm -f "$BASHRC.tmp"
+    # Nettoyer les lignes vides multiples
+    sed -i '/^$/N;/^\n$/d' "$BASHRC"
+    
+    echo "   ✅ Alias supprimés de ~/.bashrc"
+    echo "   💾 Backup créé automatiquement"
+    
+    # Vérifier que c'est bien supprimé
+    if grep -q "alias.*honeypot\|alias.*scan-web\|alias.*capture-web" "$BASHRC" 2>/dev/null; then
+        echo "   ⚠️  Attention : certains alias semblent toujours présents"
     fi
 else
     echo "   ℹ️  ~/.bashrc introuvable, skip"
