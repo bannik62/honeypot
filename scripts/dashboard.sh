@@ -1,5 +1,6 @@
 #!/bin/bash
-# Dashboard temps réel du honeypot avec écoute live
+
+# Dashboard temps réel du honeypot - Lit uniquement le CSV
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_FILE="$SCRIPT_DIR/../config/config"
@@ -8,12 +9,11 @@ if [ -f "$CONFIG_FILE" ]; then
     source "$CONFIG_FILE"
 else
     DATA_DIR="$SCRIPT_DIR/../data"
-    REFRESH_INTERVAL=5
+    REFRESH_INTERVAL=3
     SERVICE_NAME="endlessh"
 fi
 
 LOG_FILE="$DATA_DIR/logs/connections.csv"
-PARSER_SCRIPT="$SCRIPT_DIR/parser.sh"
 
 # Fonction pour nettoyer l'écran
 clear_screen() {
@@ -27,13 +27,14 @@ clear_screen() {
 show_stats() {
     if [ ! -f "$LOG_FILE" ]; then
         echo "⏳ En attente de connexions..."
+        echo "💡 Astuce: Lancez 'honeypot-monitor start' en arrière-plan pour remplir le CSV"
         return
     fi
-    
+
     # Total
     total=$(tail -n +2 "$LOG_FILE" 2>/dev/null | wc -l | tr -d ' ')
     unique_ips=$(tail -n +2 "$LOG_FILE" 2>/dev/null | cut -d',' -f2 | sort -u | wc -l | tr -d ' ')
-    
+
     # Dernière connexion
     if [ -f "$LOG_FILE" ] && [ "$total" -gt 0 ]; then
         last_line=$(tail -1 "$LOG_FILE")
@@ -41,13 +42,13 @@ show_stats() {
             IFS=',' read -r last_time last_ip last_port last_country <<< "$last_line"
         fi
     fi
-    
+
     echo "📊 Total: $total connexions | 🌍 IPs uniques: $unique_ips"
     if [ -n "$last_ip" ]; then
         echo "🆕 Dernière: $last_time - $last_ip ($last_country) - port $last_port"
     fi
     echo ""
-    
+
     # Top pays
     if [ "$total" -gt 0 ]; then
         echo "🌎 TOP 10 COUNTRIES:"
@@ -58,47 +59,17 @@ show_stats() {
                 percentage=$((count * 100 / total))
                 printf "  %-3s %s %s (%d%%)\n" "$count" "$country" "$bar" "$percentage"
             done
-        
+
         echo ""
         echo "🔥 DERNIÈRES 10 CONNEXIONS:"
         tail -10 "$LOG_FILE" 2>/dev/null | while IFS=',' read -r timestamp ip port country; do
             echo "  $timestamp - $ip ($country)"
         done
     fi
-    
-    echo ""
-    echo "🔄 Écoute en temps réel (Ctrl+C pour quitter)"
-}
 
-# Fonction pour parser une ligne ACCEPT
-parse_and_display() {
-    local line="$1"
-    if echo "$line" | grep -q "ACCEPT"; then
-        # Parser la ligne
-        if [[ $line =~ host=([^[:space:]]+) ]]; then
-            ip="${BASH_REMATCH[1]}"
-            ip=$(echo "$ip" | sed 's/::ffff://')
-            
-            if [[ $line =~ port=([0-9]+) ]]; then
-                port="${BASH_REMATCH[1]}"
-            else
-                port="unknown"
-            fi
-            
-            # Géolocaliser
-            country=$(geoiplookup "$ip" 2>/dev/null | grep -oP 'GeoIP Country Edition: \K[^,]+' | head -1 || echo "Unknown")
-            timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-            
-            # Écrire dans le CSV
-            echo "$timestamp,$ip,$port,$country" >> "$LOG_FILE"
-            
-            # Afficher immédiatement
-            clear_screen
-            show_stats
-            echo ""
-            echo "✨ NOUVELLE CONNEXION: $timestamp - $ip ($country) - port $port"
-        fi
-    fi
+    echo ""
+    echo "🔄 Rafraîchissement automatique toutes les ${REFRESH_INTERVAL}s (Ctrl+C pour quitter)"
+    echo "💡 Le CSV est alimenté par 'honeypot-monitor start' en arrière-plan"
 }
 
 # Nettoyer à la sortie
@@ -107,21 +78,19 @@ trap 'clear; exit 0' INT
 # Afficher les stats initiales
 clear_screen
 show_stats
-echo ""
 
-# Parser l'historique complet d'abord
-echo "📜 Chargement de l'historique..."
-sudo journalctl -u "$SERVICE_NAME" -o cat --no-pager 2>/dev/null | grep "ACCEPT" | while IFS= read -r line; do
-    parse_and_display "$line"
-done
+# Boucle de rafraîchissement périodique
+last_refresh=$(date +%s)
+while true; do
+    current_time=$(date +%s)
+    time_since_refresh=$((current_time - last_refresh))
 
-clear_screen
-show_stats
-echo ""
-echo "🔄 Écoute en temps réel (nouvelles connexions)..."
-echo ""
+    # Rafraîchissement toutes les REFRESH_INTERVAL secondes
+    if [ $time_since_refresh -ge $REFRESH_INTERVAL ]; then
+        clear_screen
+        show_stats
+        last_refresh=$(date +%s)
+    fi
 
-# Écouter en temps réel
-sudo journalctl -u "$SERVICE_NAME" -f -n 0 --no-pager 2>/dev/null | while IFS= read -r line; do
-    parse_and_display "$line"
+    sleep 0.5  # Check toutes les 0.5s
 done

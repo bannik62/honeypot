@@ -1,4 +1,5 @@
 #!/bin/bash
+
 # Script qui affiche les statistiques du honeypot
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -8,22 +9,38 @@ if [ -f "$CONFIG_FILE" ]; then
     source "$CONFIG_FILE"
 else
     DATA_DIR="$SCRIPT_DIR/../data"
+    SERVICE_NAME="endlessh"
 fi
 
 LOG_FILE="$DATA_DIR/logs/connections.csv"
+PARSER_SCRIPT="$SCRIPT_DIR/parser.sh"
 
+# Créer le CSV avec en-tête si nécessaire
+mkdir -p "$(dirname "$LOG_FILE")"
 if [ ! -f "$LOG_FILE" ]; then
+    echo "timestamp,ip,port,country" > "$LOG_FILE"
+fi
+
+# Parser tout l'historique de journalctl pour Endlessh
+echo "📊 Chargement de l'historique complet..."
+sudo journalctl -u "${SERVICE_NAME:-endlessh}" -o cat -n 0 2>/dev/null | \
+    grep "ACCEPT" | \
+    while IFS= read -r line; do
+        echo "$line" | "$PARSER_SCRIPT"
+    done > /dev/null 2>&1
+
+# Compter le total (ignorer la première ligne = en-tête)
+total=$(tail -n +2 "$LOG_FILE" 2>/dev/null | wc -l | tr -d ' ')
+
+# Si pas de connexions
+if [ "$total" -eq 0 ]; then
     echo "⚠️  Aucune donnée trouvée. Le monitoring n'a pas encore capturé de connexions."
     exit 0
 fi
 
-# Compter le total
-total=$(wc -l < "$LOG_FILE" | tr -d ' ')
+# Compter IPs uniques (ignorer la première ligne = en-tête)
+unique_ips=$(tail -n +2 "$LOG_FILE" 2>/dev/null | cut -d',' -f2 | sort -u | wc -l | tr -d ' ')
 
-# Compter IPs uniques
-unique_ips=$(cut -d',' -f2 "$LOG_FILE" | sort -u | wc -l | tr -d ' ')
-
-# Top 5 pays
 echo "🍯 HONEYPOT STATISTICS"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
@@ -31,16 +48,18 @@ echo "📈 Total Connections: $total"
 echo "🌍 Unique IPs: $unique_ips"
 echo ""
 
-# Top pays
-echo "🌎 TOP 5 COUNTRIES:"
-tail -n +2 "$LOG_FILE" | cut -d',' -f4 | sort | uniq -c | sort -rn | head -5 | \
-    while read count country; do
-        percentage=$((count * 100 / total))
-        echo "  $country: $count ($percentage%)"
-    done
+# Top pays (ignorer la première ligne = en-tête)
+if [ "$total" -gt 0 ]; then
+    echo "🌎 TOP 5 COUNTRIES:"
+    tail -n +2 "$LOG_FILE" 2>/dev/null | cut -d',' -f4 | sort | uniq -c | sort -rn | head -5 | \
+        while read count country; do
+            percentage=$((count * 100 / total))
+            echo "  $country: $count ($percentage%)"
+        done
 
-echo ""
-echo "🔥 LATEST 5 CONNECTIONS:"
-tail -5 "$LOG_FILE" | while IFS=',' read -r timestamp ip port country; do
-    echo "  $timestamp - $ip ($country) - port $port"
-done
+    echo ""
+    echo "🔥 LATEST 5 CONNECTIONS:"
+    tail -n +2 "$LOG_FILE" 2>/dev/null | tail -5 | while IFS=',' read -r timestamp ip port country; do
+        echo "  $timestamp - $ip ($country) - port $port"
+    done
+fi
