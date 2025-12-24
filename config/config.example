@@ -12,3 +12,7 @@ REFRESH_INTERVAL=5
 # Activer les notifications (true/false)
 ENABLE_NOTIFICATIONS=false
 
+
+# Ports à scanner pour les interfaces web (séparés par des virgules)
+# Ports par défaut: 80,443,8080,8443,8000,8888,3000,5000,9000
+SCAN_PORTS="80,443,8080,8443,8000,8888,3000,5000,9000"
