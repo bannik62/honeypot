@@ -30,9 +30,13 @@ ask_confirmation() {
 echo "1️⃣  Arrêt du monitoring..."
 if [ -f "$SCRIPT_DIR/scripts/monitor.sh" ]; then
     cd "$SCRIPT_DIR"
-    ./scripts/monitor.sh cleanup 2>/dev/null || true
-    ./scripts/monitor.sh stop 2>/dev/null || true
-    echo "   ✅ Monitoring arrêté"
+    if ask_confirmation "   ❓ Arrêter le monitoring en cours ?"; then
+        ./scripts/monitor.sh cleanup 2>/dev/null || true
+        ./scripts/monitor.sh stop 2>/dev/null || true
+        echo "   ✅ Monitoring arrêté"
+    else
+        echo "   ℹ️  Monitoring conservé"
+    fi
 else
     echo "   ℹ️  Script monitor.sh introuvable, skip"
 fi
@@ -40,42 +44,61 @@ fi
 # 2. Nettoyer les processus fantômes
 echo ""
 echo "2️⃣  Nettoyage des processus restants..."
-sudo pkill -f "journalctl.*endlessh.*-f" 2>/dev/null || true
-pkill -f "monitor.sh" 2>/dev/null || true
-echo "   ✅ Processus nettoyés"
+if ask_confirmation "   ❓ Nettoyer les processus fantômes ?"; then
+    sudo pkill -f "journalctl.*endlessh.*-f" 2>/dev/null || true
+    pkill -f "monitor.sh" 2>/dev/null || true
+    echo "   ✅ Processus nettoyés"
+else
+    echo "   ℹ️  Processus conservés"
+fi
 
 # 3. Supprimer les fichiers temporaires
 echo ""
 echo "3️⃣  Suppression des fichiers temporaires..."
-rm -f /tmp/honeypot-monitor.pid
-rm -f /tmp/honeypot-monitor.lock
-echo "   ✅ Fichiers temporaires supprimés"
+if ask_confirmation "   ❓ Supprimer les fichiers temporaires (PID, lock) ?"; then
+    rm -f /tmp/honeypot-monitor.pid
+    rm -f /tmp/honeypot-monitor.lock
+    echo "   ✅ Fichiers temporaires supprimés"
+else
+    echo "   ℹ️  Fichiers temporaires conservés"
+fi
 
 # 4. Supprimer les alias du .bashrc avec sed (méthode fiable)
 echo ""
 echo "4️⃣  Suppression des alias dans ~/.bashrc..."
 
 if [ -f "$BASHRC" ]; then
-    # Créer une backup
-    cp "$BASHRC" "$BASHRC.backup.$(date +%Y%m%d_%H%M%S)"
-    
-    # Utiliser sed pour supprimer les lignes (une par une, plus fiable)
-    sed -i '/^alias honeypot-stats/d' "$BASHRC"
-    sed -i '/^alias honeypot-dashboard/d' "$BASHRC"
-    sed -i '/^alias honeypot-monitor/d' "$BASHRC"
-    sed -i '/^alias scan-web/d' "$BASHRC"
-    sed -i '/^alias capture-web/d' "$BASHRC"
-    sed -i '/# Honeypot Monitor Aliases/d' "$BASHRC"
-    
-    # Nettoyer les lignes vides multiples
-    sed -i '/^$/N;/^\n$/d' "$BASHRC"
-    
-    echo "   ✅ Alias supprimés de ~/.bashrc"
-    echo "   💾 Backup créé automatiquement"
-    
-    # Vérifier que c'est bien supprimé
-    if grep -q "alias.*honeypot\|alias.*scan-web\|alias.*capture-web" "$BASHRC" 2>/dev/null; then
-        echo "   ⚠️  Attention : certains alias semblent toujours présents"
+    # Vérifier si des alias existent
+    if grep -q "alias honeypot-stats\|alias honeypot-dashboard\|alias honeypot-monitor\|alias scan-web\|alias capture-web\|# Honeypot Monitor Aliases" "$BASHRC" 2>/dev/null; then
+        echo "   📋 Alias trouvés dans ~/.bashrc"
+        if ask_confirmation "   ❓ Supprimer les alias du .bashrc ?"; then
+            # Créer une backup
+            cp "$BASHRC" "$BASHRC.backup.$(date +%Y%m%d_%H%M%S)"
+            
+            # Utiliser sed pour supprimer les lignes (une par une, plus fiable)
+            sed -i '/^alias honeypot-stats/d' "$BASHRC"
+            sed -i '/^alias honeypot-dashboard/d' "$BASHRC"
+            sed -i '/^alias honeypot-monitor/d' "$BASHRC"
+            sed -i '/^alias scan-web/d' "$BASHRC"
+            sed -i '/^alias capture-web/d' "$BASHRC"
+            sed -i '/# Honeypot Monitor Aliases/d' "$BASHRC"
+            
+            # Nettoyer les lignes vides multiples
+            sed -i '/^$/N;/^\n$/d' "$BASHRC"
+            
+            echo "   ✅ Alias supprimés de ~/.bashrc"
+            echo "   💾 Backup créé automatiquement"
+            
+            # Vérifier que c'est bien supprimé
+            if grep -q "alias.*honeypot\|alias.*scan-web\|alias.*capture-web" "$BASHRC" 2>/dev/null; then
+                echo "   ⚠️  Attention : certains alias semblent toujours présents"
+                echo "   💡 Essayez de recharger le .bashrc : source ~/.bashrc"
+            fi
+        else
+            echo "   ℹ️  Alias conservés dans .bashrc"
+        fi
+    else
+        echo "   ℹ️  Aucun alias honeypot trouvé dans .bashrc"
     fi
 else
     echo "   ℹ️  ~/.bashrc introuvable, skip"
@@ -84,8 +107,12 @@ fi
 # 5. Supprimer les alias de la session actuelle
 echo ""
 echo "5️⃣  Suppression des alias de la session actuelle..."
-unalias honeypot-stats honeypot-dashboard honeypot-monitor scan-web capture-web 2>/dev/null || true
-echo "   ✅ Alias supprimés de la session"
+if ask_confirmation "   ❓ Supprimer les alias de la session actuelle ?"; then
+    unalias honeypot-stats honeypot-dashboard honeypot-monitor scan-web capture-web 2>/dev/null || true
+    echo "   ✅ Alias supprimés de la session"
+else
+    echo "   ℹ️  Alias de session conservés"
+fi
 
 # 6. Demander si on garde les données
 echo ""
@@ -103,6 +130,10 @@ if [ -d "$SCRIPT_DIR/data" ]; then
     fi
 else
     echo "   ℹ️  Pas de répertoire de données"
+    if ask_confirmation "   ❓ Créer un répertoire data vide ?"; then
+        mkdir -p "$SCRIPT_DIR/data/logs" "$SCRIPT_DIR/data/cache" "$SCRIPT_DIR/data/screenshots"
+        echo "   ✅ Répertoire data créé"
+    fi
 fi
 
 # 7. Supprimer la configuration
@@ -110,6 +141,7 @@ echo ""
 echo "7️⃣  Gestion de la configuration..."
 if [ -d "$SCRIPT_DIR/config" ]; then
     if [ -f "$SCRIPT_DIR/config/config" ]; then
+        echo "   📋 Configuration personnalisée trouvée"
         if ask_confirmation "   ❓ Voulez-vous supprimer la configuration personnalisée ?"; then
             rm -f "$SCRIPT_DIR/config/config"
             echo "   ✅ Configuration supprimée (config.example conservé)"
@@ -117,17 +149,23 @@ if [ -d "$SCRIPT_DIR/config" ]; then
             echo "   ℹ️  Configuration conservée"
         fi
     else
-        echo "   ℹ️  Pas de configuration personnalisée"
+        echo "   ℹ️  Pas de configuration personnalisée (seulement config.example)"
+        if ask_confirmation "   ❓ Créer une config à partir de config.example ?"; then
+            cp "$SCRIPT_DIR/config/config.example" "$SCRIPT_DIR/config/config"
+            echo "   ✅ Configuration créée (éditez-la avec nano)"
+        fi
     fi
+else
+    echo "   ℹ️  Pas de répertoire config"
 fi
 
 # 8. Supprimer le répertoire honeypot-monitor
 echo ""
 echo "8️⃣  Suppression du répertoire d'installation..."
-if ask_confirmation "   ❓ Voulez-vous supprimer complètement ~/honeypot-monitor ?"; then
+if ask_confirmation "   ❓ Voulez-vous supprimer complètement le répertoire d'installation ?"; then
     cd "$HOME"
     rm -rf "$SCRIPT_DIR"
-    echo "   ✅ Répertoire ~/honeypot-monitor supprimé"
+    echo "   ✅ Répertoire supprimé"
     echo ""
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo "✅ DÉSINSTALLATION TERMINÉE"
@@ -156,9 +194,6 @@ if [ -d "$SCRIPT_DIR/data" ]; then
 fi
 if [ -d "$SCRIPT_DIR" ]; then
     echo "   ℹ️  Répertoire conservé : $SCRIPT_DIR"
-    echo ""
-    echo "💡 Pour terminer la désinstallation :"
-    echo "   rm -rf ~/honeypot-monitor"
 fi
 echo ""
 echo "🔄 IMPORTANT : Rechargez votre .bashrc pour finaliser :"
