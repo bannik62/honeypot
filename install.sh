@@ -1,4 +1,5 @@
 #!/bin/bash
+
 # Script d'installation du système de monitoring honeypot
 
 set -e
@@ -10,7 +11,7 @@ echo "🍯 Installation du Honeypot Monitor..."
 echo ""
 
 # Vérifier si root
-if [ "$EUID" -ne 0 ]; then 
+if [ "$EUID" -ne 0 ]; then
     echo "⚠️  Cette installation nécessite sudo. Utilisez: sudo ./install.sh"
     exit 1
 fi
@@ -44,18 +45,23 @@ chown -R "$SUDO_USER:$SUDO_USER" "$SCRIPT_DIR"
 
 # Ajouter les alias dans .bashrc
 BASHRC="/home/$SUDO_USER/.bashrc"
+
+# S'assurer que SCRIPT_DIR est un chemin absolu (au cas où)
+SCRIPT_DIR_ABS="$(cd "$SCRIPT_DIR" && pwd)"
+
 if [ -f "$BASHRC" ]; then
     if ! grep -q "honeypot-stats" "$BASHRC"; then
         echo "" >> "$BASHRC"
         echo "# Honeypot Monitor Aliases" >> "$BASHRC"
-        echo "alias honeypot-stats='cd $SCRIPT_DIR && ./scripts/stats.sh'" >> "$BASHRC"
-        echo "alias honeypot-dashboard='cd $SCRIPT_DIR && ./scripts/dashboard.sh'" >> "$BASHRC"
-        echo "alias honeypot-monitor='cd $SCRIPT_DIR && ./scripts/monitor.sh'" >> "$BASHRC"
-        echo "alias scan-web='cd $SCRIPT_DIR && ./scripts/nmap-to-csv.sh'" >> "$BASHRC"
-        echo "alias capture-web='cd $SCRIPT_DIR && ./scripts/nikto-capture.sh'" >> "$BASHRC"
+        echo "alias honeypot-stats='cd \"$SCRIPT_DIR_ABS\" && ./scripts/stats.sh'" >> "$BASHRC"
+        echo "alias honeypot-dashboard='cd \"$SCRIPT_DIR_ABS\" && ./scripts/dashboard.sh'" >> "$BASHRC"
+        echo "alias honeypot-monitor='cd \"$SCRIPT_DIR_ABS\" && ./scripts/monitor.sh'" >> "$BASHRC"
+        echo "alias scan-web='cd \"$SCRIPT_DIR_ABS\" && ./scripts/nmap-to-csv.sh'" >> "$BASHRC"
+        echo "alias capture-web='cd \"$SCRIPT_DIR_ABS\" && ./scripts/nikto-capture.sh'" >> "$BASHRC"
         echo "✅ Aliases ajoutés à $BASHRC"
     else
         echo "ℹ️  Aliases déjà présents dans $BASHRC"
+        echo "💡 Utilisez ./uninstall.sh puis réinstallez si vous voulez les mettre à jour"
     fi
 fi
 
