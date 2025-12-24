@@ -59,7 +59,8 @@ if [ -f "$BASHRC" ]; then
     # Créer une backup
     cp "$BASHRC" "$BASHRC.backup.$(date +%Y%m%d_%H%M%S)"
     
-    # Utiliser grep -v pour filtrer toutes les lignes problématiques en une fois
+    # Utiliser grep -v en chaîne pour filtrer toutes les lignes problématiques
+    # C'est la méthode la plus robuste qui fonctionne
     grep -v "alias honeypot-stats" "$BASHRC" | \
     grep -v "alias honeypot-dashboard" | \
     grep -v "alias honeypot-monitor" | \
@@ -67,11 +68,15 @@ if [ -f "$BASHRC" ]; then
     grep -v "alias capture-web" | \
     grep -v "# Honeypot Monitor Aliases" > "$BASHRC.tmp" 2>/dev/null
     
-    # Remplacer le fichier original
-    mv "$BASHRC.tmp" "$BASHRC"
-    
-    echo "   ✅ Alias supprimés de ~/.bashrc"
-    echo "   💾 Backup créé automatiquement"
+    # Remplacer le fichier original seulement si le tmp n'est pas vide
+    if [ -s "$BASHRC.tmp" ]; then
+        mv "$BASHRC.tmp" "$BASHRC"
+        echo "   ✅ Alias supprimés de ~/.bashrc"
+        echo "   💾 Backup créé automatiquement"
+    else
+        echo "   ⚠️  Erreur lors de la suppression (fichier tmp vide), backup conservé"
+        rm -f "$BASHRC.tmp"
+    fi
 else
     echo "   ℹ️  ~/.bashrc introuvable, skip"
 fi
