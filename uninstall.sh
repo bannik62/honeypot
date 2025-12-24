@@ -68,8 +68,8 @@ echo ""
 echo "4️⃣  Suppression des alias dans ~/.bashrc..."
 
 if [ -f "$BASHRC" ]; then
-    # Vérifier si des alias existent
-    if grep -q "alias honeypot-stats\|alias honeypot-dashboard\|alias honeypot-monitor\|alias scan-web\|alias capture-web\|# Honeypot Monitor Aliases" "$BASHRC" 2>/dev/null; then
+    # Vérifier si des alias existent (utiliser grep -E pour les expressions régulières)
+    if grep -qE "alias honeypot-stats|alias honeypot-dashboard|alias honeypot-monitor|alias scan-web|alias capture-web|# Honeypot Monitor Aliases" "$BASHRC" 2>/dev/null; then
         echo "   📋 Alias trouvés dans ~/.bashrc"
         if ask_confirmation "   ❓ Supprimer les alias du .bashrc ?"; then
             # Créer une backup
@@ -90,7 +90,7 @@ if [ -f "$BASHRC" ]; then
             echo "   💾 Backup créé automatiquement"
             
             # Vérifier que c'est bien supprimé
-            if grep -q "alias.*honeypot\|alias.*scan-web\|alias.*capture-web" "$BASHRC" 2>/dev/null; then
+            if grep -qE "alias honeypot-stats|alias honeypot-dashboard|alias honeypot-monitor|alias scan-web|alias capture-web" "$BASHRC" 2>/dev/null; then
                 echo "   ⚠️  Attention : certains alias semblent toujours présents"
                 echo "   💡 Essayez de recharger le .bashrc : source ~/.bashrc"
             fi
@@ -130,10 +130,6 @@ if [ -d "$SCRIPT_DIR/data" ]; then
     fi
 else
     echo "   ℹ️  Pas de répertoire de données"
-    if ask_confirmation "   ❓ Créer un répertoire data vide ?"; then
-        mkdir -p "$SCRIPT_DIR/data/logs" "$SCRIPT_DIR/data/cache" "$SCRIPT_DIR/data/screenshots"
-        echo "   ✅ Répertoire data créé"
-    fi
 fi
 
 # 7. Supprimer la configuration
@@ -150,10 +146,6 @@ if [ -d "$SCRIPT_DIR/config" ]; then
         fi
     else
         echo "   ℹ️  Pas de configuration personnalisée (seulement config.example)"
-        if ask_confirmation "   ❓ Créer une config à partir de config.example ?"; then
-            cp "$SCRIPT_DIR/config/config.example" "$SCRIPT_DIR/config/config"
-            echo "   ✅ Configuration créée (éditez-la avec nano)"
-        fi
     fi
 else
     echo "   ℹ️  Pas de répertoire config"
