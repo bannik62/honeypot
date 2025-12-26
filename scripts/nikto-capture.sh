@@ -3,8 +3,15 @@
 # Lance automatiquement le scan nmap si le CSV n'existe pas ou est vide
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CSV_INPUT="$SCRIPT_DIR/../data/logs/web_interfaces.csv"
-OUTPUT_DIR="$SCRIPT_DIR/../data/screenshots"
+# Charger la config
+CONFIG_FILE="$SCRIPT_DIR/../config/config"
+if [ -f "$CONFIG_FILE" ]; then
+    source "$CONFIG_FILE"
+else
+    DATA_DIR="$SCRIPT_DIR/../data"
+fi
+CSV_INPUT="$DATA_DIR/logs/web_interfaces.csv"
+OUTPUT_DIR="$DATA_DIR/screenshots"
 TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
 
 # Créer le répertoire
