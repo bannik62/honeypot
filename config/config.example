@@ -16,3 +16,8 @@ ENABLE_NOTIFICATIONS=false
 # Ports à scanner pour les interfaces web (séparés par des virgules)
 # Ports par défaut: 80,443,8080,8443,8000,8888,3000,5000,9000
 SCAN_PORTS="80,443,8080,8443,8000,8888,3000,5000,9000"
+
+# Nombre de scans Nikto en parallèle (min: 1, recommandé: 5-10)
+NIKTO_PARALLEL=1
+# Timeout pour chaque scan en secondes (min: 30, recommandé: 120-300)
+NIKTO_TIMEOUT=120

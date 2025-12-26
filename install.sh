@@ -9,6 +9,26 @@ DATA_DIR="$SCRIPT_DIR/data"
 
 echo "🍯 Installation du Honeypot Monitor..."
 echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "   🛡️  HONEYPOT MONITOR INSTALLATION  🛡️"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+# Demander confirmation
+echo "Cette installation va :"
+echo "  • Installer les dépendances (geoip, jq, chromium, nmap, nikto)"
+echo "  • Créer la structure de répertoires"
+echo "  • Ajouter des alias dans ~/.bashrc"
+echo ""
+read -p "Voulez-vous continuer ? (o/N) : " -n 1 -r
+echo ""
+if [[ ! $REPLY =~ ^[OoYy]$ ]]; then
+    echo "❌ Installation annulée."
+    exit 0
+fi
+
+echo ""
+
 
 # Vérifier si root
 if [ "$EUID" -ne 0 ]; then
@@ -19,7 +39,7 @@ fi
 # Installer les dépendances
 echo "📦 Installation des dépendances..."
 apt-get update -qq
-apt-get install -y geoip-bin geoip-database jq > /dev/null 2>&1
+apt-get install -y geoip-bin geoip-database jq chromium-browser nmap nikto > /dev/null 2>&1
 
 # Créer la structure de répertoires
 echo "📁 Création de la structure..."

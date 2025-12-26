@@ -1,0 +1,101 @@
+#!/bin/bash
+# Script pour scanner les vulnérabilités des interfaces web avec Nikto
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_FILE="$SCRIPT_DIR/../config/config"
+
+if [ -f "$CONFIG_FILE" ]; then
+    source "$CONFIG_FILE"
+else
+    DATA_DIR="$SCRIPT_DIR/../data"
+    NIKTO_PARALLEL=1
+    NIKTO_TIMEOUT=120
+fi
+
+if [ -z "$NIKTO_PARALLEL" ] || [ "$NIKTO_PARALLEL" -lt 1 ]; then
+    NIKTO_PARALLEL=1
+fi
+
+if [ -z "$NIKTO_TIMEOUT" ] || [ "$NIKTO_TIMEOUT" -lt 30 ]; then
+    NIKTO_TIMEOUT=120
+fi
+
+CSV_INPUT="$DATA_DIR/logs/web_interfaces.csv"
+OUTPUT_DIR="$DATA_DIR/screenshots"
+
+if [ ! -f "$CSV_INPUT" ]; then
+    echo "❌ Fichier CSV non trouvé"
+    exit 1
+fi
+
+if ! command -v nikto &> /dev/null; then
+    echo "❌ Nikto n'est pas installé"
+    exit 1
+fi
+
+echo "🔍 Scan de vulnérabilités avec Nikto..."
+echo "⚙️  Processus parallèles: $NIKTO_PARALLEL"
+echo "⏱️  Timeout: ${NIKTO_TIMEOUT}s"
+echo ""
+echo "💡 En cas de processus nikto restants après arrêt, utilisez :"
+echo "   pkill -9 -f \"nikto -h\""
+echo "   pkill -9 -f \"timeout.*nikto\""
+echo "   ps aux | grep -E \"vuln-scan|nikto\" | grep -v grep  # Vérifier qu'il n'y a plus rien"
+echo ""
+
+# Créer la liste des URLs à scanner
+temp_file=$(mktemp)
+tail -n +2 "$CSV_INPUT" | grep -v ",none," | while IFS=',' read -r timestamp ip port protocol url scanned; do
+    if [ "$port" != "none" ] && [ -n "$url" ] && [ "$url" != "none" ]; then
+        ip_dir="${OUTPUT_DIR}/${ip}"
+        mkdir -p "$ip_dir"
+        report_file="${ip_dir}/${ip}_${port}_nikto.txt"
+        if [ ! -f "$report_file" ]; then
+            echo "${url}|${ip}|${port}"
+        fi
+    fi
+done > "$temp_file"
+
+total=$(wc -l < "$temp_file" 2>/dev/null || echo 0)
+
+if [ "$total" -eq 0 ]; then
+    echo "✅ Tous les scans sont terminés"
+    rm -f "$temp_file"
+    exit 0
+fi
+
+# Scanner (séquentiel ou parallèle)
+if [ "$NIKTO_PARALLEL" -eq 1 ]; then
+    # Mode séquentiel
+    count=0
+    while IFS='|' read -r url ip port; do
+        count=$((count + 1))
+        echo "[$count/$total] 🔍 Scan: $url"
+        
+        report_file="${OUTPUT_DIR}/${ip}/${ip}_${port}_nikto.txt"
+        timeout $NIKTO_TIMEOUT nikto -h "$url" -output "$report_file" -Format txt -timeout 2 2>/dev/null
+        
+        if [ $? -eq 0 ]; then
+            echo "  ✅ Terminé: $url"
+        else
+            echo "  ⏱️  Timeout: $url"
+        fi
+    done < "$temp_file"
+else
+    # Mode parallèle avec xargs
+    cat "$temp_file" | xargs -n 1 -P "$NIKTO_PARALLEL" -I {} bash -c '
+        IFS="|" read -r url ip port <<< "$1"
+        report_file="'"$OUTPUT_DIR"'/${ip}/${ip}_${port}_nikto.txt"
+        echo "🔍 Scan: $url"
+        timeout '"$NIKTO_TIMEOUT"' nikto -h "$url" -output "$report_file" -Format txt -timeout 2 2>/dev/null
+        if [ $? -eq 0 ]; then
+            echo "  ✅ Terminé: $url"
+        else
+            echo "  ⏱️  Timeout: $url"
+        fi
+    ' _ {}
+fi
+
+rm -f "$temp_file"
+echo ""
+echo "✅ Scans terminés !"
