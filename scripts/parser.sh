@@ -71,7 +71,48 @@ parse_logs() {
     done
 }
 
-# Si appelé directement
-if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+# Fonction pour parser une ligne depuis stdin
+parse_line() {
+    local line="$1"
+    
+    if [ -z "$line" ]; then
+        return 1
+    fi
+    
+    # Extraire IP et port depuis "ACCEPT host=::ffff:IP port=PORT"
+    if [[ $line =~ host=([^[:space:]]+) ]]; then
+        ip="${BASH_REMATCH[1]}"
+        ip=$(echo "$ip" | sed 's/::ffff://')
+
+        if [[ $line =~ port=([0-9]+) ]]; then
+            port="${BASH_REMATCH[1]}"
+        else
+            port="unknown"
+        fi
+
+        # Vérifier si cette connexion existe déjà (éviter doublons)
+        if grep -q ",$ip,$port," "$LOG_FILE" 2>/dev/null; then
+            return 0  # Déjà enregistré, skip
+        fi
+
+        timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+        country=$(geolocate_ip "$ip")
+
+        # Écrire dans le CSV
+        echo "$timestamp,$ip,$port,$country" >> "$LOG_FILE"
+        return 0
+    fi
+    
+    return 1
+}
+
+
+# Si appelé avec stdin (pipe), parser la ligne
+if [ ! -t 0 ]; then
+    while IFS= read -r line; do
+        parse_line "$line"
+    done
+# Si appelé directement sans arguments, parser tout l'historique
+elif [ "${BASH_SOURCE[0]}" = "${0}" ]; then
     parse_logs
 fi

@@ -23,9 +23,8 @@ if [ ! -f "$LOG_FILE" ]; then
 fi
 
 # Créer le CSV de sortie avec en-têtes si nécessaire
-if [ -f "$CSV_OUTPUT" ]; then rm "$CSV_OUTPUT"; fi
 if [ ! -f "$CSV_OUTPUT" ]; then
-    echo "timestamp,ip,port,protocol,url" > "$CSV_OUTPUT"
+    echo "timestamp,ip,port,protocol,url,scanned" > "$CSV_OUTPUT"
 fi
 
 # Convertir SCAN_PORTS en format nmap (remplacer virgules par des virgules)
@@ -36,14 +35,14 @@ echo "📋 Ports à scanner: $SCAN_PORTS"
 echo ""
 
 # Extraire toutes les IPs uniques de connections.csv (ignorer en-tête)
-all_ips=$(tail -n +2 "$LOG_FILE" | cut -d',' -f2 | sort -u)
 
 # Extraire les IPs déjà scannées (ignorer en-tête)
-scanned_ips=$(tail -n +2 "$CSV_OUTPUT" 2>/dev/null | cut -d',' -f2 | sort -u)
+scanned_ips=$(tail -n +2 "$CSV_OUTPUT" 2>/dev/null | awk -F',' '$6=="1" {print $2}' | sort -u)
 
 # Trouver les nouvelles IPs à scanner (différence entre all_ips et scanned_ips)
-if [ -z "$scanned_ips" ]; then
+all_ips=$(tail -n +2 "$LOG_FILE" | cut -d',' -f2 | sort -u)
     # Pas encore de scans, tout scanner
+if [ -z "$scanned_ips" ]; then
     ips_to_scan="$all_ips"
     echo "🆕 Premier scan : toutes les IPs seront scannées"
 else
@@ -74,32 +73,36 @@ echo "$ips_to_scan" | while IFS= read -r ip; do
     if [ -z "$ip" ]; then
         continue
     fi
-    
+
     current=$((current + 1))
     echo "[$current/$total] Scanning $ip..."
-    
+
     # Scan nmap des ports configurés
     result=$(nmap -p "$SCAN_PORTS_NMAP" -T4 --open "$ip" 2>/dev/null | grep -E "^[0-9]+/(tcp|udp)" | grep "open")
-    
+
     if [ -n "$result" ]; then
         echo "$result" | while read -r line; do
             # Extraire port et protocole
             port=$(echo "$line" | awk '{print $1}' | cut -d'/' -f1)
             protocol=$(echo "$line" | awk '{print $1}' | cut -d'/' -f2)
-            
+
             # Déterminer le protocole URL
             if [ "$port" = "443" ] || [ "$port" = "8443" ]; then
                 url_protocol="https"
             else
                 url_protocol="http"
             fi
-            
+
             url="${url_protocol}://${ip}:${port}"
             timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-            
+
             echo "  ✅ $url ($protocol)"
-            echo "$timestamp,$ip,$port,$url_protocol,$url" >> "$CSV_OUTPUT"
+            echo "$timestamp,$ip,$port,$url_protocol,$url,1" >> "$CSV_OUTPUT"
         done
+    else
+        # Aucun port ouvert, marquer comme scanné quand même
+        timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+        echo "$timestamp,$ip,none,none,none,1" >> "$CSV_OUTPUT"
     fi
 done
 
