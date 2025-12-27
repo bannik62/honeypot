@@ -1,7 +1,10 @@
-# Configuration Honeypot Monitor
+# ╔═══════════════════════════════════════════════════════════════╗
+# ║           ⚙  Configuration Honeypot Monitor  ⚙                ║
+# ╚═══════════════════════════════════════════════════════════════╝
 
-# Répertoire des données (logs, cache)
-DATA_DIR="/home/ubuntu/honeypot-monitor/data"
+
+# Répertoire des données a modifié selon votre config  (logs, cache)
+DATA_DIR="/home/ubuntu/honeypot/data"
 
 # Nom du service systemd à monitorer
 SERVICE_NAME="endlessh"
@@ -17,10 +20,30 @@ ENABLE_NOTIFICATIONS=false
 # Ports par défaut: 80,443,8080,8443,8000,8888,3000,5000,9000
 SCAN_PORTS="80,443,8080,8443,8000,8888,3000,5000,9000"
 
-# Nombre de scans Nikto en parallèle (min: 1, recommandé: 5-10)
-NIKTO_PARALLEL=1
+# Nombre de scans Nikto en parallèle (min: 1, recommandé: 5-10) alias vuln-scan
+NIKTO_PARALLEL=10
+
+# Timeout maximum par scan Nikto (secondes, défaut: 600 = 10 minutes)
+NIKTO_TIMEOUT=600
 
 # Options de tuning Nikto (1-9, séparés par des virgules, vide = tous les tests)
 # 1=Infos fichiers, 2=Auth par défaut, 3=Chemins fichiers, 4=Injection (long!), 
 # 5=Redirections, 6=Clients, 7=BDD, 8=Fichiers serveur, 9=Divers
 NIKTO_TUNING="1,2,3,5,6,7,8"
+
+# Nombre de scans Nmap en parallèle pour scan-web (nmap-to-csv.sh alias scan-web)
+# Contrôle le nombre d'IPs scannées simultanément avec nmap
+# min: 1, recommandé: 5-20 selon les ressources du serveur
+NMAP_PARALLEL=10
+
+
+# Nombre de captures en parallèle pour capture-web (nikto-capture.sh alias capture-web)
+# Contrôle le nombre de captures d'écran simultanées avec chromium-browser
+# min: 1, recommandé: 3-5 selon les ressources du serveur
+CAPTURE_PARALLEL=5
+
+# Nombre de scans DNS en parallèle pour honeypot-dig (dig-ip.sh alias honeypot-dig)
+# Contrôle le nombre de requêtes DNS/WHOIS simultanées
+# min: 1, recommandé: 5-10 selon les ressources du serveur
+DIG_PARALLEL=10
+
