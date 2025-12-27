@@ -7,6 +7,7 @@ CONFIG_FILE="$SCRIPT_DIR/../config/config"
 if [ -f "$CONFIG_FILE" ]; then
     source "$CONFIG_FILE"
     export NIKTO_TUNING
+    export NIKTO_TIMEOUT
 else
     DATA_DIR="$SCRIPT_DIR/../data"
     NIKTO_PARALLEL=1
@@ -16,6 +17,9 @@ if [ -z "$NIKTO_PARALLEL" ] || [ "$NIKTO_PARALLEL" -lt 1 ]; then
     NIKTO_PARALLEL=1
 fi
 
+if [ -z "$NIKTO_TIMEOUT" ] || [ "$NIKTO_TIMEOUT" -lt 60 ]; then
+    NIKTO_TIMEOUT=600
+fi
 
 CSV_INPUT="$DATA_DIR/logs/web_interfaces.csv"
 OUTPUT_DIR="$DATA_DIR/screenshots"
@@ -73,7 +77,7 @@ if [ "$NIKTO_PARALLEL" -eq 1 ]; then
         mkdir -p "$ip_dir"
         report_file="$ip_dir/${ip}_${port}_nikto.txt"
 
-        nikto -h "$url" -output "$report_file" -Format txt -timeout 2 ${NIKTO_TUNING:+-Tuning $NIKTO_TUNING} 2>/dev/null
+        timeout $NIKTO_TIMEOUT nikto -h "$url" -output "$report_file" -Format txt -timeout 2 ${NIKTO_TUNING:+-Tuning $NIKTO_TUNING} 2>/dev/null
 
         if [ $? -eq 0 ]; then
             echo "  ✅ Terminé: $url"
@@ -83,14 +87,14 @@ if [ "$NIKTO_PARALLEL" -eq 1 ]; then
     done < "$temp_file"
 else
     # Mode parallèle avec xargs
-    cat "$temp_file" | xargs -n 1 -P "$NIKTO_PARALLEL" -I {} bash -c '
+    cat "$temp_file" | xargs  -P "$NIKTO_PARALLEL" -I {} bash -c '
         IFS="|" read -r url ip port <<< "$1"
         ip_dir="'"$OUTPUT_DIR"'/${ip}"
         mkdir -p "$ip_dir"
         report_file="$ip_dir/${ip}_${port}_nikto.txt"
         echo "🔍 Scan: $url"
         
-	nikto -h "$url" -output "$report_file" -Format txt -timeout 2 ${NIKTO_TUNING:+-Tuning $NIKTO_TUNING} 2>/dev/null
+	timeout '"$NIKTO_TIMEOUT"' nikto -h "$url" -output "$report_file" -Format txt -timeout 2 ${NIKTO_TUNING:+-Tuning $NIKTO_TUNING} 2>/dev/null
         
 	if [ $? -eq 0 ]; then
             echo "  ✅ Terminé: $url"
