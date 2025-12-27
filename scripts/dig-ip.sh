@@ -1,25 +1,85 @@
 #!/bin/bash
 # Script pour faire des requêtes DNS sur les IPs du honeypot
 
-if [ -z "$1" ]; then
-    echo "Usage: $0 <IP>"
-    echo "   ou: honeypot-dig <IP>"
-    exit 1
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_FILE="$SCRIPT_DIR/../config/config"
+
+if [ -f "$CONFIG_FILE" ]; then
+    source "$CONFIG_FILE"
+else
+    DATA_DIR="$SCRIPT_DIR/../data"
 fi
 
-IP="$1"
+CSV_FILE="$DATA_DIR/logs/connections.csv"
+OUTPUT_DIR="$DATA_DIR/screenshots"
 
-echo "🔍 Informations DNS pour $IP"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo ""
+# Fonction pour scanner une IP
+scan_ip() {
+    local IP="$1"
+    local ip_dir="${OUTPUT_DIR}/${IP}"
+    local report_file="${ip_dir}/${IP}_dns.txt"
+    
+    mkdir -p "$ip_dir"
+    
+    # Si le rapport existe déjà, skip
+    if [ -f "$report_file" ]; then
+        echo "⏭️  Rapport existant, skip: $IP"
+        return 0
+    fi
+    
+    echo "🔍 Scan DNS pour: $IP"
+    
+    # Créer le fichier de rapport
+    {
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "Informations DNS pour: $IP"
+        echo "Date: $(date '+%Y-%m-%d %H:%M:%S')"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
+        
+        # Reverse DNS
+        echo "📋 Reverse DNS (PTR):"
+        dig +short -x "$IP" 2>/dev/null || echo "  ❌ Aucun résultat"
+        echo ""
+        
+        # WHOIS (si disponible)
+        if command -v whois &> /dev/null; then
+            echo "📋 WHOIS:"
+            whois "$IP" 2>/dev/null || echo "  ❌ Erreur whois"
+        fi
+    } > "$report_file"
+    
+    if [ -f "$report_file" ] && [ -s "$report_file" ]; then
+        echo "  ✅ Rapport sauvegardé: $report_file"
+    else
+        echo "  ❌ Échec création rapport: $IP"
+    fi
+}
 
-# Reverse DNS
-echo "📋 Reverse DNS (PTR):"
-dig +short -x "$IP" 2>/dev/null || echo "  ❌ Aucun résultat"
-echo ""
-
-# WHOIS (si disponible)
-if command -v whois &> /dev/null; then
-    echo "📋 WHOIS (premières lignes):"
-    whois "$IP" 2>/dev/null | head -20 || echo "  ❌ Erreur whois"
+# Si une IP est fournie en argument, scanner uniquement cette IP
+if [ -n "$1" ]; then
+    IP="$1"
+    scan_ip "$IP"
+else
+    # Sinon, scanner toutes les IPs uniques du CSV
+    if [ ! -f "$CSV_FILE" ] || [ $(tail -n +2 "$CSV_FILE" 2>/dev/null | wc -l) -eq 0 ]; then
+        echo "❌ Aucune IP trouvée dans connections.csv. Lancez d'abord 'honeypot-monitor start'"
+        exit 1
+    fi
+    
+    echo "🔍 Scan DNS pour toutes les IPs..."
+    echo ""
+    
+    # Extraire les IPs uniques (ignorer l'en-tête)
+    total=$(tail -n +2 "$CSV_FILE" | cut -d',' -f2 | sort -u | wc -l)
+    count=0
+    
+    tail -n +2 "$CSV_FILE" | cut -d',' -f2 | sort -u | while read -r IP; do
+        count=$((count + 1))
+        echo "[$count/$total]"
+        scan_ip "$IP"
+        echo ""
+    done
+    
+    echo "✅ Tous les scans DNS terminés !"
 fi

@@ -6,16 +6,19 @@ CONFIG_FILE="$SCRIPT_DIR/../config/config"
 
 if [ -f "$CONFIG_FILE" ]; then
     source "$CONFIG_FILE"
-    export NIKTO_TUNING
 else
     DATA_DIR="$SCRIPT_DIR/../data"
     NIKTO_PARALLEL=1
+    NIKTO_TIMEOUT=120
 fi
 
 if [ -z "$NIKTO_PARALLEL" ] || [ "$NIKTO_PARALLEL" -lt 1 ]; then
     NIKTO_PARALLEL=1
 fi
 
+if [ -z "$NIKTO_TIMEOUT" ] || [ "$NIKTO_TIMEOUT" -lt 30 ]; then
+    NIKTO_TIMEOUT=120
+fi
 
 CSV_INPUT="$DATA_DIR/logs/web_interfaces.csv"
 OUTPUT_DIR="$DATA_DIR/screenshots"
@@ -32,7 +35,7 @@ fi
 
 echo "🔍 Scan de vulnérabilités avec Nikto..."
 echo "⚙️  Processus parallèles: $NIKTO_PARALLEL"
-echo "🎯 Tuning: ${NIKTO_TUNING:-tous les tests}"
+echo "⏱️  Timeout: ${NIKTO_TIMEOUT}s"
 echo ""
 echo "💡 En cas de processus nikto restants après arrêt, utilisez :"
 echo "   pkill -9 -f \"nikto -h\""
@@ -68,34 +71,27 @@ if [ "$NIKTO_PARALLEL" -eq 1 ]; then
     while IFS='|' read -r url ip port; do
         count=$((count + 1))
         echo "[$count/$total] 🔍 Scan: $url"
-
-        ip_dir="${OUTPUT_DIR}/${ip}"
-        mkdir -p "$ip_dir"
-        report_file="$ip_dir/${ip}_${port}_nikto.txt"
-
-        nikto -h "$url" -output "$report_file" -Format txt -timeout 2 ${NIKTO_TUNING:+-Tuning $NIKTO_TUNING} 2>/dev/null
-
+        
+        report_file="${OUTPUT_DIR}/${ip}/${ip}_${port}_nikto.txt"
+        timeout $NIKTO_TIMEOUT nikto -h "$url" -output "$report_file" -Format txt -timeout 2 2>/dev/null
+        
         if [ $? -eq 0 ]; then
             echo "  ✅ Terminé: $url"
         else
-            echo " ⚠️ Échec: $url"
+            echo "  ⏱️  Timeout: $url"
         fi
     done < "$temp_file"
 else
     # Mode parallèle avec xargs
     cat "$temp_file" | xargs -n 1 -P "$NIKTO_PARALLEL" -I {} bash -c '
         IFS="|" read -r url ip port <<< "$1"
-        ip_dir="'"$OUTPUT_DIR"'/${ip}"
-        mkdir -p "$ip_dir"
-        report_file="$ip_dir/${ip}_${port}_nikto.txt"
+        report_file="'"$OUTPUT_DIR"'/${ip}/${ip}_${port}_nikto.txt"
         echo "🔍 Scan: $url"
-        
-	nikto -h "$url" -output "$report_file" -Format txt -timeout 2 ${NIKTO_TUNING:+-Tuning $NIKTO_TUNING} 2>/dev/null
-        
-	if [ $? -eq 0 ]; then
+        timeout '"$NIKTO_TIMEOUT"' nikto -h "$url" -output "$report_file" -Format txt -timeout 2 2>/dev/null
+        if [ $? -eq 0 ]; then
             echo "  ✅ Terminé: $url"
         else
-           echo "  ⚠️  Échec: $url"
+            echo "  ⏱️  Timeout: $url"
         fi
     ' _ {}
 fi

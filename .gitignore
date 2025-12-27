@@ -13,3 +13,4 @@ config/config
 # Logs système
 *.log
 
+data/

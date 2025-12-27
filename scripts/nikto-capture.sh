@@ -32,6 +32,10 @@ fi
 echo "📸 Capture des interfaces web depuis le CSV..."
 # Lire le CSV et faire les captures
 tail -n +2 "$CSV_INPUT" | while IFS=',' read -r timestamp ip port protocol url; do
+       # Ignorer les lignes sans port ou URL valide
+    if [ "$port" = "none" ] || [ "$url" = "none" ] || [ -z "$url" ]; then
+        continue
+    fi
     ip_dir="${OUTPUT_DIR}/${ip}"
     mkdir -p "$ip_dir"
     filename="${ip_dir}/${ip}_${port}_${TIMESTAMP}.png"
@@ -84,4 +88,5 @@ done
 
 echo ""
 echo "✅ Captures sauvegardées dans: $OUTPUT_DIR"
-echo "   Total captures: $(ls -1 "$OUTPUT_DIR"/*.png 2>/dev/null | wc -l)"
+echo "   Total captures: $(find "$OUTPUT_DIR" -name "*.png" -type f 2>/dev/null | wc -l)"
+
