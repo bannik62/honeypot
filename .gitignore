@@ -12,5 +12,5 @@ config/config
 
 # Logs système
 *.log
-
+*.backup
 data/

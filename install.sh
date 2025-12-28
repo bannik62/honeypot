@@ -16,7 +16,7 @@ echo ""
 
 # Demander confirmation
 echo "Cette installation va :"
-echo "  • Installer les dépendances (geoip, jq, chromium, nmap, nikto)"
+echo "  • installer les dépendances (geoip, jq, chromium, nmap, nikto, sqlite3)"
 echo "  • Créer la structure de répertoires"
 echo "  • Ajouter des alias dans ~/.bashrc"
 echo ""
@@ -39,7 +39,7 @@ fi
 # Installer les dépendances
 echo "📦 Installation des dépendances..."
 apt-get update -qq
-apt-get install -y geoip-bin geoip-database jq chromium-browser nmap nikto > /dev/null 2>&1
+apt-get install -y geoip-bin geoip-database jq chromium-browser nmap nikto sqlite3 > /dev/null 2>&1
 
 # Créer la structure de répertoires
 echo "📁 Création de la structure..."
@@ -112,7 +112,10 @@ if [ -f "$BASHRC" ]; then
         ALIASES_ADDED=true
     fi
     if ! grep -q "alias honeypot-dig=" "$BASHRC" 2>/dev/null; then
+        echo "alias honeypot-search-nikto='cd "$SCRIPT_DIR_ABS" && ./scripts/search-nikto.sh'" >> "$BASHRC"
         echo "alias honeypot-dig='cd \"$SCRIPT_DIR_ABS\" && ./scripts/dig-ip.sh'" >> "$BASHRC"
+        echo "alias honeypot-search-nikto='cd "$SCRIPT_DIR_ABS" && ./scripts/search-nikto.sh'" >> "$BASHRC"
+        echo "alias honeypot-search-nikto='cd "$SCRIPT_DIR_ABS" && ./scripts/search-nikto.sh'" >> "$BASHRC"
         ALIASES_ADDED=true
     fi
     
@@ -142,7 +145,10 @@ if [ -f "$BASHRC" ]; then
         ALIASES_ADDED=true
     fi
     if ! grep -q "alias honeypot-dig=" "$BASHRC" 2>/dev/null; then
+        echo "alias honeypot-search-nikto='cd "$SCRIPT_DIR_ABS" && ./scripts/search-nikto.sh'" >> "$BASHRC"
         echo "alias honeypot-dig='cd \"$SCRIPT_DIR_ABS\" && ./scripts/dig-ip.sh'" >> "$BASHRC"
+        echo "alias honeypot-search-nikto='cd "$SCRIPT_DIR_ABS" && ./scripts/search-nikto.sh'" >> "$BASHRC"
+        echo "alias honeypot-search-nikto='cd "$SCRIPT_DIR_ABS" && ./scripts/search-nikto.sh'" >> "$BASHRC"
         ALIASES_ADDED=true
     fi
     
@@ -157,14 +163,31 @@ fi
 echo ""
 echo "✅ Installation terminée !"
 echo ""
-echo "📋 Prochaines étapes:"
-echo "   1. Éditer la config si nécessaire: nano config/config"
-echo "   2. Lancer le monitoring: ./scripts/monitor.sh start"
-echo "   3. Voir les stats: ./scripts/stats.sh"
-echo "   4. Dashboard live: ./scripts/dashboard.sh"
+
+echo "📋 Aliases disponibles :"
+echo "   • honeypot-stats     → Afficher les statistiques"
+echo "   • honeypot-dashboard → Dashboard en temps réel"
+echo "   • honeypot-monitor   → Démarrer/arrêter le monitoring (start|stop|status|restart)"
+echo "   • scan-web           → Scanner les ports web des IPs"
+echo "   • capture-web        → Capturer les screenshots des interfaces web"
+echo "   • vuln-scan          → Scanner les vulnérabilités avec Nikto"
+echo "   • honeypot-dig       → Requêtes DNS/WHOIS sur les IPs"
+echo "   • honeypot-search-nikto → Recherche dans les rapports Nikto"
 echo ""
-echo "💡 Ou utilisez les alias: honeypot-stats, honeypot-dashboard, honeypot-monitor, scan-web, capture-web, vuln-scan, honeypot-dig"
-echo ""
-echo "⚠️  Important: Pour utiliser les aliases dans cette session, exécutez:"
+echo "⚠️  Pour utiliser les aliases dans cette session :"
 echo "   source ~/.bashrc"
-echo "   (Ou ouvrez un nouveau terminal)
+echo "   (Ou ouvrez un nouveau terminal)"
+echo ""
+read -p "🚀 Voulez-vous démarrer le monitoring maintenant ? (o/N) : " -n 1 -r
+echo ""
+if [[ $REPLY =~ ^[Oo]$ ]]; then
+    echo "🚀 Démarrage du monitoring..."
+    cd "$SCRIPT_DIR_ABS"
+    ./scripts/monitor.sh start
+    echo ""
+    echo "✅ Monitoring démarré !"
+    echo "💡 Utilisez 'honeypot-dashboard' pour voir le dashboard en temps réel"
+else
+    echo "ℹ️  Vous pourrez démarrer le monitoring plus tard avec :"
+    echo "   honeypot-monitor start"
+fi

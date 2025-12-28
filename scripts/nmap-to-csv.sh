@@ -94,6 +94,20 @@ scan_one_ip() {
             fi
             
             url="${url_protocol}://${ip}:${port}"
+            
+            # Vérifier que le port répond vraiment en HTTP/HTTPS avec curl
+            http_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 --connect-timeout 3 --insecure "$url" 2>/dev/null)
+            
+            # Si curl échoue, vérifier avec wget ou juste vérifier qu'il y a une réponse
+            if [ -z "$http_code" ] || [ "$http_code" = "000" ]; then
+                # Essayer avec wget comme fallback (plus permissif)
+                wget_response=$(wget --spider --timeout=3 --tries=1 -S "$url" 2>&1 | head -1 | grep -i "http" || echo "")
+                if [ -z "$wget_response" ]; then
+                    # Le port est ouvert mais ne répond pas en HTTP, on le skip
+                    continue
+                fi
+            fi
+            
             timestamp=$(date '+%Y-%m-%d %H:%M:%S')
             
             echo "  ✅ $url ($protocol)"

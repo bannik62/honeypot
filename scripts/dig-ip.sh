@@ -15,7 +15,7 @@ if [ -z "$DIG_PARALLEL" ] || [ "$DIG_PARALLEL" -lt 1 ]; then
     DIG_PARALLEL=1
 fi
 
-CSV_FILE="$DATA_DIR/logs/connections.csv"
+CSV_FILE="$DATA_DIR/logs/web_interfaces.csv"
 OUTPUT_DIR="$DATA_DIR/screenshots"
 
 # Fonction pour scanner une IP
@@ -71,7 +71,7 @@ if [ -n "$1" ]; then
 else
     # Sinon, scanner toutes les IPs uniques du CSV
     if [ ! -f "$CSV_FILE" ] || [ $(tail -n +2 "$CSV_FILE" 2>/dev/null | wc -l) -eq 0 ]; then
-        echo "❌ Aucune IP trouvée dans connections.csv. Lancez d'abord 'honeypot-monitor start'"
+        echo "❌ Aucune IP trouvée dans web_interfaces.csv. Lancez d'abord 'scan-web'"
         exit 1
     fi
     

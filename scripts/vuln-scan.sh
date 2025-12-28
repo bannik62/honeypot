@@ -1,5 +1,4 @@
 #!/bin/bash
-
 # Script pour scanner les vulnérabilités des interfaces web avec Nikto
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -85,7 +84,6 @@ if [ "$NIKTO_PARALLEL" -eq 1 ]; then
             echo "  ✅ Terminé: $url"
         else
             echo "  ⚠️  Échec: $url"
-            # Supprimer le fichier s'il est vide (0 octet)
             if [ ! -f "$report_file" ] || [ ! -s "$report_file" ]; then
                 echo "Scan failed: timeout or error" > "$report_file"
             fi
@@ -114,5 +112,13 @@ else
 fi
 
 rm -f "$temp_file"
+
+# Parser les rapports dans SQLite (seulement si des scans ont été effectués)
+if [ "$total" -gt 0 ]; then
+    echo ""
+    echo "🔍 Parsing des rapports dans SQLite..."
+    "$SCRIPT_DIR/parse-nikto.sh" 2>/dev/null || echo "⚠️  Erreur lors du parsing"
+fi
+
 echo ""
 echo "✅ Scans terminés !"
