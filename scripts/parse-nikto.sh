@@ -1,5 +1,5 @@
 #!/bin/bash
-# Script pour parser les rapports Nikto et les stocker dans SQLite
+# Script pour parser les rapports nmap et les stocker dans SQLite
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_FILE="$SCRIPT_DIR/../config/config"
@@ -41,13 +41,13 @@ CREATE INDEX IF NOT EXISTS idx_vulnerability ON vulns(vulnerability);
 CREATE INDEX IF NOT EXISTS idx_file_path ON vulns(file_path);
 SQL
 
-echo "🔍 Parsing des rapports Nikto..."
+echo "🔍 Parsing des rapports nmap..."
 echo "📂 Base de données: $DB_FILE"
 echo ""
 
-total=$(find "$SCREENSHOTS_DIR" -name "*_nikto.txt" -type f | wc -l)
+total=$(find "$SCREENSHOTS_DIR" -name "*_nmap.txt" -type f | wc -l)
 if [ "$total" -eq 0 ]; then
-    echo "⚠️  Aucun rapport Nikto trouvé"
+    echo "⚠️  Aucun rapport nmap trouvé"
     exit 0
 fi
 
@@ -55,109 +55,164 @@ count=0
 skipped=0
 parsed=0
 
-# Créer un fichier temporaire avec la liste des fichiers
 temp_file_list=$(mktemp)
-find "$SCREENSHOTS_DIR" -name "*_nikto.txt" -type f > "$temp_file_list"
+find "$SCREENSHOTS_DIR" -name "*_nmap.txt" -type f > "$temp_file_list"
 
-# Lire depuis le fichier au lieu d'un pipe pour éviter la sous-shell
 while IFS= read -r report_file; do
     count=$((count + 1))
-    
-    # Obtenir la date de modification du fichier
+
     file_mtime=$(stat -c %Y "$report_file" 2>/dev/null || echo "0")
     file_mtime_readable=$(date -r "$report_file" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date '+%Y-%m-%d %H:%M:%S')
-    
-    # Échapper le chemin pour SQL
     report_file_escaped=$(echo "$report_file" | sed "s/'/''/g")
-    
-    # Vérifier si le fichier a déjà été parsé avec la même date de modification
+
     existing_mtime=$(sqlite3 "$DB_FILE" "SELECT file_mtime FROM parsed_files WHERE report_file = '$report_file_escaped';" 2>/dev/null)
-    
+
     if [ -n "$existing_mtime" ] && [ "$existing_mtime" = "$file_mtime" ]; then
-        # Fichier déjà parsé et pas modifié, skip
         skipped=$((skipped + 1))
         continue
     fi
-    
-    # Supprimer les anciennes entrées pour ce fichier si elles existent
+
     sqlite3 "$DB_FILE" "DELETE FROM vulns WHERE report_file = '$report_file_escaped';" 2>/dev/null
-    
-    # Extraire IP et port depuis le chemin du fichier
+
     filename=$(basename "$report_file")
     dir_path=$(dirname "$report_file")
     ip=$(basename "$dir_path")
-    
-    # Extraire port depuis le nom de fichier (ex: 101.200.75.167_443_nikto.txt)
-    port=$(echo "$filename" | sed -n 's/.*_\([0-9]*\)_nikto\.txt/\1/p')
-    
-    # Lire le fichier et extraire les vulnérabilités
+
+    report_ip=$(grep "Nmap scan report for" "$report_file" | head -1 | sed -n 's/.*Nmap scan report for \([0-9.]*\).*/\1/p')
+    if [ -n "$report_ip" ]; then
+        ip="$report_ip"
+    fi
+
+    current_port=""
+    current_service=""
+    current_version=""
+    in_vulners_section=0
+    vuln_lines=()
+
     while IFS= read -r line; do
-        # Extraire Target Host et Target Port pour mettre à jour ip/port si nécessaire
-        if [[ $line =~ Target\ Host:\ (.+) ]]; then
-            ip="${BASH_REMATCH[1]}"
-        fi
-        if [[ $line =~ Target\ Port:\ (.+) ]]; then
-            port="${BASH_REMATCH[1]}"
-        fi
-        
-        # Ignorer les lignes Target Host/Port (ce sont des métadonnées, pas des vulnérabilités)
-        if [[ $line =~ Target\ Host: ]] || [[ $line =~ Target\ Port: ]]; then
+        if [[ $line =~ ^([0-9]+)/tcp[[:space:]]+open[[:space:]]+([^[:space:]]+)[[:space:]]*(.*)$ ]]; then
+            current_port="${BASH_REMATCH[1]}"
+            current_service="${BASH_REMATCH[2]}"
+            current_version="${BASH_REMATCH[3]}"
+            in_vulners_section=0
+            vuln_lines=()
             continue
         fi
-        
-        # Parser uniquement les lignes de vulnérabilité (commencent par "+")
-        if [[ $line =~ ^\+ ]]; then
-            # Nettoyer la ligne (enlever le "+")
-            vuln_text=$(echo "$line" | sed 's/^+ //')
-            
-            # Extraire le chemin de fichier si présent (ex: GET /robots.txt:)
-            file_path=""
-            if [[ $vuln_text =~ GET\ ([^:]+): ]]; then
-                file_path="${BASH_REMATCH[1]}"
+
+        if [[ $line =~ ^\|[[:space:]]+vulners: ]]; then
+            in_vulners_section=1
+            continue
+        fi
+
+        if [ "$in_vulners_section" -eq 1 ] && [ -n "$current_port" ]; then
+            if [[ $line =~ ^\|[[:space:]]+cpe: ]] || [[ $line =~ ^[[:space:]]*$ ]]; then
+                continue
             fi
-            
-            # Détecter si c'est un CVE
-            cve=""
-            if [[ $vuln_text =~ (CVE-[0-9]{4}-[0-9]+) ]]; then
-                cve="${BASH_REMATCH[1]}"
-            fi
-            
-            # Détecter la sévérité basique
-            severity="LOW"
-            if echo "$vuln_text" | grep -qiE "critical|high|dangerous|exploit"; then
-                severity="HIGH"
-            elif echo "$vuln_text" | grep -qiE "warning|medium|vulnerable"; then
-                severity="MEDIUM"
-            fi
-            
-            # Extraire version serveur si présente
-            server_version=""
-            if [[ $vuln_text =~ (Apache|nginx|IIS|Server)[\ /]+([0-9\.]+) ]]; then
-                server_version="${BASH_REMATCH[0]}"
-            fi
-            
-            # Échapper les apostrophes pour SQL
-            vuln_text_escaped=$(echo "$vuln_text" | sed "s/'/''/g")
-            line_escaped=$(echo "$line" | sed "s/'/''/g")
-            ip_escaped=$(echo "$ip" | sed "s/'/''/g")
-            
-            # Insérer dans SQLite
-            sqlite3 "$DB_FILE" << SQL
+
+            if [[ $line =~ ^[0-9]+/tcp ]] || [[ ! $line =~ ^\| ]]; then
+                if [ ${#vuln_lines[@]} -gt 0 ]; then
+                    for vuln_line in "${vuln_lines[@]}"; do
+                        vuln_text=$(echo "$vuln_line" | sed 's/^|[[:space:]]*//' | awk '{print $1}')
+                        severity_score=$(echo "$vuln_line" | sed 's/^|[[:space:]]*//' | awk '{print $2}')
+                        vuln_url=$(echo "$vuln_line" | sed 's/^|[[:space:]]*//' | awk '{print $3}')
+
+                        if [ -z "$vuln_text" ]; then
+                            continue
+                        fi
+
+                        severity="LOW"
+                        if [ -n "$severity_score" ]; then
+                            score=$(echo "$severity_score" | cut -d'.' -f1 | grep -oE "^[0-9]+" | head -1)
+                            if [ -n "$score" ] && [ "$score" -ge 9 ]; then
+                                severity="HIGH"
+                            elif [ -n "$score" ] && [ "$score" -ge 7 ]; then
+                                severity="MEDIUM"
+                            fi
+                        fi
+
+                        cve=""
+                        if [[ $vuln_text =~ CVE-[0-9]{4}-[0-9]+ ]]; then
+                            cve="$vuln_text"
+                        fi
+
+                        vuln_text_escaped=$(echo "$vuln_text" | sed "s/'/''/g")
+                        line_escaped=$(echo "$vuln_line" | sed "s/'/''/g")
+                        ip_escaped=$(echo "$ip" | sed "s/'/''/g")
+                        service_escaped=$(echo "$current_service" | sed "s/'/''/g")
+                        version_escaped=$(echo "$current_version" | sed "s/'/''/g")
+
+                        sqlite3 "$DB_FILE" << SQL
 INSERT INTO vulns (ip, port, report_file, vulnerability, severity, file_path, server_version, cve, scan_date, full_text)
-VALUES ('$ip_escaped', $port, '$report_file_escaped', '$vuln_text_escaped', '$severity', '$file_path', '$server_version', '$cve', '$file_mtime_readable', '$line_escaped');
+VALUES ('$ip_escaped', $current_port, '$report_file_escaped', '$vuln_text_escaped', '$severity', '', '$service_escaped $version_escaped', '$cve', '$file_mtime_readable', '$line_escaped');
 SQL
+                    done
+                fi
+
+                if [[ $line =~ ^([0-9]+)/tcp[[:space:]]+open ]]; then
+                    current_port="${BASH_REMATCH[1]}"
+                    current_service=$(echo "$line" | awk '{print $3}')
+                    current_version=$(echo "$line" | awk '{for(i=4;i<=NF;i++) printf "%s ", $i; print ""}' | sed 's/[[:space:]]*$//')
+                else
+                    current_port=""
+                    current_service=""
+                    current_version=""
+                fi
+                in_vulners_section=0
+                vuln_lines=()
+                continue
+            fi
+
+            if [[ $line =~ ^\|[[:space:]]+ ]]; then
+                vuln_lines+=("$line")
+            fi
         fi
     done < "$report_file"
-    
-    # Marquer le fichier comme parsé
+
+    if [ "$in_vulners_section" -eq 1 ] && [ -n "$current_port" ] && [ ${#vuln_lines[@]} -gt 0 ]; then
+        for vuln_line in "${vuln_lines[@]}"; do
+            vuln_text=$(echo "$vuln_line" | sed 's/^|[[:space:]]*//' | awk '{print $1}')
+            severity_score=$(echo "$vuln_line" | sed 's/^|[[:space:]]*//' | awk '{print $2}')
+
+            if [ -z "$vuln_text" ]; then
+                continue
+            fi
+
+            severity="LOW"
+            if [ -n "$severity_score" ]; then
+                score=$(echo "$severity_score" | cut -d'.' -f1 | grep -oE "^[0-9]+" | head -1)
+                if [ -n "$score" ] && [ "$score" -ge 9 ]; then
+                    severity="HIGH"
+                elif [ -n "$score" ] && [ "$score" -ge 7 ]; then
+                    severity="MEDIUM"
+                fi
+            fi
+
+            cve=""
+            if [[ $vuln_text =~ CVE-[0-9]{4}-[0-9]+ ]]; then
+                cve="$vuln_text"
+            fi
+
+            vuln_text_escaped=$(echo "$vuln_text" | sed "s/'/''/g")
+            line_escaped=$(echo "$vuln_line" | sed "s/'/''/g")
+            ip_escaped=$(echo "$ip" | sed "s/'/''/g")
+            service_escaped=$(echo "$current_service" | sed "s/'/''/g")
+            version_escaped=$(echo "$current_version" | sed "s/'/''/g")
+
+            sqlite3 "$DB_FILE" << SQL
+INSERT INTO vulns (ip, port, report_file, vulnerability, severity, file_path, server_version, cve, scan_date, full_text)
+VALUES ('$ip_escaped', $current_port, '$report_file_escaped', '$vuln_text_escaped', '$severity', '', '$service_escaped $version_escaped', '$cve', '$file_mtime_readable', '$line_escaped');
+SQL
+        done
+    fi
+
     parsed_date=$(date '+%Y-%m-%d %H:%M:%S')
     sqlite3 "$DB_FILE" << SQL
 INSERT OR REPLACE INTO parsed_files (report_file, file_mtime, parsed_date)
 VALUES ('$report_file_escaped', '$file_mtime', '$parsed_date');
 SQL
-    
+
     parsed=$((parsed + 1))
-    
+
     if [ $((count % 50)) -eq 0 ]; then
         echo "  [$count/$total] Fichiers traités (parsés: $parsed, ignorés: $skipped)..."
     fi

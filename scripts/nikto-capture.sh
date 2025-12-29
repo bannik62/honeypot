@@ -99,7 +99,7 @@ export OUTPUT_DIR TIMESTAMP
 
 # Créer une liste temporaire des URLs à capturer
 temp_file=$(mktemp)
-tail -n +2 "$CSV_INPUT" | while IFS=',' read -r timestamp ip port protocol url; do
+tail -n +2 "$CSV_INPUT" | while IFS=',' read -r timestamp ip port protocol url scanned; do
     # Ignorer les lignes sans port ou URL valide
     if [ "$port" != "none" ] && [ "$url" != "none" ] && [ -n "$url" ]; then
         echo "${timestamp}|${ip}|${port}|${protocol}|${url}"
