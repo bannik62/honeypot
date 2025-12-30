@@ -178,6 +178,79 @@ echo "⚠️  Pour utiliser les aliases dans cette session :"
 echo "   source ~/.bashrc"
 echo "   (Ou ouvrez un nouveau terminal)"
 echo ""
+
+# Configuration de la mise à jour automatique
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "   ⏰ Configuration de la mise à jour automatique"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "Voulez-vous activer la mise à jour automatique des scans ?"
+echo "  • scan-web (nmap-to-csv)"
+echo "  • capture-web (nikto-capture)"
+echo "  • honeypot-dig (dig-ip)"
+echo "  • vuln-scan"
+echo ""
+read -p "Activer la mise à jour automatique ? (O/n) [Oui par défaut] : " -n 1 -r
+echo ""
+AUTO_SCAN_ENABLED="true"
+if [[ $REPLY =~ ^[Nn]$ ]]; then
+    AUTO_SCAN_ENABLED="false"
+fi
+
+if [ "$AUTO_SCAN_ENABLED" = "true" ]; then
+    echo ""
+    read -p "Toutes les combien d'heures ? (1-23) [1 par défaut] : " AUTO_SCAN_HOUR
+    AUTO_SCAN_HOUR=${AUTO_SCAN_HOUR:-1}
+    if ! [[ "$AUTO_SCAN_HOUR" =~ ^[0-9]+$ ]] || [ "$AUTO_SCAN_HOUR" -lt 1 ] || [ "$AUTO_SCAN_HOUR" -gt 23 ]; then
+        AUTO_SCAN_HOUR=1
+        echo "⚠️  Valeur invalide, utilisation de 1 heure par défaut"
+    fi
+fi
+
+# Ajouter dans le fichier config
+CONFIG_FILE="$SCRIPT_DIR/config/config"
+if [ -f "$CONFIG_FILE" ]; then
+    # Supprimer les anciennes valeurs si elles existent
+    sed -i "/^AUTO_SCAN_ENABLED=/d" "$CONFIG_FILE"
+    sed -i "/^AUTO_SCAN_HOUR=/d" "$CONFIG_FILE"
+    # Ajouter les nouvelles valeurs
+    echo "" >> "$CONFIG_FILE"
+    echo "# Mise à jour automatique des scans (true/false)" >> "$CONFIG_FILE"
+    echo "AUTO_SCAN_ENABLED=$AUTO_SCAN_ENABLED" >> "$CONFIG_FILE"
+    if [ "$AUTO_SCAN_ENABLED" = "true" ]; then
+        echo "# Intervalle entre chaque exécution automatique (heures, 1-23)" >> "$CONFIG_FILE"
+        echo "AUTO_SCAN_HOUR=$AUTO_SCAN_HOUR" >> "$CONFIG_FILE"
+    else
+        echo "# AUTO_SCAN_HOUR=1  # Non utilisé si AUTO_SCAN_ENABLED=false" >> "$CONFIG_FILE"
+    fi
+fi
+
+# Créer le cron si activé
+if [ "$AUTO_SCAN_ENABLED" = "true" ]; then
+    CRON_USER="$SUDO_USER"
+    CRON_COMMAND="0 * * * * $SCRIPT_DIR_ABS/scripts/run-all-scans.sh"
+    # Si l'heure est différente de 1, ajuster le cron
+    if [ "$AUTO_SCAN_HOUR" != "1" ]; then
+        CRON_COMMAND="0 */$AUTO_SCAN_HOUR * * * $SCRIPT_DIR_ABS/scripts/run-all-scans.sh"
+    fi
+    # Vérifier si le cron existe déjà
+    if ! sudo -u "$CRON_USER" crontab -l 2>/dev/null | grep -q "run-all-scans.sh"; then
+        (sudo -u "$CRON_USER" crontab -l 2>/dev/null; echo "$CRON_COMMAND") | sudo -u "$CRON_USER" crontab -
+        echo "✅ Cron ajouté : exécution toutes les $AUTO_SCAN_HOUR heure(s)"
+    else
+        # Remplacer le cron existant
+        sudo -u "$CRON_USER" crontab -l 2>/dev/null | grep -v "run-all-scans.sh" | sudo -u "$CRON_USER" crontab -
+        (sudo -u "$CRON_USER" crontab -l 2>/dev/null; echo "$CRON_COMMAND") | sudo -u "$CRON_USER" crontab -
+        echo "✅ Cron mis à jour : exécution toutes les $AUTO_SCAN_HOUR heure(s)"
+    fi
+else
+    # Supprimer le cron si désactivé
+    if sudo -u "$SUDO_USER" crontab -l 2>/dev/null | grep -q "run-all-scans.sh"; then
+        sudo -u "$SUDO_USER" crontab -l 2>/dev/null | grep -v "run-all-scans.sh" | sudo -u "$SUDO_USER" crontab -
+        echo "✅ Cron supprimé (mise à jour automatique désactivée)"
+    fi
+fi
 read -p "🚀 Voulez-vous démarrer le monitoring maintenant ? (o/N) : " -n 1 -r
 echo ""
 if [[ $REPLY =~ ^[Oo]$ ]]; then

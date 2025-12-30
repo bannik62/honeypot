@@ -47,3 +47,9 @@ CAPTURE_PARALLEL=5
 # min: 1, recommandé: 5-10 selon les ressources du serveur
 DIG_PARALLEL=10
 
+
+# Mise à jour automatique des scans (true/false)
+AUTO_SCAN_ENABLED=true
+
+# Intervalle entre chaque exécution automatique (heures, 1-23)
+AUTO_SCAN_HOUR=1
