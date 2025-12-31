@@ -53,3 +53,17 @@ AUTO_SCAN_ENABLED=true
 
 # Intervalle entre chaque exécution automatique (heures, 1-23)
 AUTO_SCAN_HOUR=1
+
+# Timeouts pour nmap dans vuln-scan.sh (secondes)
+# max-rtt-timeout: timeout pour chaque retry (ex: 500ms, 1s)
+NMAP_MAX_RTT_TIMEOUT="500ms"
+
+# host-timeout: timeout maximum par host (ex: 600s = 10 minutes)
+NMAP_HOST_TIMEOUT="600s"
+
+# Timeouts pour nmap dans vuln-scan.sh (secondes)
+# max-rtt-timeout: timeout pour chaque retry (ex: 500ms, 1s)
+NMAP_MAX_RTT_TIMEOUT="500ms"
+
+# host-timeout: timeout maximum par host (ex: 600s = 10 minutes)
+NMAP_HOST_TIMEOUT="600s"

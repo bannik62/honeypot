@@ -214,4 +214,4 @@ echo "✅ Scan terminé ! Résultats dans: $CSV_OUTPUT"
 
 echo "💡 Utilisez 'capture-web' pour prendre des screenshots"
 
-tty -s && stty sane
+tty -s && stty sane || true

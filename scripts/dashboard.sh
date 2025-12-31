@@ -51,7 +51,8 @@ show_stats() {
 
     # Top pays
     if [ "$total" -gt 0 ]; then
-        echo "🌎 TOP 10 COUNTRIES:"
+        total_countries=$(tail -n +2 "$LOG_FILE" 2>/dev/null | cut -d"," -f4 | sort -u | wc -l)
+        echo "🌎 TOP 10 COUNTRIES (sur $total_countries pays au total):"
         tail -n +2 "$LOG_FILE" 2>/dev/null | cut -d',' -f4 | sort | uniq -c | sort -rn | head -10 | \
             while read count country; do
                 bar_length=$((count * 50 / total))

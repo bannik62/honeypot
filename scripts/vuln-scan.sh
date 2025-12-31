@@ -6,6 +6,10 @@ CONFIG_FILE="$SCRIPT_DIR/../config/config"
 
 if [ -f "$CONFIG_FILE" ]; then
     source "$CONFIG_FILE"
+
+# Valeurs par défaut pour les timeouts nmap
+NMAP_MAX_RTT_TIMEOUT="${NMAP_MAX_RTT_TIMEOUT:-500ms}"
+NMAP_HOST_TIMEOUT="${NMAP_HOST_TIMEOUT:-600s}"
 else
     DATA_DIR="$SCRIPT_DIR/../data"
     NMAP_PARALLEL=1
@@ -77,7 +81,7 @@ scan_one_ip() {
     local report_file="${ip_dir}/${ip}_nmap.txt"
     
     # Scan nmap avec vulnérabilités (100 ports communs)
-    nmap -F -sV --script vuln "$ip" > "$report_file" 2>&1
+    nmap -F -sV --script vuln --max-rtt-timeout "${NMAP_MAX_RTT_TIMEOUT:-500ms}" --host-timeout "${NMAP_HOST_TIMEOUT:-600s}" "$ip" > "$report_file" 2>&1
     
     if [ $? -eq 0 ]; then
         echo "  ✅ Terminé: $ip"
