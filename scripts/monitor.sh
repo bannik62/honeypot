@@ -139,9 +139,9 @@ if [ -n "$existing_jpid" ]; then
     
     echo "✅ Historique parsé, écoute des nouvelles connexions..."
     
-    # Lancer journalctl en arrière-plan avec limite de mémoire
-    # Utiliser --since pour limiter la quantité de données en mémoire
-    ( sudo journalctl -u "$SERVICE_NAME" -f --since "1 hour ago" -o cat --no-pager 2>/dev/null | while IFS= read -r line; do
+    # Lancer journalctl en arrière-plan pour suivre uniquement les nouvelles lignes
+    # (l'historique est déjà parsé au démarrage)
+    ( sudo journalctl -u "$SERVICE_NAME" -f -o cat --no-pager 2>/dev/null | while IFS= read -r line; do
         if echo "$line" | grep -q "ACCEPT"; then
             echo "$line" | "$PARSER_SCRIPT" 2>/dev/null
         fi
