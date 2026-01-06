@@ -3,7 +3,26 @@
 # Lit le CSV des interfaces web et fait les captures + scan nikto
 # Lance automatiquement le scan nmap si le CSV n'existe pas ou est vide
 
+# Variable pour le nettoyage
+temp_file=""
+
+# Nettoyage des fichiers temporaires en cas d'interruption
+cleanup_temp_files() {
+    if [ -n "$temp_file" ] && [ -f "$temp_file" ]; then
+        rm -f "$temp_file" 2>/dev/null
+    fi
+}
+
+trap cleanup_temp_files EXIT INT TERM
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Vérifier les dépendances
+if ! command -v chromium-browser &> /dev/null && ! command -v chromium &> /dev/null; then
+    echo "❌ Erreur: chromium-browser ou chromium n'est pas installé" >&2
+    echo "💡 Installez-le avec: sudo apt install chromium-browser" >&2
+    exit 1
+fi
 
 # Charger la config
 CONFIG_FILE="$SCRIPT_DIR/../config/config"

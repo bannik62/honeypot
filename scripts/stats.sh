@@ -53,8 +53,27 @@ if [ "$total" -gt 0 ]; then
     echo "🌎 TOP 5 COUNTRIES:"
     tail -n +2 "$LOG_FILE" 2>/dev/null | cut -d',' -f4 | sort | uniq -c | sort -rn | head -5 | \
         while read count country; do
-            percentage=$((count * 100 / total))
-            echo "  $country: $count ($percentage%)"
+            # Calcul avec arrondi : multiplier par 1000, diviser, puis arrondir
+            if [ "$total" -gt 0 ]; then
+                # Calcul en dixièmes de pourcent : (count * 1000) / total
+                percentage_tenths=$((count * 1000 / total))
+                # Arrondir : si le reste >= 5, ajouter 1
+                remainder=$((count * 1000 % total))
+                if [ "$remainder" -ge $((total / 2)) ]; then
+                    percentage_tenths=$((percentage_tenths + 1))
+                fi
+                # Convertir en pourcentage entier
+                percentage=$((percentage_tenths / 10))
+                # Si 0 mais qu'il y a des connexions, afficher <1%
+                if [ "$percentage" -eq 0 ] && [ "$count" -gt 0 ]; then
+                    percentage="<1"
+                else
+                    percentage="${percentage}%"
+                fi
+            else
+                percentage="0%"
+            fi
+            echo "  $country: $count ($percentage)"
         done
 
     echo ""

@@ -1,7 +1,27 @@
 #!/bin/bash
 # Script pour parser les rapports nmap et les stocker dans SQLite
 
+# Variable pour le nettoyage
+temp_file_list=""
+
+# Nettoyage des fichiers temporaires en cas d'interruption
+cleanup_temp_files() {
+    if [ -n "$temp_file_list" ] && [ -f "$temp_file_list" ]; then
+        rm -f "$temp_file_list" 2>/dev/null
+    fi
+}
+
+trap cleanup_temp_files EXIT INT TERM
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Vérifier les dépendances
+if ! command -v sqlite3 &> /dev/null; then
+    echo "❌ Erreur: sqlite3 n'est pas installé" >&2
+    echo "💡 Installez-le avec: sudo apt install sqlite3" >&2
+    exit 1
+fi
+
 CONFIG_FILE="$SCRIPT_DIR/../config/config"
 
 if [ -f "$CONFIG_FILE" ]; then

@@ -2,6 +2,14 @@
 # Script de recherche dans les rapports Nikto (menu interactif + CLI)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Vérifier les dépendances
+if ! command -v sqlite3 &> /dev/null; then
+    echo "❌ Erreur: sqlite3 n'est pas installé" >&2
+    echo "💡 Installez-le avec: sudo apt install sqlite3" >&2
+    exit 1
+fi
+
 CONFIG_FILE="$SCRIPT_DIR/../config/config"
 
 if [ -f "$CONFIG_FILE" ]; then
@@ -11,6 +19,35 @@ else
 fi
 
 DB_FILE="$DATA_DIR/logs/nikto.db"
+
+# Fonction pour échapper les chaînes SQL (prévention injection SQL)
+escape_sql() {
+    local input="$1"
+    # Échapper les guillemets simples en les doublant
+    echo "$input" | sed "s/'/''/g"
+}
+
+# Fonction pour valider une IP ou partie d'IP
+validate_ip_input() {
+    local input="$1"
+    # Autoriser seulement des caractères alphanumériques, points, deux-points et tirets
+    if [[ "$input" =~ ^[0-9a-fA-F.:-]+$ ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Fonction pour valider un mot-clé (pas de caractères SQL dangereux)
+validate_keyword() {
+    local input="$1"
+    # Autoriser seulement des caractères alphanumériques, espaces, tirets, underscores, points
+    if [[ "$input" =~ ^[0-9a-zA-Z\s._-]+$ ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
 
 # Fonction pour afficher le menu
 show_menu() {
@@ -59,14 +96,22 @@ show_ip_details() {
     local detail_ip="$1"
     local filter_severity="$2"
     
+    # Valider l'IP
+    if ! validate_ip_input "$detail_ip"; then
+        echo "❌ IP invalide: $detail_ip"
+        return 1
+    fi
+    
     echo ""
     echo "📋 Détails des vulnérabilités pour: $detail_ip"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
     
-    local where_clause="WHERE ip = '$detail_ip'"
+    local detail_ip_escaped=$(escape_sql "$detail_ip")
+    local where_clause="WHERE ip = '$detail_ip_escaped'"
     if [ -n "$filter_severity" ]; then
-        where_clause="$where_clause AND severity = '$filter_severity'"
+        local severity_escaped=$(escape_sql "$filter_severity")
+        where_clause="$where_clause AND severity = '$severity_escaped'"
     fi
     
     sqlite3 -header -column "$DB_FILE" << SQL
@@ -129,16 +174,23 @@ search_by_ip() {
         echo "❌ IP vide"
         return
     fi
+    
+    # Valider l'input
+    if ! validate_ip_input "$search_ip"; then
+        echo "❌ IP invalide: caractères non autorisés détectés"
+        return 1
+    fi
 
     echo ""
     echo "📋 Résultats pour IP contenant: $search_ip"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
 
+    local search_ip_escaped=$(escape_sql "$search_ip")
     sqlite3 -header -column "$DB_FILE" << SQL
 SELECT DISTINCT ip, port, COUNT(*) as vulns_count
 FROM vulns
-WHERE ip LIKE '%$search_ip%'
+WHERE ip LIKE '%$search_ip_escaped%'
 GROUP BY ip, port
 ORDER BY vulns_count DESC
 LIMIT 50;
@@ -236,18 +288,25 @@ search_keyword() {
         echo "❌ Mot-clé vide"
         return
     fi
+    
+    # Valider l'input
+    if ! validate_keyword "$keyword"; then
+        echo "❌ Mot-clé invalide: caractères non autorisés détectés"
+        return 1
+    fi
 
     echo ""
     echo "📋 Résultats pour: $keyword"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
 
+    local keyword_escaped=$(escape_sql "$keyword")
     sqlite3 -header -column "$DB_FILE" << SQL
 SELECT ip, port, vulnerability, severity, file_path
 FROM vulns
-WHERE vulnerability LIKE '%$keyword%'
-   OR file_path LIKE '%$keyword%'
-   OR server_version LIKE '%$keyword%'
+WHERE vulnerability LIKE '%$keyword_escaped%'
+   OR file_path LIKE '%$keyword_escaped%'
+   OR server_version LIKE '%$keyword_escaped%'
 ORDER BY severity DESC, ip, port
 LIMIT 100;
 SQL
@@ -473,11 +532,29 @@ if [ $# -gt 0 ]; then
     case "$1" in
         --ip)
             search_ip="$2"
-            sqlite3 -header -column "$DB_FILE" "SELECT DISTINCT ip, port, COUNT(*) as vulns_count FROM vulns WHERE ip LIKE '%$search_ip%' GROUP BY ip, port ORDER BY vulns_count DESC LIMIT 50;"
+            if [ -z "$search_ip" ]; then
+                echo "❌ IP vide"
+                exit 1
+            fi
+            if ! validate_ip_input "$search_ip"; then
+                echo "❌ IP invalide: caractères non autorisés détectés"
+                exit 1
+            fi
+            search_ip_escaped=$(escape_sql "$search_ip")
+            sqlite3 -header -column "$DB_FILE" "SELECT DISTINCT ip, port, COUNT(*) as vulns_count FROM vulns WHERE ip LIKE '%$search_ip_escaped%' GROUP BY ip, port ORDER BY vulns_count DESC LIMIT 50;"
             ;;
         --keyword)
             keyword="$2"
-            sqlite3 -header -column "$DB_FILE" "SELECT ip, port, vulnerability, file_path FROM vulns WHERE vulnerability LIKE '%$keyword%' OR file_path LIKE '%$keyword%' ORDER BY ip, port LIMIT 100;"
+            if [ -z "$keyword" ]; then
+                echo "❌ Mot-clé vide"
+                exit 1
+            fi
+            if ! validate_keyword "$keyword"; then
+                echo "❌ Mot-clé invalide: caractères non autorisés détectés"
+                exit 1
+            fi
+            keyword_escaped=$(escape_sql "$keyword")
+            sqlite3 -header -column "$DB_FILE" "SELECT ip, port, vulnerability, file_path FROM vulns WHERE vulnerability LIKE '%$keyword_escaped%' OR file_path LIKE '%$keyword_escaped%' ORDER BY ip, port LIMIT 100;"
             ;;
         --stats)
             show_stats

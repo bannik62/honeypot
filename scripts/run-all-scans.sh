@@ -6,9 +6,25 @@ LOG_DIR="$SCRIPT_DIR/../data/logs"
 # Créer le répertoire de logs si nécessaire
 mkdir -p "$LOG_DIR"
 
+LOG_FILE="$LOG_DIR/run-all-scans.log"
+
+# Rotation du fichier de log si trop gros (10MB)
+if [ -f "$LOG_FILE" ]; then
+    LOG_SIZE=$(stat -f%z "$LOG_FILE" 2>/dev/null || stat -c%s "$LOG_FILE" 2>/dev/null || echo 0)
+    if [ "$LOG_SIZE" -gt 10485760 ]; then  # 10MB
+        BACKUP_FILE="${LOG_FILE}.$(date +%Y%m%d_%H%M%S).bak"
+        mv "$LOG_FILE" "$BACKUP_FILE"
+        # Compresser l'ancien log en arrière-plan
+        (gzip "$BACKUP_FILE" 2>/dev/null) &
+        # Nettoyer les anciens logs (garder les 5 derniers)
+        find "$LOG_DIR" -name "run-all-scans.log.*.bak*" -type f -printf '%T@ %p\n' 2>/dev/null | \
+            sort -rn | tail -n +6 | cut -d' ' -f2- | xargs -r rm -f 2>/dev/null
+    fi
+fi
+
 # Fonction pour logger
 log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_DIR/run-all-scans.log"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
 }
 
 log "========================================="

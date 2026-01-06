@@ -57,8 +57,27 @@ show_stats() {
             while read count country; do
                 bar_length=$((count * 50 / total))
                 bar=$(printf '█%.0s' $(seq 1 $bar_length))
-                percentage=$((count * 100 / total))
-                printf "  %-3s %s %s (%d%%)\n" "$count" "$country" "$bar" "$percentage"
+                # Calcul avec arrondi : multiplier par 1000, diviser, puis arrondir
+                if [ "$total" -gt 0 ]; then
+                    # Calcul en dixièmes de pourcent : (count * 1000) / total
+                    percentage_tenths=$((count * 1000 / total))
+                    # Arrondir : si le reste >= 5, ajouter 1
+                    remainder=$((count * 1000 % total))
+                    if [ "$remainder" -ge $((total / 2)) ]; then
+                        percentage_tenths=$((percentage_tenths + 1))
+                    fi
+                    # Convertir en pourcentage entier
+                    percentage=$((percentage_tenths / 10))
+                    # Si 0 mais qu'il y a des connexions, afficher <1%
+                    if [ "$percentage" -eq 0 ] && [ "$count" -gt 0 ]; then
+                        percentage="<1"
+                    else
+                        percentage="${percentage}%"
+                    fi
+                else
+                    percentage="0%"
+                fi
+                printf "  %-3s %s %s (%s)\n" "$count" "$country" "$bar" "$percentage"
             done
 
         echo ""

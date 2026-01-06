@@ -2,6 +2,7 @@
 data/logs/*.csv
 data/logs/daily/
 data/cache/*.json
+data/cache/recent_connections.txt
 
 # Config personnelle (garder seulement .example)
 config/config

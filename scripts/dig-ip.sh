@@ -1,7 +1,27 @@
 #!/bin/bash
 # Script pour faire des requêtes DNS sur les IPs du honeypot
 
+# Variable pour le nettoyage
+temp_file=""
+
+# Nettoyage des fichiers temporaires en cas d'interruption
+cleanup_temp_files() {
+    if [ -n "$temp_file" ] && [ -f "$temp_file" ]; then
+        rm -f "$temp_file" 2>/dev/null
+    fi
+}
+
+trap cleanup_temp_files EXIT INT TERM
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Vérifier les dépendances
+if ! command -v dig &> /dev/null; then
+    echo "❌ Erreur: dig n'est pas installé" >&2
+    echo "💡 Installez-le avec: sudo apt install dnsutils" >&2
+    exit 1
+fi
+
 CONFIG_FILE="$SCRIPT_DIR/../config/config"
 
 if [ -f "$CONFIG_FILE" ]; then

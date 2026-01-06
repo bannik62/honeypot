@@ -1,21 +1,83 @@
 #!/bin/bash
 # Script qui parse les logs Endlessh et extrait les IPs
 
-# Charger la config
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE="$SCRIPT_DIR/../config/config"
 
-if [ -f "$CONFIG_FILE" ]; then
-    source "$CONFIG_FILE"
+# Charger la bibliothèque commune si disponible (mode amélioré)
+LIB_DIR="$SCRIPT_DIR/../lib"
+USE_COMMON_LIB=false
+if [ -f "$LIB_DIR/common.sh" ]; then
+    source "$LIB_DIR/common.sh" 2>/dev/null && USE_COMMON_LIB=true
+fi
+
+# Vérifier les dépendances (mode compatible)
+for cmd in geoiplookup jq; do
+    if ! command -v "$cmd" &> /dev/null; then
+        if [ "$USE_COMMON_LIB" = true ]; then
+            check_command "$cmd" "geoip-bin" || die "Dépendances manquantes"
+        else
+            echo "❌ Erreur: $cmd n'est pas installé" >&2
+            echo "💡 Installez-le avec: sudo apt install geoip-bin jq" >&2
+            exit 1
+        fi
+    fi
+done
+
+# Charger la configuration (mode compatible)
+if [ "$USE_COMMON_LIB" = true ]; then
+    load_config "$SCRIPT_DIR" || {
+        # Fallback si load_config échoue
+        CONFIG_FILE="$SCRIPT_DIR/../config/config"
+        if [ -f "$CONFIG_FILE" ]; then
+            source "$CONFIG_FILE"
+        else
+            DATA_DIR="$SCRIPT_DIR/../data"
+        fi
+    }
 else
-    DATA_DIR="$SCRIPT_DIR/../data"
+    # Mode ancien (compatible)
+    CONFIG_FILE="$SCRIPT_DIR/../config/config"
+    if [ -f "$CONFIG_FILE" ]; then
+        source "$CONFIG_FILE"
+    else
+        DATA_DIR="$SCRIPT_DIR/../data"
+    fi
 fi
 
 LOG_FILE="$DATA_DIR/logs/connections.csv"
 CACHE_FILE="$DATA_DIR/cache/geoip-cache.json"
+# Cache en mémoire pour les dernières connexions (évite de lire tout le fichier)
+RECENT_CONNECTIONS_FILE="$DATA_DIR/cache/recent_connections.txt"
+RECENT_CONNECTIONS_MAX=1000  # Garder les 1000 dernières en mémoire
 
-# Créer les répertoires si nécessaire
-mkdir -p "$(dirname "$LOG_FILE")" "$(dirname "$CACHE_FILE")"
+# Créer les répertoires si nécessaire (mode compatible)
+if [ "$USE_COMMON_LIB" = true ]; then
+    safe_mkdir "$(dirname "$LOG_FILE")"
+    safe_mkdir "$(dirname "$CACHE_FILE")"
+    # Initialiser le logging
+    init_logging "parser" 2>/dev/null || true
+else
+    mkdir -p "$(dirname "$LOG_FILE")" "$(dirname "$CACHE_FILE")"
+fi
+
+# Initialiser le cache des connexions récentes
+if [ ! -f "$RECENT_CONNECTIONS_FILE" ]; then
+    touch "$RECENT_CONNECTIONS_FILE"
+fi
+
+# Rotation du fichier CSV si trop gros (50MB) - mode compatible
+if [ "$USE_COMMON_LIB" = true ] && command -v rotate_file_if_needed &> /dev/null; then
+    rotate_file_if_needed "$LOG_FILE" 50 2>/dev/null || true
+    cleanup_old_backups "$LOG_FILE" 3 2>/dev/null || true
+else
+    # Fallback : rotation manuelle si fichier > 50MB
+    if [ -f "$LOG_FILE" ]; then
+        FILE_SIZE=$(stat -f%z "$LOG_FILE" 2>/dev/null || stat -c%s "$LOG_FILE" 2>/dev/null || echo 0)
+        if [ "$FILE_SIZE" -gt 52428800 ]; then  # 50MB
+            mv "$LOG_FILE" "${LOG_FILE}.$(date +%Y%m%d_%H%M%S).bak" 2>/dev/null || true
+        fi
+    fi
+fi
 
 # Fonction pour géolocaliser une IP
 geolocate_ip() {
@@ -38,10 +100,37 @@ geolocate_ip() {
     
     # Sauvegarder dans le cache
     if [ ! -f "$CACHE_FILE" ]; then
-        echo "{}" > "$CACHE_FILE"
+        if [ "$USE_COMMON_LIB" = true ] && command -v safe_create_file &> /dev/null; then
+            safe_create_file "$CACHE_FILE" "{}"
+        else
+            echo "{}" > "$CACHE_FILE"
+        fi
     fi
+    
+    # Limiter la taille du cache GeoIP (max 10MB, ~100k entrées)
+    local cache_size=$(stat -f%z "$CACHE_FILE" 2>/dev/null || stat -c%s "$CACHE_FILE" 2>/dev/null || echo 0)
+    if [ "$cache_size" -gt 10485760 ]; then  # 10MB
+        if [ "$USE_COMMON_LIB" = true ]; then
+            log_warn "Cache GeoIP trop volumineux (${cache_size} bytes), nettoyage..." 2>/dev/null || true
+        fi
+        # Garder seulement les 50000 dernières entrées (environ)
+        local temp_cache=$(mktemp)
+        jq 'to_entries | sort_by(.key) | reverse | .[0:50000] | from_entries' "$CACHE_FILE" > "$temp_cache" 2>/dev/null
+        if [ $? -eq 0 ] && [ -s "$temp_cache" ]; then
+            mv "$temp_cache" "$CACHE_FILE" 2>/dev/null || true
+        else
+            rm -f "$temp_cache" 2>/dev/null
+            # Si le nettoyage échoue, recréer un cache vide
+            echo "{}" > "$CACHE_FILE"
+        fi
+    fi
+    
     local temp=$(mktemp)
-    jq ". + {\"$ip\": \"$country\"}" "$CACHE_FILE" > "$temp" 2>/dev/null && mv "$temp" "$CACHE_FILE"
+    if jq ". + {\"$ip\": \"$country\"}" "$CACHE_FILE" > "$temp" 2>/dev/null; then
+        mv "$temp" "$CACHE_FILE" 2>/dev/null || true
+    else
+        rm -f "$temp" 2>/dev/null
+    fi
     
     echo "$country"
 }
@@ -91,15 +180,58 @@ parse_line() {
         fi
 
         # Vérifier si cette connexion existe déjà (éviter doublons)
-        if grep -q ",$ip,$port," "$LOG_FILE" 2>/dev/null; then
-            return 0  # Déjà enregistré, skip
+        # Utiliser un cache en fichier d'abord (beaucoup plus rapide que grep sur tout le fichier)
+        local connection_key="${ip}:${port}"
+        
+        # Vérifier dans le cache des connexions récentes
+        if [ -f "$RECENT_CONNECTIONS_FILE" ] && grep -qFx "$connection_key" "$RECENT_CONNECTIONS_FILE" 2>/dev/null; then
+            return 0  # Déjà vu récemment, skip
+        fi
+        
+        # Si pas dans le cache, vérifier seulement les dernières lignes (optimisation)
+        # Au lieu de lire tout le fichier, on lit seulement les 1000 dernières lignes
+        if [ -f "$LOG_FILE" ] && [ -s "$LOG_FILE" ]; then
+            if tail -n 1000 "$LOG_FILE" 2>/dev/null | grep -q ",$ip,$port,"; then
+                # Ajouter au cache pour éviter de re-vérifier
+                echo "$connection_key" >> "$RECENT_CONNECTIONS_FILE"
+                # Limiter la taille du cache (garder seulement les N dernières lignes)
+                local cache_lines=$(wc -l < "$RECENT_CONNECTIONS_FILE" 2>/dev/null || echo 0)
+                if [ "$cache_lines" -gt $RECENT_CONNECTIONS_MAX ]; then
+                    tail -n $RECENT_CONNECTIONS_MAX "$RECENT_CONNECTIONS_FILE" > "${RECENT_CONNECTIONS_FILE}.tmp" 2>/dev/null
+                    mv "${RECENT_CONNECTIONS_FILE}.tmp" "$RECENT_CONNECTIONS_FILE" 2>/dev/null || true
+                fi
+                return 0  # Déjà enregistré, skip
+            fi
         fi
 
         timestamp=$(date '+%Y-%m-%d %H:%M:%S')
         country=$(geolocate_ip "$ip")
 
+        # Ajouter au cache
+        echo "$connection_key" >> "$RECENT_CONNECTIONS_FILE"
+
         # Écrire dans le CSV
         echo "$timestamp,$ip,$port,$country" >> "$LOG_FILE"
+        
+        # Rotation périodique (toutes les 1000 connexions environ)
+        local line_count=$(wc -l < "$LOG_FILE" 2>/dev/null || echo 0)
+        if [ $((line_count % 1000)) -eq 0 ] && [ "$line_count" -gt 0 ]; then
+            if [ "$USE_COMMON_LIB" = true ] && command -v rotate_file_if_needed &> /dev/null; then
+                rotate_file_if_needed "$LOG_FILE" 50 2>/dev/null || true
+            else
+                # Fallback : rotation manuelle
+                FILE_SIZE=$(stat -f%z "$LOG_FILE" 2>/dev/null || stat -c%s "$LOG_FILE" 2>/dev/null || echo 0)
+                if [ "$FILE_SIZE" -gt 52428800 ]; then  # 50MB
+                    mv "$LOG_FILE" "${LOG_FILE}.$(date +%Y%m%d_%H%M%S).bak" 2>/dev/null || true
+                fi
+            fi
+            # Nettoyer le cache des connexions récentes aussi
+            if [ -f "$RECENT_CONNECTIONS_FILE" ]; then
+                tail -n 500 "$RECENT_CONNECTIONS_FILE" > "${RECENT_CONNECTIONS_FILE}.tmp" 2>/dev/null
+                mv "${RECENT_CONNECTIONS_FILE}.tmp" "$RECENT_CONNECTIONS_FILE" 2>/dev/null || true
+            fi
+        fi
+        
         return 0
     fi
     

@@ -1,6 +1,31 @@
 #!/bin/bash
 
+# Nettoyage des fichiers temporaires en cas d'interruption
+cleanup_temp_files() {
+    # Nettoyer les fichiers temporaires créés par scan_one_ip
+    find /tmp -name "tmp.*" -user "$(whoami)" -type f -mmin -10 2>/dev/null | \
+        xargs -r grep -l "scan_one_ip\|nmap-to-csv" 2>/dev/null | \
+        xargs -r rm -f 2>/dev/null || true
+}
+
+trap cleanup_temp_files EXIT INT TERM
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Charger la bibliothèque commune
+LIB_DIR="$SCRIPT_DIR/../lib"
+if [ -f "$LIB_DIR/common.sh" ]; then
+    source "$LIB_DIR/common.sh"
+fi
+
+# Vérifier les dépendances
+for cmd in nmap curl; do
+    if ! command -v "$cmd" &> /dev/null; then
+        echo "❌ Erreur: $cmd n'est pas installé" >&2
+        echo "💡 Installez-le avec: sudo apt install nmap curl" >&2
+        exit 1
+    fi
+done
 
 CONFIG_FILE="$SCRIPT_DIR/../config/config"
 
@@ -29,6 +54,12 @@ fi
 LOG_FILE="$DATA_DIR/logs/connections.csv"
 
 CSV_OUTPUT="$DATA_DIR/logs/web_interfaces.csv"
+
+# Rotation du fichier CSV si trop gros (50MB)
+if [ -f "$CSV_OUTPUT" ]; then
+    rotate_file_if_needed "$CSV_OUTPUT" 50 || true
+    cleanup_old_backups "$CSV_OUTPUT" 3
+fi
 
 if [ ! -f "$LOG_FILE" ]; then
 
@@ -103,6 +134,8 @@ scan_one_ip() {
     local ip="$1"
 
     local temp_written=$(mktemp)
+    # Nettoyer le fichier temporaire à la sortie de la fonction
+    trap "rm -f '$temp_written' 2>/dev/null" RETURN
 
     result=$(nmap -p "$SCAN_PORTS_NMAP" -T4 --open "$ip" 2>/dev/null | grep -E "^[0-9]+/(tcp|udp)" | grep "open")
 

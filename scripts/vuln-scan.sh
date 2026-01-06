@@ -1,6 +1,18 @@
 #!/bin/bash
 # Script pour scanner les vulnérabilités avec nmap (100 ports communs)
 
+# Variables pour le nettoyage
+IPS_LIST=""
+
+# Nettoyage des fichiers temporaires en cas d'interruption
+cleanup_temp_files() {
+    if [ -n "$IPS_LIST" ] && [ -f "$IPS_LIST" ]; then
+        rm -f "$IPS_LIST" 2>/dev/null
+    fi
+}
+
+trap cleanup_temp_files EXIT INT TERM
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_FILE="$SCRIPT_DIR/../config/config"
 

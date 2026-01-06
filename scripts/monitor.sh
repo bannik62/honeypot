@@ -22,6 +22,33 @@ find_journalctl_pid() {
     echo "$result"
 }
 
+# Fonction pour nettoyer les fichiers PID/LOCK orphelins
+cleanup_orphan_files() {
+    # Vérifier si le PID dans le fichier correspond à un processus actif
+    if [ -f "$PID_FILE" ]; then
+        local saved_pid=$(cat "$PID_FILE" 2>/dev/null)
+        if [ -n "$saved_pid" ]; then
+            if ! ps -p "$saved_pid" > /dev/null 2>&1; then
+                # Le processus n'existe plus, nettoyer les fichiers
+                rm -f "$PID_FILE" "$LOCK_FILE" 2>/dev/null
+            fi
+        fi
+    fi
+    
+    # Vérifier aussi le LOCK_FILE
+    if [ -f "$LOCK_FILE" ] && [ ! -f "$PID_FILE" ]; then
+        local lock_pid=$(cat "$LOCK_FILE" 2>/dev/null)
+        if [ -n "$lock_pid" ]; then
+            if ! ps -p "$lock_pid" > /dev/null 2>&1; then
+                rm -f "$LOCK_FILE" 2>/dev/null
+            fi
+        else
+            # Fichier LOCK vide ou invalide
+            rm -f "$LOCK_FILE" 2>/dev/null
+        fi
+    fi
+}
+
 # Fonction pour nettoyer tous les processus liés
 cleanup_processes() {
     # Tuer TOUS les processus journalctl liés
@@ -46,10 +73,16 @@ cleanup_processes() {
     if [ -n "$sudo_journal" ]; then
         sudo kill -9 "$sudo_journal" 2>/dev/null
     fi
+    
+    # Nettoyer les fichiers PID/LOCK après avoir tué les processus
+    cleanup_orphan_files
 }
 
 # Fonction pour démarrer le monitoring
 start_monitor() {
+    # Nettoyer d'abord les fichiers orphelins
+    cleanup_orphan_files
+    
     # Vérifier si déjà en cours
     if [ -f "$LOCK_FILE" ]; then
         local existing_pid=$(cat "$LOCK_FILE" 2>/dev/null)
@@ -70,18 +103,19 @@ if [ -n "$existing_jpid" ]; then
     
     echo "🚀 Démarrage du monitoring..."
     
-    # Parser l'historique complet au démarrage
+    # Parser l'historique complet au démarrage (limiter à 10000 dernières lignes pour éviter la surcharge mémoire)
     echo "📜 Parsing de l'historique complet d'abord..."
-    sudo journalctl -u "$SERVICE_NAME" -o cat -n 0 2>/dev/null | \
+    sudo journalctl -u "$SERVICE_NAME" -o cat -n 10000 2>/dev/null | \
         grep "ACCEPT" | \
         while IFS= read -r line; do
             echo "$line" | "$PARSER_SCRIPT" 2>/dev/null
         done
     
-    echo "✅ Historique parsé, écoute des nouvelles connexions..."
+    echo "✅ Historique parsé (10000 dernières lignes), écoute des nouvelles connexions..."
     
-    # Lancer journalctl en arrière-plan
-    ( sudo journalctl -u "$SERVICE_NAME" -f -n 0 -o cat --no-pager 2>/dev/null | while IFS= read -r line; do
+    # Lancer journalctl en arrière-plan avec limite de mémoire
+    # Utiliser --since pour limiter la quantité de données en mémoire
+    ( sudo journalctl -u "$SERVICE_NAME" -f --since "1 hour ago" -o cat --no-pager 2>/dev/null | while IFS= read -r line; do
         if echo "$line" | grep -q "ACCEPT"; then
             echo "$line" | "$PARSER_SCRIPT" 2>/dev/null
         fi
