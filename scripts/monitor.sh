@@ -105,13 +105,39 @@ if [ -n "$existing_jpid" ]; then
     
     # Parser l'historique complet au démarrage (limiter à 10000 dernières lignes pour éviter la surcharge mémoire)
     echo "📜 Parsing de l'historique complet d'abord..."
-    sudo journalctl -u "$SERVICE_NAME" -o cat -n 10000 2>/dev/null | \
-        grep "ACCEPT" | \
+    
+    local temp_file=$(mktemp)
+    # Nettoyer le fichier temporaire en cas d'interruption
+    trap "rm -f '$temp_file'" EXIT INT TERM
+    
+    sudo journalctl -u "$SERVICE_NAME" -o cat -n 10000 2>/dev/null | grep "ACCEPT" > "$temp_file"
+    local total_lines=$(wc -l < "$temp_file" 2>/dev/null || echo "0")
+    
+    if [ "$total_lines" -gt 0 ]; then
+        echo "📊 $total_lines lignes à parser..."
+        local count=0
+        
         while IFS= read -r line; do
             echo "$line" | "$PARSER_SCRIPT" 2>/dev/null
-        done
+            count=$((count + 1))
+            # Afficher la progression toutes les 50 lignes ou toutes les lignes si < 50
+            if [ "$total_lines" -le 50 ] || [ $((count % 50)) -eq 0 ] || [ "$count" -eq "$total_lines" ]; then
+                local percent=$((count * 100 / total_lines))
+                printf "\r⏳ Parsing... %d/%d lignes (%d%%)" "$count" "$total_lines" "$percent"
+            fi
+        done < "$temp_file"
+        
+        echo ""  # Nouvelle ligne après la progression
+        echo "✅ $count lignes parsées"
+    else
+        echo "ℹ️  Aucune ligne à parser dans l'historique"
+    fi
     
-    echo "✅ Historique parsé (10000 dernières lignes), écoute des nouvelles connexions..."
+    # Nettoyer le trap et le fichier temporaire
+    trap - EXIT INT TERM
+    rm -f "$temp_file"
+    
+    echo "✅ Historique parsé, écoute des nouvelles connexions..."
     
     # Lancer journalctl en arrière-plan avec limite de mémoire
     # Utiliser --since pour limiter la quantité de données en mémoire

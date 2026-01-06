@@ -153,6 +153,22 @@ if [ -f "$BASHRC" ]; then
         echo "alias honeypot-search-nikto='cd \"$SCRIPT_DIR_ABS\" && ./scripts/search-nikto.sh'" >> "$BASHRC"
         ALIASES_ADDED=true
     fi
+    if ! grep -q "alias honeypot-logs=" "$BASHRC" 2>/dev/null; then
+        echo "alias honeypot-logs='tail -n 50 -f \"$SCRIPT_DIR_ABS/data/logs/run-all-scans.log\"'" >> "$BASHRC"
+        ALIASES_ADDED=true
+    fi
+    if ! grep -q "alias setup-auto-scan=" "$BASHRC" 2>/dev/null; then
+        echo "alias setup-auto-scan='cd \"$SCRIPT_DIR_ABS\" && ./scripts/setup-auto-scan.sh'" >> "$BASHRC"
+        ALIASES_ADDED=true
+    fi
+    if ! grep -q "alias count-ips=" "$BASHRC" 2>/dev/null; then
+        echo "alias count-ips='echo \"📊 Journal endlessh:\" && sudo journalctl -u endlessh -o cat --no-pager 2>/dev/null | grep -oE \"[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\" | sort -u | wc -l && echo \"📊 connections.csv:\" && tail -n +2 \"$SCRIPT_DIR_ABS/data/logs/connections.csv\" 2>/dev/null | cut -d\",\" -f2 | sort -u | wc -l && echo \"📊 Différence (manquantes dans connections.csv):\" && comm -23 <(sudo journalctl -u endlessh -o cat --no-pager 2>/dev/null | grep -oE \"[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\" | sort -u) <(tail -n +2 \"$SCRIPT_DIR_ABS/data/logs/connections.csv\" 2>/dev/null | cut -d\",\" -f2 | sort -u | grep -E \"^[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}$\") | wc -l'" >> "$BASHRC"
+        ALIASES_ADDED=true
+    fi
+    if ! grep -q "alias piegeAbot=" "$BASHRC" 2>/dev/null; then
+        echo "alias piegeAbot='sudo journalctl -u endlessh -f'" >> "$BASHRC"
+        ALIASES_ADDED=true
+    fi
     
     if [ "$ALIASES_ADDED" = true ]; then
         echo "✅ Aliases ajoutés à $BASHRC"
@@ -174,6 +190,10 @@ echo "   • capture-web        → Capturer les screenshots des interfaces web"
 echo "   • vuln-scan          → Scanner les vulnérabilités avec nmap"
 echo "   • honeypot-dig       → Requêtes DNS/WHOIS sur les IPs"
 echo "   • honeypot-search-nikto → Recherche dans les rapports Nikto"
+echo "   • honeypot-logs      → Suivre les logs des scans (tail -f)"
+echo "   • setup-auto-scan    → Configurer les scans automatiques"
+echo "   • count-ips          → Compter les IPs (journal vs connections.csv)"
+echo "   • piegeAbot          → Suivre les connexions en temps réel (journalctl)"
 echo ""
 echo "⚠️  Pour utiliser les aliases dans cette session :"
 echo "   source ~/.bashrc"
