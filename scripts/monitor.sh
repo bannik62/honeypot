@@ -121,16 +121,16 @@ start_monitor() {
     
     echo "✅ Historique parsé, écoute des nouvelles connexions..."
     
-    # Lancer journalctl en arrière-plan
-    # Utiliser stdbuf si disponible pour forcer le flush immédiat (évite le buffering)
+    # Lancer journalctl en arrière-plan avec unbuffer pour éviter le buffering
+    # Utiliser stdbuf pour forcer le flush immédiat (si disponible)
     if command -v stdbuf >/dev/null 2>&1; then
-        ( stdbuf -oL -eL sudo journalctl -u "$SERVICE_NAME" -f -n 0 -o cat --no-pager 2>/dev/null | while IFS= read -r line; do
-            if echo "$line" | grep -q "ACCEPT"; then
-                echo "$line" | "$PARSER_SCRIPT" 2>/dev/null
+        ( stdbuf -oL -eL sudo journalctl -u "$SERVICE_NAME" -f -n 0 -o cat --no-pager 2>/dev/null | stdbuf -oL -eL bash -c "while IFS= read -r line; do
+            if echo \"\$line\" | grep -q \"ACCEPT\"; then
+                echo \"\$line\" | \"$PARSER_SCRIPT\" 2>/dev/null
             fi
-        done ) &
+        done" ) &
     else
-        # Fallback sans stdbuf (peut avoir du buffering)
+        # Fallback sans stdbuf
         ( sudo journalctl -u "$SERVICE_NAME" -f -n 0 -o cat --no-pager 2>/dev/null | while IFS= read -r line; do
             if echo "$line" | grep -q "ACCEPT"; then
                 echo "$line" | "$PARSER_SCRIPT" 2>/dev/null
