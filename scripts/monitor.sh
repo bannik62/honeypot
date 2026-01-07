@@ -24,11 +24,11 @@ find_journalctl_pid() {
 
 # Fonction pour nettoyer tous les processus liés
 cleanup_processes() {
-    # Tuer TOUS les processus journalctl liés
-    sudo pkill -f "journalctl -u $SERVICE_NAME -f" 2>/dev/null
+    # Tuer TOUS les processus journalctl liés à endlessh (tous les patterns possibles)
+    sudo pkill -f "journalctl.*endlessh" 2>/dev/null
     
     # Tuer TOUS les sudo journalctl restants
-    sudo pkill -f "sudo journalctl -u $SERVICE_NAME" 2>/dev/null
+    sudo pkill -f "sudo journalctl.*endlessh" 2>/dev/null
     
     # Tuer tous les monitor.sh en arrière-plan
     pkill -f "monitor.sh start" 2>/dev/null
@@ -36,16 +36,18 @@ cleanup_processes() {
     # Attendre un peu
     sleep 0.5
     
-    # Si certains processus persistent, forcer
-    local remaining=$(pgrep -f "journalctl.*endlessh" | head -1)
-    if [ -n "$remaining" ]; then
-        sudo kill -9 "$remaining" 2>/dev/null
-    fi
+    # Si certains processus persistent, forcer avec kill -9 sur TOUS
+    pgrep -f "journalctl.*endlessh" 2>/dev/null | while read -r pid; do
+        sudo kill -9 "$pid" 2>/dev/null
+    done
     
-    local sudo_journal=$(pgrep -f "sudo journalctl.*endlessh" | head -1)
-    if [ -n "$sudo_journal" ]; then
-        sudo kill -9 "$sudo_journal" 2>/dev/null
-    fi
+    # Tuer aussi les processus sudo qui pointent vers journalctl
+    pgrep -f "sudo.*journalctl.*endlessh" 2>/dev/null | while read -r pid; do
+        sudo kill -9 "$pid" 2>/dev/null
+    done
+    
+    # Attendre encore un peu pour que les processus se terminent
+    sleep 0.5
 }
 
 # Fonction pour démarrer le monitoring
@@ -61,16 +63,26 @@ start_monitor() {
         fi
     fi
     
-    # Vérifier et nettoyer les processus existants
+    # TOUJOURS nettoyer les processus existants avant de démarrer
     local existing_count=$(pgrep -f "journalctl.*endlessh" 2>/dev/null | wc -l)
     if [ "$existing_count" -gt 0 ]; then
         echo "⚠️  $existing_count instance(s) de journalctl détectée(s), nettoyage..."
         cleanup_processes
+    else
+        # Nettoyer quand même au cas où (processus zombies ou non détectés)
+        cleanup_processes
+    fi
+    
+    # Attendre et vérifier à nouveau
+    sleep 1
+    local remaining=$(pgrep -f "journalctl.*endlessh" 2>/dev/null | wc -l)
+    if [ "$remaining" -gt 0 ]; then
+        echo "⚠️  $remaining processus restant(s), nettoyage forcé..."
+        cleanup_processes
         sleep 1
-        # Vérifier à nouveau
-        local remaining=$(pgrep -f "journalctl.*endlessh" 2>/dev/null | wc -l)
+        remaining=$(pgrep -f "journalctl.*endlessh" 2>/dev/null | wc -l)
         if [ "$remaining" -gt 0 ]; then
-            echo "❌ Impossible de nettoyer tous les processus journalctl"
+            echo "❌ Impossible de nettoyer tous les processus journalctl ($remaining restant(s))"
             return 1
         fi
     fi
