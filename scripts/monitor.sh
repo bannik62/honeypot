@@ -103,22 +103,27 @@ if [ -n "$existing_jpid" ]; then
     
     echo "🚀 Démarrage du monitoring..."
     
-    # Lancer journalctl en arrière-plan pour suivre les logs en temps réel
-    ( sudo journalctl -u "$SERVICE_NAME" -f -o cat --no-pager 2>/dev/null | while IFS= read -r line; do
-        if echo "$line" | grep -q "ACCEPT"; then
-            echo "$line" | "$PARSER_SCRIPT" 2>/dev/null
+    # Parser l'historique complet au démarrage (pour éviter les doublons)
+    echo "📜 Parsing de l'historique complet..."
+    sudo journalctl -u "$SERVICE_NAME" -o cat -n 0 2>/dev/null | grep "ACCEPT" | "$PARSER_SCRIPT" 2>/dev/null
+    echo "✅ Historique parsé"
+    
+    # Lancer journalctl en daemon (arrière-plan) pour suivre les logs en temps réel
+    nohup bash -c "sudo journalctl -u \"$SERVICE_NAME\" -f -o cat --no-pager 2>/dev/null | while IFS= read -r line; do
+        if echo \"\$line\" | grep -q \"ACCEPT\"; then
+            echo \"\$line\" | \"$PARSER_SCRIPT\" 2>/dev/null
         fi
-    done ) &
+    done" > /dev/null 2>&1 &
     
     local monitor_pid=$!
     
     # Attendre un peu pour que journalctl démarre
-    sleep 1
+    sleep 2
     
     # Trouver le PID réel de journalctl
     local jpid=$(find_journalctl_pid)
     if [ -z "$jpid" ]; then
-        # Si pas trouvé, utiliser le PID du pipe
+        # Si pas trouvé, utiliser le PID du processus
         jpid=$monitor_pid
     fi
     
@@ -126,7 +131,7 @@ if [ -n "$existing_jpid" ]; then
     echo "$jpid" > "$PID_FILE"
     echo "$jpid" > "$LOCK_FILE"
     
-    echo "✅ Monitoring démarré (PID: $jpid)"
+    echo "✅ Monitoring démarré en arrière-plan (PID: $jpid)"
 }
 
 # Fonction pour arrêter
