@@ -61,11 +61,18 @@ start_monitor() {
         fi
     fi
     
-    # Vérifier aussi avec pgrep
-    local existing_jpid=$(find_journalctl_pid)
-if [ -n "$existing_jpid" ]; then
-        echo "⚠️  Un processus journalctl est déjà actif"
-        return 1
+    # Vérifier et nettoyer les processus existants
+    local existing_count=$(pgrep -f "journalctl.*endlessh" 2>/dev/null | wc -l)
+    if [ "$existing_count" -gt 0 ]; then
+        echo "⚠️  $existing_count instance(s) de journalctl détectée(s), nettoyage..."
+        cleanup_processes
+        sleep 1
+        # Vérifier à nouveau
+        local remaining=$(pgrep -f "journalctl.*endlessh" 2>/dev/null | wc -l)
+        if [ "$remaining" -gt 0 ]; then
+            echo "❌ Impossible de nettoyer tous les processus journalctl"
+            return 1
+        fi
     fi
     
     echo "🚀 Démarrage du monitoring..."
