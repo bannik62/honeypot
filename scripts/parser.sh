@@ -172,9 +172,17 @@ parse_line() {
         fi
 
         # Vérifier si cette connexion existe déjà (éviter doublons)
-        # Vérifier seulement les 1000 dernières lignes pour l'optimisation
+        # Vérifier les dernières lignes pour l'optimisation (ajusté dynamiquement)
+        # Utiliser 50% du fichier ou 5000 lignes max pour équilibrer performance/précision
         if [ -f "$LOG_FILE" ] && [ -s "$LOG_FILE" ]; then
-            if tail -n 1000 "$LOG_FILE" 2>/dev/null | grep -q ",$ip,$port,"; then
+            local total_lines=$(wc -l < "$LOG_FILE" 2>/dev/null || echo 0)
+            local check_lines=$((total_lines / 2))
+            if [ "$check_lines" -gt 5000 ]; then
+                check_lines=5000
+            elif [ "$check_lines" -lt 1000 ]; then
+                check_lines=1000
+            fi
+            if tail -n "$check_lines" "$LOG_FILE" 2>/dev/null | grep -q ",$ip,$port,"; then
                 return 0  # Déjà enregistré, skip
             fi
         fi
