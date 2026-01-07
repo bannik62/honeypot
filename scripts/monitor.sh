@@ -22,16 +22,14 @@ find_journalctl_pid() {
     echo "$result"
 }
 
-# Fonction pour nettoyer tous les processus liés
+# Fonction pour nettoyer tous les processus journalctl liés
+# NOTE: Ne tue PAS les processus monitor.sh (géré par stop_monitor)
 cleanup_processes() {
     # Tuer TOUS les processus journalctl liés à endlessh (tous les patterns possibles)
     sudo pkill -f "journalctl.*endlessh" 2>/dev/null
     
     # Tuer TOUS les sudo journalctl restants
     sudo pkill -f "sudo journalctl.*endlessh" 2>/dev/null
-    
-    # Tuer tous les monitor.sh en arrière-plan
-    pkill -f "monitor.sh start" 2>/dev/null
     
     # Attendre un peu
     sleep 0.5
@@ -91,7 +89,7 @@ start_monitor() {
     
     # Parser l'historique complet au démarrage
     echo "📜 Parsing de l'historique complet d'abord..."
-    sudo journalctl -u "$SERVICE_NAME" -o cat -n 0 2>/dev/null | \
+    sudo journalctl -u "$SERVICE_NAME" -o cat --no-pager 2>/dev/null | \
         grep "ACCEPT" | \
         while IFS= read -r line; do
             echo "$line" | "$PARSER_SCRIPT" 2>/dev/null
