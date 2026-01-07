@@ -22,33 +22,6 @@ find_journalctl_pid() {
     echo "$result"
 }
 
-# Fonction pour nettoyer les fichiers PID/LOCK orphelins
-cleanup_orphan_files() {
-    # Vérifier si le PID dans le fichier correspond à un processus actif
-    if [ -f "$PID_FILE" ]; then
-        local saved_pid=$(cat "$PID_FILE" 2>/dev/null)
-        if [ -n "$saved_pid" ]; then
-            if ! ps -p "$saved_pid" > /dev/null 2>&1; then
-                # Le processus n'existe plus, nettoyer les fichiers
-                rm -f "$PID_FILE" "$LOCK_FILE" 2>/dev/null
-            fi
-        fi
-    fi
-    
-    # Vérifier aussi le LOCK_FILE
-    if [ -f "$LOCK_FILE" ] && [ ! -f "$PID_FILE" ]; then
-        local lock_pid=$(cat "$LOCK_FILE" 2>/dev/null)
-        if [ -n "$lock_pid" ]; then
-            if ! ps -p "$lock_pid" > /dev/null 2>&1; then
-                rm -f "$LOCK_FILE" 2>/dev/null
-            fi
-        else
-            # Fichier LOCK vide ou invalide
-            rm -f "$LOCK_FILE" 2>/dev/null
-        fi
-    fi
-}
-
 # Fonction pour nettoyer tous les processus liés
 cleanup_processes() {
     # Tuer TOUS les processus journalctl liés
@@ -73,16 +46,10 @@ cleanup_processes() {
     if [ -n "$sudo_journal" ]; then
         sudo kill -9 "$sudo_journal" 2>/dev/null
     fi
-    
-    # Nettoyer les fichiers PID/LOCK après avoir tué les processus
-    cleanup_orphan_files
 }
 
 # Fonction pour démarrer le monitoring
 start_monitor() {
-    # Nettoyer d'abord les fichiers orphelins
-    cleanup_orphan_files
-    
     # Vérifier si déjà en cours
     if [ -f "$LOCK_FILE" ]; then
         local existing_pid=$(cat "$LOCK_FILE" 2>/dev/null)
@@ -94,78 +61,41 @@ start_monitor() {
         fi
     fi
     
-    # Vérifier aussi avec pgrep et nettoyer toutes les instances
-    local existing_count=$(pgrep -f "journalctl.*endlessh" 2>/dev/null | wc -l)
-    if [ "$existing_count" -gt 0 ]; then
-        echo "⚠️  $existing_count instance(s) de journalctl détectée(s), nettoyage..."
-        cleanup_processes
-        sleep 2
-        # Vérifier à nouveau
-        local remaining=$(pgrep -f "journalctl.*endlessh" 2>/dev/null | wc -l)
-        if [ "$remaining" -gt 0 ]; then
-            echo "❌ Impossible de nettoyer tous les processus journalctl"
-            return 1
-        fi
+    # Vérifier aussi avec pgrep
+    local existing_jpid=$(find_journalctl_pid)
+if [ -n "$existing_jpid" ]; then
+        echo "⚠️  Un processus journalctl est déjà actif"
+        return 1
     fi
     
     echo "🚀 Démarrage du monitoring..."
     
-    # Nettoyer le cache orphelin du parser (pour éviter les problèmes)
-    RECENT_CONNECTIONS_FILE="$SCRIPT_DIR/../data/cache/recent_connections.txt"
-    if [ -f "$RECENT_CONNECTIONS_FILE" ]; then
-        rm -f "$RECENT_CONNECTIONS_FILE"
-    fi
-    
-    # Parser l'historique complet au démarrage (avec compteur)
-    echo "📜 Parsing de l'historique complet..."
-    
-    local temp_file=$(mktemp)
-    trap "rm -f '$temp_file'" EXIT INT TERM
-    
-    sudo journalctl -u "$SERVICE_NAME" -o cat 2>/dev/null | grep "ACCEPT" > "$temp_file"
-    local total_lines=$(wc -l < "$temp_file" 2>/dev/null || echo "0")
-    
-    if [ "$total_lines" -gt 0 ]; then
-        echo "📊 $total_lines lignes à parser..."
-        local count=0
-        
+    # Parser l'historique complet au démarrage
+    echo "📜 Parsing de l'historique complet d'abord..."
+    sudo journalctl -u "$SERVICE_NAME" -o cat -n 0 2>/dev/null | \
+        grep "ACCEPT" | \
         while IFS= read -r line; do
             echo "$line" | "$PARSER_SCRIPT" 2>/dev/null
-            count=$((count + 1))
-            # Afficher la progression toutes les 50 lignes ou toutes les lignes si < 50
-            if [ "$total_lines" -le 50 ] || [ $((count % 50)) -eq 0 ] || [ "$count" -eq "$total_lines" ]; then
-                local percent=$((count * 100 / total_lines))
-                printf "\r⏳ Parsing... %d/%d lignes (%d%%)" "$count" "$total_lines" "$percent"
-            fi
-        done < "$temp_file"
-        
-        echo ""  # Nouvelle ligne après la progression
-        echo "✅ $count lignes parsées"
-    else
-        echo "ℹ️  Aucune ligne à parser dans l'historique"
-    fi
-    
-    trap - EXIT INT TERM
-    rm -f "$temp_file"
+        done
     
     echo "✅ Historique parsé, écoute des nouvelles connexions..."
     
-    # Lancer journalctl en daemon (arrière-plan) pour suivre les logs en temps réel
-    nohup bash -c "sudo journalctl -u \"$SERVICE_NAME\" -f -o cat --no-pager 2>/dev/null | while IFS= read -r line; do
-        if echo \"\$line\" | grep -q \"ACCEPT\"; then
-            echo \"\$line\" | \"$PARSER_SCRIPT\" 2>/dev/null
+    # Lancer journalctl en arrière-plan
+    ( sudo journalctl -u "$SERVICE_NAME" -f -n 0 -o cat --no-pager 2>/dev/null | while IFS= read -r line; do
+        if echo "$line" | grep -q "ACCEPT"; then
+            echo "$line" | "$PARSER_SCRIPT" 2>/dev/null
         fi
-    done" > /dev/null 2>&1 &
+    done ) &
     
     local monitor_pid=$!
     
     # Attendre un peu pour que journalctl démarre
-    sleep 2
+    sleep 1
     
     # Trouver le PID réel de journalctl
     local jpid=$(find_journalctl_pid)
     if [ -z "$jpid" ]; then
-        # Si pas trouvé, utiliser le PID du processus
+        # Si pas trouvé, utiliser le PID du pipe
         jpid=$monitor_pid
     fi
     
@@ -173,7 +103,7 @@ start_monitor() {
     echo "$jpid" > "$PID_FILE"
     echo "$jpid" > "$LOCK_FILE"
     
-    echo "✅ Monitoring démarré en arrière-plan (PID: $jpid)"
+    echo "✅ Monitoring démarré (PID: $jpid)"
 }
 
 # Fonction pour arrêter
