@@ -103,6 +103,18 @@ if [ -n "$existing_jpid" ]; then
     
     echo "🚀 Démarrage du monitoring..."
     
+    # Charger toutes les connexions existantes dans le cache (pour éviter les doublons)
+    LOG_FILE="$SCRIPT_DIR/../data/logs/connections.csv"
+    RECENT_CONNECTIONS_FILE="$SCRIPT_DIR/../data/cache/recent_connections.txt"
+    if [ -f "$LOG_FILE" ] && [ -s "$LOG_FILE" ]; then
+        echo "📋 Chargement des connexions existantes dans le cache..."
+        mkdir -p "$(dirname "$RECENT_CONNECTIONS_FILE")"
+        # Extraire toutes les IP:port du fichier et les mettre dans le cache
+        tail -n +2 "$LOG_FILE" 2>/dev/null | awk -F',' '{print $2":"$3}' | sort -u > "$RECENT_CONNECTIONS_FILE" 2>/dev/null || true
+        local cached_count=$(wc -l < "$RECENT_CONNECTIONS_FILE" 2>/dev/null || echo "0")
+        echo "   ✅ $cached_count connexions chargées dans le cache"
+    fi
+    
     # Parser l'historique complet au démarrage (pour éviter les doublons)
     echo "📜 Parsing de l'historique complet..."
     
@@ -128,6 +140,17 @@ if [ -n "$existing_jpid" ]; then
         
         echo ""  # Nouvelle ligne après la progression
         echo "✅ $count lignes parsées"
+        
+        # Nettoyer le cache pour garder seulement les connexions récentes (éviter que ça devienne trop gros)
+        if [ -f "$RECENT_CONNECTIONS_FILE" ]; then
+            local cache_lines=$(wc -l < "$RECENT_CONNECTIONS_FILE" 2>/dev/null || echo "0")
+            if [ "$cache_lines" -gt 1000 ]; then
+                echo "🧹 Nettoyage du cache (garder les 1000 dernières connexions)..."
+                tail -n 1000 "$RECENT_CONNECTIONS_FILE" > "${RECENT_CONNECTIONS_FILE}.tmp" 2>/dev/null
+                mv "${RECENT_CONNECTIONS_FILE}.tmp" "$RECENT_CONNECTIONS_FILE" 2>/dev/null || true
+                echo "   ✅ Cache nettoyé"
+            fi
+        fi
     else
         echo "ℹ️  Aucune ligne à parser dans l'historique"
     fi
