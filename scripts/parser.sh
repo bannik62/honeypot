@@ -46,9 +46,6 @@ fi
 
 LOG_FILE="$DATA_DIR/logs/connections.csv"
 CACHE_FILE="$DATA_DIR/cache/geoip-cache.json"
-# Cache en mémoire pour les dernières connexions (évite de lire tout le fichier)
-RECENT_CONNECTIONS_FILE="$DATA_DIR/cache/recent_connections.txt"
-RECENT_CONNECTIONS_MAX=1000  # Garder les 1000 dernières en mémoire
 
 # Créer les répertoires si nécessaire (mode compatible)
 if [ "$USE_COMMON_LIB" = true ]; then
@@ -58,11 +55,6 @@ if [ "$USE_COMMON_LIB" = true ]; then
     init_logging "parser" 2>/dev/null || true
 else
     mkdir -p "$(dirname "$LOG_FILE")" "$(dirname "$CACHE_FILE")"
-fi
-
-# Initialiser le cache des connexions récentes
-if [ ! -f "$RECENT_CONNECTIONS_FILE" ]; then
-    touch "$RECENT_CONNECTIONS_FILE"
 fi
 
 # Rotation du fichier CSV si trop gros (50MB) - mode compatible
@@ -180,35 +172,15 @@ parse_line() {
         fi
 
         # Vérifier si cette connexion existe déjà (éviter doublons)
-        # Utiliser un cache en fichier d'abord (beaucoup plus rapide que grep sur tout le fichier)
-        local connection_key="${ip}:${port}"
-        
-        # Vérifier dans le cache des connexions récentes
-        if [ -f "$RECENT_CONNECTIONS_FILE" ] && grep -qFx "$connection_key" "$RECENT_CONNECTIONS_FILE" 2>/dev/null; then
-            return 0  # Déjà vu récemment, skip
-        fi
-        
-        # Si pas dans le cache, vérifier seulement les dernières lignes (optimisation)
-        # Au lieu de lire tout le fichier, on lit seulement les 1000 dernières lignes
+        # Vérifier seulement les 1000 dernières lignes pour l'optimisation
         if [ -f "$LOG_FILE" ] && [ -s "$LOG_FILE" ]; then
             if tail -n 1000 "$LOG_FILE" 2>/dev/null | grep -q ",$ip,$port,"; then
-                # Ajouter au cache pour éviter de re-vérifier
-                echo "$connection_key" >> "$RECENT_CONNECTIONS_FILE"
-                # Limiter la taille du cache (garder seulement les N dernières lignes)
-                local cache_lines=$(wc -l < "$RECENT_CONNECTIONS_FILE" 2>/dev/null || echo 0)
-                if [ "$cache_lines" -gt $RECENT_CONNECTIONS_MAX ]; then
-                    tail -n $RECENT_CONNECTIONS_MAX "$RECENT_CONNECTIONS_FILE" > "${RECENT_CONNECTIONS_FILE}.tmp" 2>/dev/null
-                    mv "${RECENT_CONNECTIONS_FILE}.tmp" "$RECENT_CONNECTIONS_FILE" 2>/dev/null || true
-                fi
                 return 0  # Déjà enregistré, skip
             fi
         fi
 
         timestamp=$(date '+%Y-%m-%d %H:%M:%S')
         country=$(geolocate_ip "$ip")
-
-        # Ajouter au cache
-        echo "$connection_key" >> "$RECENT_CONNECTIONS_FILE"
 
         # Écrire dans le CSV
         echo "$timestamp,$ip,$port,$country" >> "$LOG_FILE"
@@ -224,11 +196,6 @@ parse_line() {
                 if [ "$FILE_SIZE" -gt 52428800 ]; then  # 50MB
                     mv "$LOG_FILE" "${LOG_FILE}.$(date +%Y%m%d_%H%M%S).bak" 2>/dev/null || true
                 fi
-            fi
-            # Nettoyer le cache des connexions récentes aussi
-            if [ -f "$RECENT_CONNECTIONS_FILE" ]; then
-                tail -n 500 "$RECENT_CONNECTIONS_FILE" > "${RECENT_CONNECTIONS_FILE}.tmp" 2>/dev/null
-                mv "${RECENT_CONNECTIONS_FILE}.tmp" "$RECENT_CONNECTIONS_FILE" 2>/dev/null || true
             fi
         fi
         

@@ -67,16 +67,6 @@ if [ -f "$DATA_DIR/cache/geoip-cache.json" ]; then
     fi
 fi
 
-# 5. Nettoyer le cache des connexions récentes (garder max 500 lignes)
-if [ -f "$DATA_DIR/cache/recent_connections.txt" ]; then
-    CACHE_LINES=$(wc -l < "$DATA_DIR/cache/recent_connections.txt" 2>/dev/null || echo 0)
-    if [ "$CACHE_LINES" -gt 1000 ]; then
-        log_info "Réduction du cache des connexions récentes ($CACHE_LINES lignes)..."
-        tail -n 500 "$DATA_DIR/cache/recent_connections.txt" > "${DATA_DIR}/cache/recent_connections.txt.tmp" 2>/dev/null
-        mv "${DATA_DIR}/cache/recent_connections.txt.tmp" "$DATA_DIR/cache/recent_connections.txt" 2>/dev/null
-        log_info "✅ Cache des connexions réduit"
-    fi
-fi
 
 echo ""
 echo "✅ Nettoyage terminé !"
