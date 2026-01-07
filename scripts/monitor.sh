@@ -105,7 +105,7 @@ if [ -n "$existing_jpid" ]; then
     
     # Parser l'historique complet au démarrage (pour éviter les doublons)
     echo "📜 Parsing de l'historique complet..."
-    sudo journalctl -u "$SERVICE_NAME" -o cat -n 0 2>/dev/null | grep "ACCEPT" | "$PARSER_SCRIPT" 2>/dev/null
+    sudo journalctl -u "$SERVICE_NAME" -o cat 2>/dev/null | grep "ACCEPT" | "$PARSER_SCRIPT" 2>/dev/null
     echo "✅ Historique parsé"
     
     # Lancer journalctl en daemon (arrière-plan) pour suivre les logs en temps réel
