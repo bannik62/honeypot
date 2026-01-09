@@ -74,3 +74,15 @@ fi
 log "========================================="
 log "Tous les scans sont terminés"
 log "========================================="
+
+# 5. Nettoyage du cache et des anciennes données
+log "5/5 - Nettoyage du cache et des anciennes données..."
+if [ -f "$SCRIPT_DIR/cleanup-old-data.sh" ]; then
+    if "$SCRIPT_DIR/cleanup-old-data.sh" >> "$LOG_DIR/run-all-scans.log" 2>&1; then
+        log "✅ Nettoyage terminé"
+    else
+        log "⚠️  Erreur lors du nettoyage (non bloquant)"
+    fi
+else
+    log "⚠️  Script cleanup-old-data.sh non trouvé"
+fi

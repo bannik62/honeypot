@@ -4,8 +4,19 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_FILE="$SCRIPT_DIR/../config/config"
-PID_FILE="/tmp/honeypot-monitor.pid"
-LOCK_FILE="/tmp/honeypot-monitor.lock"
+
+# Utiliser un répertoire accessible à l'utilisateur au lieu de /tmp
+if [ -f "$CONFIG_FILE" ]; then
+    source "$CONFIG_FILE"
+else
+    DATA_DIR="$SCRIPT_DIR/../data"
+    SERVICE_NAME="endlessh"
+fi
+
+PID_DIR="${DATA_DIR}/cache"
+mkdir -p "$PID_DIR" 2>/dev/null || PID_DIR="/tmp"
+PID_FILE="$PID_DIR/honeypot-monitor.pid"
+LOCK_FILE="$PID_DIR/honeypot-monitor.lock"
 
 if [ -f "$CONFIG_FILE" ]; then
     source "$CONFIG_FILE"
@@ -90,34 +101,30 @@ start_monitor() {
     # Parser l'historique complet au démarrage
     echo "📜 Parsing de l'historique complet d'abord..."
     
-    local temp_file=$(mktemp)
-    trap "rm -f '$temp_file'" EXIT INT TERM
-    
-    sudo journalctl -u "$SERVICE_NAME" -o cat --no-pager 2>/dev/null | grep "ACCEPT" > "$temp_file"
-    local total_lines=$(wc -l < "$temp_file" 2>/dev/null || echo "0")
+    # Compter d'abord le total de lignes
+    local total_lines=$(sudo journalctl -u "$SERVICE_NAME" -o cat --no-pager 2>/dev/null | grep -c "ACCEPT" || echo "0")
     
     if [ "$total_lines" -gt 0 ]; then
         echo "📊 $total_lines lignes à parser..."
         local count=0
         
+        # Parser directement depuis journalctl sans fichier temporaire
+        # Utiliser un process substitution pour éviter le sous-shell
         while IFS= read -r line; do
             echo "$line" | "$PARSER_SCRIPT" 2>/dev/null
             count=$((count + 1))
             # Afficher la progression toutes les 50 lignes ou toutes les lignes si < 50
             if [ "$total_lines" -le 50 ] || [ $((count % 50)) -eq 0 ] || [ "$count" -eq "$total_lines" ]; then
                 local percent=$((count * 100 / total_lines))
-                printf "\r⏳ Parsing... %d/%d lignes (%d%%)" "$count" "$total_lines" "$percent"
+                printf "\r⏳ Parsing... %d/%d lignes (%d%%)" "$count" "$total_lines" "$percent" >&2
             fi
-        done < "$temp_file"
+        done < <(sudo journalctl -u "$SERVICE_NAME" -o cat --no-pager 2>/dev/null | grep "ACCEPT")
         
         echo ""  # Nouvelle ligne après la progression
         echo "✅ $count lignes parsées"
     else
         echo "⚠️  Aucune ligne à parser"
     fi
-    
-    rm -f "$temp_file"
-    trap - EXIT INT TERM
     
     echo "✅ Historique parsé, écoute des nouvelles connexions..."
     
