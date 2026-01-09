@@ -219,7 +219,7 @@ honeypot/
 │   ├── setup-auto-scan.sh      # Configure les scans automatiques
 │   └── cleanup-old-data.sh     # Nettoyage automatique
 ├── lib/
-│   └── common.sh               # Fonctions partagées (logging, config, validation)
+│   └── common.sh               # Bibliothèque commune : fonctions partagées (logging, config, validation, SQL escaping, nettoyage fichiers temporaires)
 ├── config/
 │   ├── config.example          # Exemple de configuration
 │   └── config                  # Configuration personnalisée
