@@ -43,10 +43,11 @@ if ! [[ "$AUTO_SCAN_HOUR" =~ ^[0-9]+$ ]] || [ "$AUTO_SCAN_HOUR" -lt 1 ] || [ "$A
 fi
 
 # Construire la commande cron
+# SCRIPT_DIR_ABS pointe déjà vers le répertoire scripts/, donc pas besoin de /scripts/
 if [ "$AUTO_SCAN_HOUR" = "1" ]; then
-    CRON_COMMAND="0 * * * * $SCRIPT_DIR_ABS/scripts/run-all-scans.sh"
+    CRON_COMMAND="0 * * * * $SCRIPT_DIR_ABS/run-all-scans.sh"
 else
-    CRON_COMMAND="0 */$AUTO_SCAN_HOUR * * * $SCRIPT_DIR_ABS/scripts/run-all-scans.sh"
+    CRON_COMMAND="0 */$AUTO_SCAN_HOUR * * * $SCRIPT_DIR_ABS/run-all-scans.sh"
 fi
 
 # Supprimer l'ancien cron s'il existe
