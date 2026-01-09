@@ -44,29 +44,29 @@ else
     fi
 fi
 
-LOG_FILE="$DATA_DIR/logs/connections.csv"
+CSV_FILE="$DATA_DIR/logs/connections.csv"
 CACHE_FILE="$DATA_DIR/cache/geoip-cache.json"
 
 # Créer les répertoires si nécessaire (mode compatible)
 if [ "$USE_COMMON_LIB" = true ]; then
-    safe_mkdir "$(dirname "$LOG_FILE")"
+    safe_mkdir "$(dirname "$CSV_FILE")"
     safe_mkdir "$(dirname "$CACHE_FILE")"
-    # Initialiser le logging
+    # Initialiser le logging (après avoir défini CSV_FILE pour éviter le conflit)
     init_logging "parser" 2>/dev/null || true
 else
-    mkdir -p "$(dirname "$LOG_FILE")" "$(dirname "$CACHE_FILE")"
+    mkdir -p "$(dirname "$CSV_FILE")" "$(dirname "$CACHE_FILE")"
 fi
 
 # Rotation du fichier CSV si trop gros (50MB) - mode compatible
 if [ "$USE_COMMON_LIB" = true ] && command -v rotate_file_if_needed &> /dev/null; then
-    rotate_file_if_needed "$LOG_FILE" 50 2>/dev/null || true
-    cleanup_old_backups "$LOG_FILE" 3 2>/dev/null || true
+    rotate_file_if_needed "$CSV_FILE" 50 2>/dev/null || true
+    cleanup_old_backups "$CSV_FILE" 3 2>/dev/null || true
 else
     # Fallback : rotation manuelle si fichier > 50MB
-    if [ -f "$LOG_FILE" ]; then
-        FILE_SIZE=$(stat -f%z "$LOG_FILE" 2>/dev/null || stat -c%s "$LOG_FILE" 2>/dev/null || echo 0)
+    if [ -f "$CSV_FILE" ]; then
+        FILE_SIZE=$(stat -f%z "$CSV_FILE" 2>/dev/null || stat -c%s "$CSV_FILE" 2>/dev/null || echo 0)
         if [ "$FILE_SIZE" -gt 52428800 ]; then  # 50MB
-            mv "$LOG_FILE" "${LOG_FILE}.$(date +%Y%m%d_%H%M%S).bak" 2>/dev/null || true
+            mv "$CSV_FILE" "${CSV_FILE}.$(date +%Y%m%d_%H%M%S).bak" 2>/dev/null || true
         fi
     fi
 fi
@@ -147,7 +147,7 @@ parse_logs() {
             country=$(geolocate_ip "$ip")
             
             # Écrire dans le CSV
-            echo "$timestamp,$ip,$port,$country" >> "$LOG_FILE"
+            echo "$timestamp,$ip,$port,$country" >> "$CSV_FILE"
         fi
     done
 }
@@ -174,15 +174,15 @@ parse_line() {
         # Vérifier si cette connexion existe déjà (éviter doublons)
         # Vérifier les dernières lignes pour l'optimisation (ajusté dynamiquement)
         # Utiliser 50% du fichier ou 5000 lignes max pour équilibrer performance/précision
-        if [ -f "$LOG_FILE" ] && [ -s "$LOG_FILE" ]; then
-            local total_lines=$(wc -l < "$LOG_FILE" 2>/dev/null || echo 0)
+        if [ -f "$CSV_FILE" ] && [ -s "$CSV_FILE" ]; then
+            local total_lines=$(wc -l < "$CSV_FILE" 2>/dev/null || echo 0)
             local check_lines=$((total_lines / 2))
             if [ "$check_lines" -gt 5000 ]; then
                 check_lines=5000
             elif [ "$check_lines" -lt 1000 ]; then
                 check_lines=1000
             fi
-            if tail -n "$check_lines" "$LOG_FILE" 2>/dev/null | grep -q ",$ip,$port,"; then
+            if tail -n "$check_lines" "$CSV_FILE" 2>/dev/null | grep -q ",$ip,$port,"; then
                 return 0  # Déjà enregistré, skip
             fi
         fi
@@ -191,18 +191,18 @@ parse_line() {
         country=$(geolocate_ip "$ip")
 
         # Écrire dans le CSV
-        echo "$timestamp,$ip,$port,$country" >> "$LOG_FILE"
+        echo "$timestamp,$ip,$port,$country" >> "$CSV_FILE"
         
         # Rotation périodique (toutes les 1000 connexions environ)
-        local line_count=$(wc -l < "$LOG_FILE" 2>/dev/null || echo 0)
+        local line_count=$(wc -l < "$CSV_FILE" 2>/dev/null || echo 0)
         if [ $((line_count % 1000)) -eq 0 ] && [ "$line_count" -gt 0 ]; then
             if [ "$USE_COMMON_LIB" = true ] && command -v rotate_file_if_needed &> /dev/null; then
-                rotate_file_if_needed "$LOG_FILE" 50 2>/dev/null || true
+                rotate_file_if_needed "$CSV_FILE" 50 2>/dev/null || true
             else
                 # Fallback : rotation manuelle
-                FILE_SIZE=$(stat -f%z "$LOG_FILE" 2>/dev/null || stat -c%s "$LOG_FILE" 2>/dev/null || echo 0)
+                FILE_SIZE=$(stat -f%z "$CSV_FILE" 2>/dev/null || stat -c%s "$CSV_FILE" 2>/dev/null || echo 0)
                 if [ "$FILE_SIZE" -gt 52428800 ]; then  # 50MB
-                    mv "$LOG_FILE" "${LOG_FILE}.$(date +%Y%m%d_%H%M%S).bak" 2>/dev/null || true
+                    mv "$CSV_FILE" "${CSV_FILE}.$(date +%Y%m%d_%H%M%S).bak" 2>/dev/null || true
                 fi
             fi
         fi
