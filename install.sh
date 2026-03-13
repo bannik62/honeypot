@@ -16,7 +16,7 @@ echo ""
 
 # Demander confirmation
 echo "Cette installation va :"
-echo "  • installer les dépendances (geoip, jq, chromium, nmap, nikto, sqlite3)"
+echo "  • installer les dépendances (geoip, jq, google-chrome, nmap, nikto, sqlite3)"
 echo "  • Créer la structure de répertoires"
 echo "  • Ajouter des alias dans ~/.bashrc"
 echo ""
@@ -52,7 +52,18 @@ fi
 # Installer les dépendances
 echo "📦 Installation des dépendances..."
 apt-get update -qq
-apt-get install -y geoip-bin geoip-database jq chromium-browser nmap nikto sqlite3 > /dev/null 2>&1
+apt-get install -y geoip-bin geoip-database jq nmap nikto sqlite3 > /dev/null 2>&1
+
+# Installer Google Chrome (non-snap) si pas déjà présent
+if ! command -v google-chrome &> /dev/null && ! command -v google-chrome-stable &> /dev/null; then
+    echo "🌐 Installation de Google Chrome..."
+    CHROME_DEB="/tmp/google-chrome-stable.deb"
+    wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -O "$CHROME_DEB"
+    apt-get install -y "$CHROME_DEB" > /dev/null 2>&1
+    rm -f "$CHROME_DEB"
+else
+    echo "✅ Google Chrome déjà installé"
+fi
 
 # Créer la structure de répertoires
 echo "📁 Création de la structure..."
