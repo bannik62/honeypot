@@ -129,31 +129,44 @@ start_monitor() {
     # Parser l'historique depuis le dernier timestamp (ou tout si premier démarrage)
     if [ "$marker_exists" = true ] && [ -n "$since_timestamp" ]; then
         echo "📜 Parsing depuis le dernier checkpoint (${since_timestamp})..."
-        # Utiliser --since pour parser seulement depuis ce timestamp
-        # Format attendu: "YYYY-MM-DD HH:MM:SS" ou "YYYY-MM-DD HH:MM:SS" converti en format journalctl
-        local journalctl_since="$since_timestamp"
-        # Compter les lignes depuis ce timestamp
+        # Convertir le timestamp au format ISO accepté par journalctl
+        # Format CSV: "YYYY-MM-DD HH:MM:SS" -> Format ISO: "YYYY-MM-DDTHH:MM:SS" ou "YYYY-MM-DDTHH:MM:SS+00:00"
+        # journalctl préfère le format ISO avec T
+        
+        # Convertir au format ISO (remplacer espace par T)
+        local journalctl_since=$(echo "$since_timestamp" | sed 's/ /T/')
+        
+        # Compter les lignes ACCEPT depuis ce timestamp
+        # Utiliser --since avec le format ISO
         local total_lines=$(sudo journalctl -u "$SERVICE_NAME" -o cat --since "$journalctl_since" --no-pager 2>/dev/null | grep -c "ACCEPT" || echo "0")
+        
+        # Si aucune ligne trouvée avec le format ISO, essayer le format original
+        if [ "$total_lines" -eq 0 ]; then
+            journalctl_since="$since_timestamp"
+            total_lines=$(sudo journalctl -u "$SERVICE_NAME" -o cat --since "$journalctl_since" --no-pager 2>/dev/null | grep -c "ACCEPT" || echo "0")
+        fi
         
         if [ "$total_lines" -gt 0 ]; then
             echo "📊 $total_lines nouvelles lignes à parser..."
             local count=0
             
-            # Parser depuis le timestamp
+            # Parser toutes les lignes depuis le timestamp et filtrer ACCEPT
             while IFS= read -r line; do
-                echo "$line" | "$PARSER_SCRIPT" 2>/dev/null
-                count=$((count + 1))
-                # Afficher la progression toutes les 50 lignes ou toutes les lignes si < 50
-                if [ "$total_lines" -le 50 ] || [ $((count % 50)) -eq 0 ] || [ "$count" -eq "$total_lines" ]; then
-                    local percent=$((count * 100 / total_lines))
-                    printf "\r⏳ Parsing... %d/%d lignes (%d%%)" "$count" "$total_lines" "$percent" >&2
+                if echo "$line" | grep -q "ACCEPT"; then
+                    echo "$line" | "$PARSER_SCRIPT" 2>/dev/null
+                    count=$((count + 1))
+                    # Afficher la progression toutes les 50 lignes ou toutes les lignes si < 50
+                    if [ "$total_lines" -le 50 ] || [ $((count % 50)) -eq 0 ] || [ "$count" -eq "$total_lines" ]; then
+                        local percent=$((count * 100 / total_lines))
+                        printf "\r⏳ Parsing... %d/%d lignes (%d%%)" "$count" "$total_lines" "$percent" >&2
+                    fi
                 fi
-            done < <(sudo journalctl -u "$SERVICE_NAME" -o cat --since "$journalctl_since" --no-pager 2>/dev/null | grep "ACCEPT")
+            done < <(sudo journalctl -u "$SERVICE_NAME" -o cat --since "$journalctl_since" --no-pager 2>/dev/null)
             
             echo ""  # Nouvelle ligne après la progression
             echo "✅ $count nouvelles lignes parsées"
         else
-            echo "✅ Aucune nouvelle ligne depuis le dernier checkpoint"
+            echo "✅ Aucune nouvelle ligne depuis le dernier checkpoint (format: $journalctl_since)"
         fi
     else
         # Premier démarrage : parser tout l'historique

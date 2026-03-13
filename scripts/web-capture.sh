@@ -15,10 +15,20 @@ cleanup_temp_files() {
 
 trap cleanup_temp_files EXIT INT TERM
 
+# Nettoyage du cache temporaire de Chromium snap après chaque capture
+cleanup_chromium_tmp() {
+    find /tmp/snap-private-tmp/snap.chromium -mindepth 2 -maxdepth 3 \
+        -type d -name "tmp" -exec rm -rf {}/* \; 2>/dev/null
+}
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Vérifier les dépendances
-if ! command -v chromium-browser &> /dev/null && ! command -v chromium &> /dev/null; then
+# Vérifier les dépendances et détecter le bon binaire
+if command -v chromium-browser &> /dev/null; then
+    CHROMIUM_BIN="chromium-browser"
+elif command -v chromium &> /dev/null; then
+    CHROMIUM_BIN="chromium"
+else
     echo "❌ Erreur: chromium-browser ou chromium n'est pas installé" >&2
     echo "💡 Installez-le avec: sudo apt install chromium-browser" >&2
     exit 1
@@ -34,12 +44,12 @@ else
     DATA_DIR="$SCRIPT_DIR/../data"
 fi
 
-if [ -z "$CAPTURE_PARALLEL" ] || [ "$CAPTURE_PARALLEL" -lt 1 ]; then
+if [ -z "$CAPTURE_PARALLEL" ] || ! [[ "$CAPTURE_PARALLEL" =~ ^[0-9]+$ ]] || [ "$CAPTURE_PARALLEL" -lt 1 ]; then
     CAPTURE_PARALLEL=1
 fi
 
 CSV_INPUT="$DATA_DIR/logs/web_interfaces.csv"
-OUTPUT_DIR="$DATA_DIR/screenshots"
+OUTPUT_DIR="$DATA_DIR/screenshotAndLog"
 TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
 
 # Créer le répertoire
@@ -83,14 +93,16 @@ capture_one_url() {
     fi
     
     # Capture avec chromium headless
-    timeout 15 chromium-browser --headless --disable-gpu --no-sandbox --disable-web-security --ignore-certificate-errors --ignore-ssl-errors --window-size=1920,1080 --screenshot="$filename" "$url" 2>/dev/null
+    timeout 15 "$CHROMIUM_BIN" --headless --disable-gpu --no-sandbox --disable-web-security --ignore-certificate-errors --ignore-ssl-errors --window-size=1920,1080 --screenshot="$filename" "$url" 2>/dev/null
+    cleanup_chromium_tmp
     
     # Si HTTPS échoue (port 443/8443), réessayer en HTTP
     if [ ! -f "$filename" ] || [ ! -s "$filename" ]; then
         if [ "$port" = "443" ] || [ "$port" = "8443" ]; then
             http_url="http://${ip}:${port}"
             echo "  ⚠️  HTTPS échoué, tentative en HTTP: $http_url"
-            timeout 15 chromium-browser --headless --disable-gpu --no-sandbox --window-size=1920,1080 --screenshot="$filename" "$http_url" 2>/dev/null
+            timeout 15 "$CHROMIUM_BIN" --headless --disable-gpu --no-sandbox --window-size=1920,1080 --screenshot="$filename" "$http_url" 2>/dev/null
+            cleanup_chromium_tmp
         fi
     fi
     
@@ -113,8 +125,8 @@ capture_one_url() {
     fi
 }
 
-export -f capture_one_url
-export OUTPUT_DIR TIMESTAMP
+export -f capture_one_url cleanup_chromium_tmp
+export OUTPUT_DIR TIMESTAMP CHROMIUM_BIN
 
 # Créer une liste temporaire des URLs à capturer
 temp_file=$(mktemp)
@@ -144,10 +156,11 @@ if [ "$CAPTURE_PARALLEL" -eq 1 ]; then
     done < "$temp_file"
 else
     # Mode parallèle avec xargs
-    cat "$temp_file" | xargs -P "$CAPTURE_PARALLEL" -I {} bash -c '
-        IFS="|" read -r timestamp ip port protocol url <<< "$1"
-        capture_one_url "$timestamp" "$ip" "$port" "$protocol" "$url"
-    ' _ {}
+    while IFS='|' read -r timestamp ip port protocol url; do
+        printf '%s\0%s\0%s\0%s\0%s\0' "$timestamp" "$ip" "$port" "$protocol" "$url"
+    done < "$temp_file" | xargs -0 -P "$CAPTURE_PARALLEL" -n 5 bash -c '
+        capture_one_url "$1" "$2" "$3" "$4" "$5"
+    ' _
 fi
 
 rm -f "$temp_file"

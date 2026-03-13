@@ -32,7 +32,7 @@ if [ -z "$NMAP_PARALLEL" ] || [ "$NMAP_PARALLEL" -lt 1 ]; then
 fi
 
 CSV_INPUT="$DATA_DIR/logs/connections.csv"
-OUTPUT_DIR="$DATA_DIR/screenshots"
+OUTPUT_DIR="$DATA_DIR/screenshotAndLog"
 
 if [ ! -f "$CSV_INPUT" ]; then
     echo "❌ Fichier connections.csv non trouvé"

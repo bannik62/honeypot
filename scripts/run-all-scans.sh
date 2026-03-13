@@ -42,9 +42,9 @@ else
     exit 1
 fi
 
-# 2. capture-web (nikto-capture)
+# 2. capture-web (web-capture)
 log "2/4 - Démarrage de capture-web..."
-if "$SCRIPT_DIR/nikto-capture.sh" >> "$LOG_DIR/run-all-scans.log" 2>&1; then
+if "$SCRIPT_DIR/web-capture.sh" >> "$LOG_DIR/run-all-scans.log" 2>&1; then
     log "✅ capture-web terminé"
 sleep 30
 else

@@ -121,7 +121,7 @@ if [ -z "$ips_to_scan" ] || [ -z "$(echo "$ips_to_scan" | grep -v '^$')" ]; then
 
     echo "✅ Toutes les IPs ont déjà été scannées !"
 
-    echo "💡 Utilisez 'capture-web' pour prendre des screenshots"
+    echo "💡 Utilisez 'capture-web' pour prendre des screenshotAndLog"
 
     exit 0
 
@@ -245,6 +245,6 @@ echo ""
 
 echo "✅ Scan terminé ! Résultats dans: $CSV_OUTPUT"
 
-echo "💡 Utilisez 'capture-web' pour prendre des screenshots"
+echo "💡 Utilisez 'capture-web' pour prendre des screenshotAndLog"
 
 tty -s && stty sane || true

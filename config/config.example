@@ -37,7 +37,7 @@ NIKTO_TUNING="1,2,3,5,6,7,8"
 NMAP_PARALLEL=10
 
 
-# Nombre de captures en parallèle pour capture-web (nikto-capture.sh alias capture-web)
+# Nombre de captures en parallèle pour capture-web (web-capture.sh alias capture-web)
 # Contrôle le nombre de captures d'écran simultanées avec chromium-browser
 # min: 1, recommandé: 3-5 selon les ressources du serveur
 CAPTURE_PARALLEL=5

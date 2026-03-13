@@ -138,7 +138,7 @@ if [ -f "$BASHRC" ]; then
         ALIASES_ADDED=true
     fi
     if ! grep -q "alias capture-web=" "$BASHRC" 2>/dev/null; then
-        echo "alias capture-web='cd \"$SCRIPT_DIR_ABS\" && ./scripts/nikto-capture.sh'" >> "$BASHRC"
+        echo "alias capture-web='cd \"$SCRIPT_DIR_ABS\" && ./scripts/web-capture.sh'" >> "$BASHRC"
         ALIASES_ADDED=true
     fi
     if ! grep -q "alias vuln-scan=" "$BASHRC" 2>/dev/null; then
@@ -186,7 +186,7 @@ echo "   • honeypot-stats     → Afficher les statistiques"
 echo "   • honeypot-dashboard → Dashboard en temps réel"
 echo "   • honeypot-monitor   → Démarrer/arrêter le monitoring (start|stop|status|restart)"
 echo "   • scan-web           → Scanner les ports web des IPs"
-echo "   • capture-web        → Capturer les screenshots des interfaces web"
+echo "   • capture-web        → Capturer les screenshotAndLog des interfaces web"
 echo "   • vuln-scan          → Scanner les vulnérabilités avec nmap"
 echo "   • honeypot-dig       → Requêtes DNS/WHOIS sur les IPs"
 echo "   • honeypot-search-nikto → Recherche dans les rapports Nikto"
@@ -208,7 +208,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 echo "Voulez-vous activer la mise à jour automatique des scans ?"
 echo "  • scan-web (nmap-to-csv)"
-echo "  • capture-web (nikto-capture)"
+echo "  • capture-web (web-capture)"
 echo "  • honeypot-dig (dig-ip)"
 echo "  • vuln-scan"
 echo ""

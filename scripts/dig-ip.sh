@@ -36,7 +36,7 @@ if [ -z "$DIG_PARALLEL" ] || [ "$DIG_PARALLEL" -lt 1 ]; then
 fi
 
 CSV_FILE="$DATA_DIR/logs/web_interfaces.csv"
-OUTPUT_DIR="$DATA_DIR/screenshots"
+OUTPUT_DIR="$DATA_DIR/screenshotAndLog"
 
 # Fonction pour scanner une IP
 scan_ip() {

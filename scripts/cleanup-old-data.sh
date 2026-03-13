@@ -18,13 +18,13 @@ echo "🧹 Nettoyage des anciennes données..."
 echo ""
 
 # 1. Nettoyer les captures d'écran anciennes (> 30 jours)
-if [ -d "$DATA_DIR/screenshots" ]; then
-    OLD_SCREENSHOTS=$(find "$DATA_DIR/screenshots" -name "*.png" -type f -mtime +30 2>/dev/null | wc -l)
+if [ -d "$DATA_DIR/screenshotAndLog" ]; then
+    OLD_SCREENSHOTS=$(find "$DATA_DIR/screenshotAndLog" -name "*.png" -type f -mtime +30 2>/dev/null | wc -l)
     if [ "$OLD_SCREENSHOTS" -gt 0 ]; then
         log_info "Suppression de $OLD_SCREENSHOTS captures d'écran de plus de 30 jours..."
-        find "$DATA_DIR/screenshots" -name "*.png" -type f -mtime +30 -delete 2>/dev/null
+        find "$DATA_DIR/screenshotAndLog" -name "*.png" -type f -mtime +30 -delete 2>/dev/null
         # Supprimer les répertoires vides
-        find "$DATA_DIR/screenshots" -type d -empty -delete 2>/dev/null
+        find "$DATA_DIR/screenshotAndLog" -type d -empty -delete 2>/dev/null
         log_info "✅ Captures d'écran nettoyées"
     else
         log_info "Aucune capture d'écran ancienne à supprimer"
@@ -32,11 +32,11 @@ if [ -d "$DATA_DIR/screenshots" ]; then
 fi
 
 # 2. Nettoyer les rapports nmap anciens (> 60 jours)
-if [ -d "$DATA_DIR/screenshots" ]; then
-    OLD_NMAP=$(find "$DATA_DIR/screenshots" -name "*_nmap.txt" -type f -mtime +60 2>/dev/null | wc -l)
+if [ -d "$DATA_DIR/screenshotAndLog" ]; then
+    OLD_NMAP=$(find "$DATA_DIR/screenshotAndLog" -name "*_nmap.txt" -type f -mtime +60 2>/dev/null | wc -l)
     if [ "$OLD_NMAP" -gt 0 ]; then
         log_info "Suppression de $OLD_NMAP rapports nmap de plus de 60 jours..."
-        find "$DATA_DIR/screenshots" -name "*_nmap.txt" -type f -mtime +60 -delete 2>/dev/null
+        find "$DATA_DIR/screenshotAndLog" -name "*_nmap.txt" -type f -mtime +60 -delete 2>/dev/null
         log_info "✅ Rapports nmap nettoyés"
     fi
 fi

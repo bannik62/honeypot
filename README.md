@@ -195,7 +195,7 @@ honeypot/
 │   │   ├── run-all-scans.log   # Logs des scans automatiques
 │   │   ├── parser.log          # Logs du parser
 │   │   └── *.bak.gz            # Backups compressés (rotation automatique)
-│   ├── screenshots/             # Captures d'écran des interfaces web
+│   ├── screenshotAndLog/             # Captures d'écran des interfaces web
 │   │   ├── 192.168.1.100_80_20251222_120430.png
 │   │   ├── 192.168.1.100_80_20251222_120430.txt
 │   │   └── 192.168.1.100_80_20251222_120430_nikto.txt
@@ -210,7 +210,7 @@ honeypot/
 │   ├── stats.sh                # Statistiques rapides
 │   ├── dashboard.sh            # Dashboard temps réel
 │   ├── nmap-to-csv.sh          # Scan nmap → CSV interfaces web
-│   ├── nikto-capture.sh        # Capture d'écran + scan nikto
+│   ├── web-capture.sh          # Capture d'écran des interfaces web
 │   ├── vuln-scan.sh            # Scan de vulnérabilités avec nmap
 │   ├── dig-ip.sh               # Analyse DNS/WHOIS
 │   ├── parse-nikto.sh          # Parse les rapports nmap → SQLite
@@ -260,7 +260,7 @@ Les bots se connectent au port 22. Endlessh les piège et génère des logs `ACC
 - `capture-web` : lit `web_interfaces.csv`
 - Prend des captures PNG avec `chromium-browser --headless`
 - Scanne les vulnérabilités avec nikto (si installé)
-- Sauvegarde dans `data/screenshots/`
+- Sauvegarde dans `data/screenshotAndLog/`
 
 ### 5. Scan de vulnérabilités (optionnel)
 
@@ -437,7 +437,7 @@ Le dashboard affiche les stats en continu et montre immédiatement chaque nouvel
 
 ## 📸 Captures d'Écran
 
-Les captures sont sauvegardées dans `data/screenshots/` :
+Les captures sont sauvegardées dans `data/screenshotAndLog/` :
 - **Fichiers PNG** : captures d'écran des interfaces web (format : `{IP}_{PORT}_{TIMESTAMP}.png`)
 - **Fichiers .txt** : métadonnées (IP, port, URL, timestamp)
 - **Fichiers _nikto.txt** : rapports de vulnérabilités (si nikto est installé)

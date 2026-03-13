@@ -147,7 +147,7 @@ SQL
     fi
     
     # Afficher les domaines DNS associés
-    dns_file="$DATA_DIR/screenshots/$detail_ip/${detail_ip}_dns.txt"
+    dns_file="$DATA_DIR/screenshotAndLog/$detail_ip/${detail_ip}_dns.txt"
     if [ -f "$dns_file" ]; then
         echo ""
         echo "🌐 Domaines associés:"

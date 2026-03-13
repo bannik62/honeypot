@@ -31,7 +31,7 @@ else
 fi
 
 DB_FILE="$DATA_DIR/logs/nikto.db"
-SCREENSHOTS_DIR="$DATA_DIR/screenshots"
+SCREENSHOTS_DIR="$DATA_DIR/screenshotAndLog"
 
 # Créer la base de données et la table si nécessaire
 sqlite3 "$DB_FILE" << 'SQL'
