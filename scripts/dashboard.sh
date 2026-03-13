@@ -31,9 +31,10 @@ show_stats() {
         return
     fi
 
-    # Total
-    total=$(tail -n +2 "$LOG_FILE" 2>/dev/null | wc -l | tr -d ' ')
-    unique_ips=$(tail -n +2 "$LOG_FILE" 2>/dev/null | cut -d',' -f2 | sort -u | wc -l | tr -d ' ')
+    # Total (données uniquement, sans header ; grep -c évite le souci de dernière ligne sans \n)
+    data_lines=$(tail -n +2 "$LOG_FILE" 2>/dev/null | grep -c . || echo 0)
+    total=$data_lines
+    unique_ips=$(tail -n +2 "$LOG_FILE" 2>/dev/null | cut -d',' -f2 | sort -u | grep -c . || echo 0)
 
     # Dernière connexion
     if [ -f "$LOG_FILE" ] && [ "$total" -gt 0 ]; then
@@ -82,8 +83,8 @@ show_stats() {
 
         echo ""
         echo "🔥 DERNIÈRES 10 CONNEXIONS:"
-        tail -10 "$LOG_FILE" 2>/dev/null | while IFS=',' read -r timestamp ip port country; do
-            echo "  $timestamp - $ip ($country)"
+        tail -n +2 "$LOG_FILE" 2>/dev/null | tail -10 | while IFS=',' read -r timestamp ip port country; do
+            [ -n "$ip" ] && [[ "$ip" =~ ^[0-9.]+$ ]] && echo "  $timestamp - $ip ($country)"
         done
     fi
 
