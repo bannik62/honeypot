@@ -124,68 +124,40 @@ BASHRC="$USER_HOME/.bashrc"
 SCRIPT_DIR_ABS="$(cd "$SCRIPT_DIR" && pwd)"
 
 if [ -f "$BASHRC" ]; then
-    # Vérifier et ajouter chaque alias individuellement
-    ALIASES_ADDED=false
-    
+    # Supprimer les anciennes définitions honeypot pour toujours mettre à jour (bons noms de scripts)
+    sed -i.bak '/^alias honeypot-stats=/d' "$BASHRC" 2>/dev/null
+    sed -i.bak '/^alias honeypot-dashboard=/d' "$BASHRC" 2>/dev/null
+    sed -i.bak '/^alias honeypot-monitor=/d' "$BASHRC" 2>/dev/null
+    sed -i.bak '/^alias scan-web=/d' "$BASHRC" 2>/dev/null
+    sed -i.bak '/^alias capture-web=/d' "$BASHRC" 2>/dev/null
+    sed -i.bak '/^alias vuln-scan=/d' "$BASHRC" 2>/dev/null
+    sed -i.bak '/^alias honeypot-dig=/d' "$BASHRC" 2>/dev/null
+    sed -i.bak '/^alias honeypot-search-nikto=/d' "$BASHRC" 2>/dev/null
+    sed -i.bak '/^alias honeypot-logs=/d' "$BASHRC" 2>/dev/null
+    sed -i.bak '/^alias setup-auto-scan=/d' "$BASHRC" 2>/dev/null
+    sed -i.bak '/^alias count-ips=/d' "$BASHRC" 2>/dev/null
+    sed -i.bak '/^alias piegeAbot=/d' "$BASHRC" 2>/dev/null
+    rm -f "${BASHRC}.bak" 2>/dev/null
+
     if ! grep -q "# Honeypot Monitor Aliases" "$BASHRC" 2>/dev/null; then
         echo "" >> "$BASHRC"
         echo "# Honeypot Monitor Aliases" >> "$BASHRC"
     fi
-    
-    if ! grep -q "alias honeypot-stats=" "$BASHRC" 2>/dev/null; then
-        echo "alias honeypot-stats='cd \"$SCRIPT_DIR_ABS\" && ./scripts/stats.sh'" >> "$BASHRC"
-        ALIASES_ADDED=true
-    fi
-    if ! grep -q "alias honeypot-dashboard=" "$BASHRC" 2>/dev/null; then
-        echo "alias honeypot-dashboard='cd \"$SCRIPT_DIR_ABS\" && ./scripts/dashboard.sh'" >> "$BASHRC"
-        ALIASES_ADDED=true
-    fi
-    if ! grep -q "alias honeypot-monitor=" "$BASHRC" 2>/dev/null; then
-        echo "alias honeypot-monitor='cd \"$SCRIPT_DIR_ABS\" && ./scripts/monitor.sh'" >> "$BASHRC"
-        ALIASES_ADDED=true
-    fi
-    if ! grep -q "alias scan-web=" "$BASHRC" 2>/dev/null; then
-        echo "alias scan-web='cd \"$SCRIPT_DIR_ABS\" && ./scripts/nmap-to-csv.sh'" >> "$BASHRC"
-        ALIASES_ADDED=true
-    fi
-    if ! grep -q "alias capture-web=" "$BASHRC" 2>/dev/null; then
-        echo "alias capture-web='cd \"$SCRIPT_DIR_ABS\" && ./scripts/web-capture.sh'" >> "$BASHRC"
-        ALIASES_ADDED=true
-    fi
-    if ! grep -q "alias vuln-scan=" "$BASHRC" 2>/dev/null; then
-        echo "alias vuln-scan='cd \"$SCRIPT_DIR_ABS\" && ./scripts/vuln-scan.sh'" >> "$BASHRC"
-        ALIASES_ADDED=true
-    fi
-    if ! grep -q "alias honeypot-dig=" "$BASHRC" 2>/dev/null; then
-        echo "alias honeypot-dig='cd \"$SCRIPT_DIR_ABS\" && ./scripts/dig-ip.sh'" >> "$BASHRC"
-        ALIASES_ADDED=true
-    fi
-    if ! grep -q "alias honeypot-search-nikto=" "$BASHRC" 2>/dev/null; then
-        echo "alias honeypot-search-nikto='cd \"$SCRIPT_DIR_ABS\" && ./scripts/search-nikto.sh'" >> "$BASHRC"
-        ALIASES_ADDED=true
-    fi
-    if ! grep -q "alias honeypot-logs=" "$BASHRC" 2>/dev/null; then
-        echo "alias honeypot-logs='tail -n 50 -f \"$SCRIPT_DIR_ABS/data/logs/run-all-scans.log\"'" >> "$BASHRC"
-        ALIASES_ADDED=true
-    fi
-    if ! grep -q "alias setup-auto-scan=" "$BASHRC" 2>/dev/null; then
-        echo "alias setup-auto-scan='cd \"$SCRIPT_DIR_ABS\" && ./scripts/setup-auto-scan.sh'" >> "$BASHRC"
-        ALIASES_ADDED=true
-    fi
-    if ! grep -q "alias count-ips=" "$BASHRC" 2>/dev/null; then
-        echo "alias count-ips='echo \"📊 Journal endlessh (lignes ACCEPT):\" && sudo journalctl -u endlessh -o cat --no-pager 2>/dev/null | grep \"ACCEPT\" | grep -oE \"[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\" | sort -u | wc -l && echo \"📊 connections.csv:\" && tail -n +2 \"$SCRIPT_DIR_ABS/data/logs/connections.csv\" 2>/dev/null | cut -d\",\" -f2 | sort -u | wc -l && echo \"📊 Différence (manquantes dans connections.csv):\" && comm -23 <(sudo journalctl -u endlessh -o cat --no-pager 2>/dev/null | grep \"ACCEPT\" | grep -oE \"[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\" | sort -u) <(tail -n +2 \"$SCRIPT_DIR_ABS/data/logs/connections.csv\" 2>/dev/null | cut -d\",\" -f2 | sort -u | grep -E \"^[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}$\") | wc -l'" >> "$BASHRC"
-        ALIASES_ADDED=true
-    fi
-    if ! grep -q "alias piegeAbot=" "$BASHRC" 2>/dev/null; then
-        echo "alias piegeAbot='sudo journalctl -u endlessh -f'" >> "$BASHRC"
-        ALIASES_ADDED=true
-    fi
-    
-    if [ "$ALIASES_ADDED" = true ]; then
-        echo "✅ Aliases ajoutés à $BASHRC"
-    else
-        echo "ℹ️  Tous les aliases sont déjà présents dans $BASHRC"
-    fi
+
+    echo "alias honeypot-stats='cd \"$SCRIPT_DIR_ABS\" && ./scripts/stats.sh'" >> "$BASHRC"
+    echo "alias honeypot-dashboard='cd \"$SCRIPT_DIR_ABS\" && ./scripts/dashboard.sh'" >> "$BASHRC"
+    echo "alias honeypot-monitor='cd \"$SCRIPT_DIR_ABS\" && ./scripts/monitor.sh'" >> "$BASHRC"
+    echo "alias scan-web='cd \"$SCRIPT_DIR_ABS\" && ./scripts/nmap-to-csv.sh'" >> "$BASHRC"
+    echo "alias capture-web='cd \"$SCRIPT_DIR_ABS\" && ./scripts/web-capture.sh'" >> "$BASHRC"
+    echo "alias vuln-scan='cd \"$SCRIPT_DIR_ABS\" && ./scripts/vuln-scan.sh'" >> "$BASHRC"
+    echo "alias honeypot-dig='cd \"$SCRIPT_DIR_ABS\" && ./scripts/dig-ip.sh'" >> "$BASHRC"
+    echo "alias honeypot-search-nikto='cd \"$SCRIPT_DIR_ABS\" && ./scripts/search-nikto.sh'" >> "$BASHRC"
+    echo "alias honeypot-logs='tail -n 50 -f \"$SCRIPT_DIR_ABS/data/logs/run-all-scans.log\"'" >> "$BASHRC"
+    echo "alias setup-auto-scan='cd \"$SCRIPT_DIR_ABS\" && ./scripts/setup-auto-scan.sh'" >> "$BASHRC"
+    echo "alias count-ips='echo \"📊 Journal endlessh (lignes ACCEPT):\" && sudo journalctl -u endlessh -o cat --no-pager 2>/dev/null | grep \"ACCEPT\" | grep -oE \"[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\" | sort -u | wc -l && echo \"📊 connections.csv:\" && tail -n +2 \"$SCRIPT_DIR_ABS/data/logs/connections.csv\" 2>/dev/null | cut -d\",\" -f2 | sort -u | wc -l && echo \"📊 Différence (manquantes dans connections.csv):\" && comm -23 <(sudo journalctl -u endlessh -o cat --no-pager 2>/dev/null | grep \"ACCEPT\" | grep -oE \"[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\" | sort -u) <(tail -n +2 \"$SCRIPT_DIR_ABS/data/logs/connections.csv\" 2>/dev/null | cut -d\",\" -f2 | sort -u | grep -E \"^[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}$\") | wc -l'" >> "$BASHRC"
+    echo "alias piegeAbot='sudo journalctl -u endlessh -f'" >> "$BASHRC"
+
+    echo "✅ Aliases mis à jour dans $BASHRC"
 fi
 
 echo ""
