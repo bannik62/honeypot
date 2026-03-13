@@ -137,7 +137,8 @@ scan_one_ip() {
     # Nettoyer le fichier temporaire à la sortie de la fonction
     trap "rm -f '$temp_written' 2>/dev/null" RETURN
 
-    result=$(nmap -p "$SCAN_PORTS_NMAP" -T4 --open "$ip" 2>/dev/null | grep -E "^[0-9]+/(tcp|udp)" | grep "open")
+    # --host-timeout évite les blocages sur IPs lentes ou "collantes" (ex. endlessh)
+    result=$(nmap -p "$SCAN_PORTS_NMAP" -T4 --open --host-timeout 90s "$ip" 2>/dev/null | grep -E "^[0-9]+/(tcp|udp)" | grep "open")
 
     if [ -n "$result" ]; then
 
