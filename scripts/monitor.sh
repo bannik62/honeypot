@@ -138,12 +138,15 @@ start_monitor() {
         
         # Compter les lignes ACCEPT depuis ce timestamp
         # Utiliser --since avec le format ISO
-        local total_lines=$(sudo journalctl -u "$SERVICE_NAME" -o cat --since "$journalctl_since" --no-pager 2>/dev/null | grep -c "ACCEPT" || echo "0")
+        local total_lines
+        total_lines=$(sudo journalctl -u "$SERVICE_NAME" -o cat --since "$journalctl_since" --no-pager 2>/dev/null | grep -c "ACCEPT" || true)
+        total_lines=${total_lines:-0}
         
         # Si aucune ligne trouvée avec le format ISO, essayer le format original
         if [ "$total_lines" -eq 0 ]; then
             journalctl_since="$since_timestamp"
-            total_lines=$(sudo journalctl -u "$SERVICE_NAME" -o cat --since "$journalctl_since" --no-pager 2>/dev/null | grep -c "ACCEPT" || echo "0")
+            total_lines=$(sudo journalctl -u "$SERVICE_NAME" -o cat --since "$journalctl_since" --no-pager 2>/dev/null | grep -c "ACCEPT" || true)
+            total_lines=${total_lines:-0}
         fi
         
         if [ "$total_lines" -gt 0 ]; then
