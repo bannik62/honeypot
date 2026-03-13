@@ -15,24 +15,24 @@ cleanup_temp_files() {
 
 trap cleanup_temp_files EXIT INT TERM
 
-# Nettoyage du cache temporaire de Chromium snap après chaque capture
-cleanup_chromium_tmp() {
-    find /tmp/snap-private-tmp/snap.chromium -mindepth 2 -maxdepth 3 \
-        -type d -name "tmp" -exec rm -rf {}/* \; 2>/dev/null
-}
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Vérifier les dépendances et détecter le bon binaire
-if command -v chromium-browser &> /dev/null; then
+if command -v google-chrome &> /dev/null; then
+    CHROMIUM_BIN="google-chrome"
+elif command -v google-chrome-stable &> /dev/null; then
+    CHROMIUM_BIN="google-chrome-stable"
+elif command -v chromium-browser &> /dev/null; then
     CHROMIUM_BIN="chromium-browser"
 elif command -v chromium &> /dev/null; then
     CHROMIUM_BIN="chromium"
 else
-    echo "❌ Erreur: chromium-browser ou chromium n'est pas installé" >&2
-    echo "💡 Installez-le avec: sudo apt install chromium-browser" >&2
+    echo "❌ Erreur: aucun navigateur headless trouvé" >&2
+    echo "💡 Installez Google Chrome: wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && sudo apt install ./google-chrome-stable_current_amd64.deb" >&2
     exit 1
 fi
+echo "🌐 Navigateur détecté: $CHROMIUM_BIN"
 
 # Charger la config
 CONFIG_FILE="$SCRIPT_DIR/../config/config"
@@ -92,17 +92,22 @@ capture_one_url() {
         return 0
     fi
     
+    # Répertoire temporaire isolé par capture pour éviter les conflits
+    local user_data_dir
+    user_data_dir=$(mktemp -d /tmp/chromium-XXXXXX)
+    
     # Capture avec chromium headless
-    timeout 15 "$CHROMIUM_BIN" --headless --disable-gpu --no-sandbox --disable-web-security --ignore-certificate-errors --ignore-ssl-errors --window-size=1920,1080 --screenshot="$filename" "$url" 2>/dev/null
-    cleanup_chromium_tmp
+    timeout 15 "$CHROMIUM_BIN" --headless --disable-gpu --no-sandbox --disable-web-security --ignore-certificate-errors --ignore-ssl-errors --window-size=1920,1080 --user-data-dir="$user_data_dir" --screenshot="$filename" "$url" 2>/dev/null
+    rm -rf "$user_data_dir" 2>/dev/null
     
     # Si HTTPS échoue (port 443/8443), réessayer en HTTP
     if [ ! -f "$filename" ] || [ ! -s "$filename" ]; then
         if [ "$port" = "443" ] || [ "$port" = "8443" ]; then
             http_url="http://${ip}:${port}"
             echo "  ⚠️  HTTPS échoué, tentative en HTTP: $http_url"
-            timeout 15 "$CHROMIUM_BIN" --headless --disable-gpu --no-sandbox --window-size=1920,1080 --screenshot="$filename" "$http_url" 2>/dev/null
-            cleanup_chromium_tmp
+            user_data_dir=$(mktemp -d /tmp/chromium-XXXXXX)
+            timeout 15 "$CHROMIUM_BIN" --headless --disable-gpu --no-sandbox --window-size=1920,1080 --user-data-dir="$user_data_dir" --screenshot="$filename" "$http_url" 2>/dev/null
+            rm -rf "$user_data_dir" 2>/dev/null
         fi
     fi
     
@@ -125,7 +130,7 @@ capture_one_url() {
     fi
 }
 
-export -f capture_one_url cleanup_chromium_tmp
+export -f capture_one_url
 export OUTPUT_DIR TIMESTAMP CHROMIUM_BIN
 
 # Créer une liste temporaire des URLs à capturer
