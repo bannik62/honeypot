@@ -263,20 +263,20 @@ function drawMapOverlay(){
       var c=entry[0],cnt=entry[1];
       var co=CC[c];if(!co||c==='Unknown')return;
       var cp=projection(co);if(!cp)return;
-      var cx=cp[0],cy=cp[1];
-      var r=3+(cnt/maxC)*12,big=cnt>D.length*0.08;
-      var dot=g.append('g').attr('class',big?'adot big':'adot');
-      dot.append('circle').attr('cx',cx).attr('cy',cy).attr('r',r+5).attr('class','rng');
-      dot.append('circle').attr('cx',cx).attr('cy',cy).attr('r',r).attr('class','m');
-      if(cnt>=3){
-        dot.append('text').attr('x',cx+r+3).attr('y',cy+3).attr('class','dlbl')
-          .attr('fill',big?'var(--w)':'var(--tx)').text(c+'('+cnt+')');
-      }
+    var cx=cp[0],cy=cp[1];
+    var r=2+(cnt/maxC)*8,big=cnt>D.length*0.08;
+    var dot=g.append('g').attr('class',big?'adot big':'adot');
+    dot.append('circle').attr('cx',cx).attr('cy',cy).attr('r',r+4).attr('class','rng');
+    dot.append('circle').attr('cx',cx).attr('cy',cy).attr('r',r).attr('class','m');
+    if(cnt>=3){
+      dot.append('text').attr('x',cx+r+2).attr('y',cy+2).attr('class','dlbl')
+        .attr('fill',big?'var(--w)':'var(--tx)').attr('font-size',9).text(c+'('+cnt+')');
+    }
       dot.on('mouseenter',function(e){showTip(e,c,null,cnt);})
        .on('mousemove',moveTip).on('mouseleave',hideTip);
     });
   }else{
-    // Vue détaillée : un point par IP (réparti autour du pays)
+    // Vue détaillée : un point par IP, pastille plus petite avec IP écrite dedans
     D.forEach(function(d){
       var c=d.country||'Unknown';
       var co=CC[c];if(!co)return;
@@ -284,8 +284,12 @@ function drawMapOverlay(){
       var lon=co[0]+j[0],lat=co[1]+j[1];
       var p=projection([lon,lat]);if(!p)return;
       var cx=p[0],cy=p[1];
+      var parts=d.ip.split('.');
+      var shortIp=parts.length>=2?parts.slice(-2).join('.'):d.ip;
       var dot=g.append('g').attr('class','adot');
-      dot.append('circle').attr('cx',cx).attr('cy',cy).attr('r',4).attr('class','m');
+      dot.append('circle').attr('cx',cx).attr('cy',cy).attr('r',6).attr('class','m');
+      dot.append('text').attr('x',cx).attr('y',cy).attr('text-anchor','middle').attr('dominant-baseline','central')
+        .attr('fill','var(--tx)').attr('font-size',5).attr('pointer-events','none').text(shortIp);
       dot.on('mouseenter',function(e){showTip(e,d.country,d.ip,d.vuln_high?'Vulns: '+d.vuln_high:'');})
        .on('mousemove',moveTip).on('mouseleave',hideTip);
     });
