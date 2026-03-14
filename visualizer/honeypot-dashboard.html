@@ -40,6 +40,7 @@ header{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 14px;
 @keyframes drawl{0%{stroke-dashoffset:400;opacity:.6}100%{stroke-dashoffset:0;opacity:.14}}
 .adot{cursor:pointer}
 .adot .m{fill:var(--w)}.adot.big .m{fill:var(--a2)}
+.adot .atk-icon{fill:var(--w)}.adot.big .atk-icon{fill:var(--a2)}
 .adot .rng{fill:none;stroke:var(--w);stroke-width:.9}
 .adot.big .rng{stroke:var(--a2);animation:rp 2.5s ease-out infinite}
 @keyframes rp{0%{r:3;opacity:.7}100%{r:18;opacity:0}}
@@ -136,7 +137,14 @@ tr:hover td{background:rgba(0,212,255,.03)}
       <button type="button" title="Déplacer droite">→</button>
     </div>
     <div id="map-loader">CHARGEMENT CARTE...</div>
-    <svg id="mapsvg" viewBox="0 0 960 500"></svg>
+    <svg id="mapsvg" viewBox="0 0 960 500">
+      <defs>
+        <symbol id="attacker-icon" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.2"/>
+          <circle cx="12" cy="12" r="3" fill="currentColor"/>
+        </symbol>
+      </defs>
+    </svg>
     <div class="mleg">
       <div class="lr"><div class="ld" style="background:var(--a3)"></div>Votre VPS</div>
       <div class="lr"><div class="ld" style="background:var(--w)"></div>Attaquant</div>
