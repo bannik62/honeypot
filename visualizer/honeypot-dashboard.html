@@ -60,6 +60,7 @@ header{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 14px;
 #gwrap{position:relative;width:100%;height:clamp(320px,65vw,560px);background:var(--s);border:1px solid var(--b);border-radius:8px;overflow:hidden}
 #gsvg{width:100%;height:100%}
 .gctl{position:absolute;top:8px;right:8px;display:flex;gap:6px}
+#graph-meta{position:absolute;top:8px;left:8px;background:rgba(5,10,15,.92);border:1px solid var(--b);border-radius:6px;padding:5px 8px;font-size:.62rem;color:var(--mu)}
 .nv circle{fill:var(--a3);filter:drop-shadow(0 0 6px var(--a3))}
 .na circle{fill:var(--a2);opacity:.8;cursor:pointer}
 .na:hover circle{opacity:1;filter:drop-shadow(0 0 4px var(--a2))}
@@ -88,6 +89,7 @@ tr:hover td{background:rgba(0,212,255,.03)}
 .badge.ok{border-color:var(--a3);color:var(--a3)}
 .badge.warn{border-color:var(--w);color:var(--w)}
 .badge.err{border-color:var(--a2);color:var(--a2)}
+#ip-meta{margin:4px 0 8px;color:var(--mu);font-size:.68rem}
 #empty{text-align:center;padding:40px 20px;color:var(--mu)}
 #empty .ei{font-size:2.2rem;margin-bottom:10px;opacity:.4}
 #empty h2{font-family:'Orbitron',monospace;font-size:.82rem;margin-bottom:5px}
@@ -147,6 +149,7 @@ tr:hover td{background:rgba(0,212,255,.03)}
 <div id="panel-graph" class="panel">
   <div id="gwrap">
     <svg id="gsvg"></svg>
+    <div id="graph-meta">Réseau: —</div>
     <div class="gctl"><button class="btn" onclick="resetSim()">↺ Reset</button></div>
   </div>
 </div>
@@ -179,7 +182,14 @@ tr:hover td{background:rgba(0,212,255,.03)}
         <option value="vuln">Vulns HIGH</option>
         <option value="screenshot">Screenshot</option>
       </select>
+      <select id="ip-limit" style="background:var(--s);border:1px solid var(--b);color:var(--mu);padding:6px 8px;border-radius:4px;font-family:'Share Tech Mono',monospace;font-size:.72rem">
+        <option value="200">200</option>
+        <option value="1000">1000</option>
+        <option value="5000">5000</option>
+        <option value="all">Tous</option>
+      </select>
     </div>
+    <div id="ip-meta">IPs affichées: —</div>
     <table><thead><tr><th>IP</th><th>PAYS</th><th>PORTS</th><th>RAPPORTS</th><th>VULNS</th></tr></thead>
     <tbody id="ip-tbody"></tbody></table>
   </div>
@@ -570,6 +580,8 @@ function renderGraph(){
     .append('path').attr('d','M0,-5L10,0L0,5').attr('class','ah');
 
   var top=D.slice().sort(function(a,b){return (b.vuln_high||0)-(a.vuln_high||0);}).slice(0,40);
+  var gm=document.getElementById('graph-meta');
+  if(gm) gm.textContent='Réseau: '+top.length.toLocaleString()+' / '+D.length.toLocaleString()+' (top vuln)';
   if(!top.length)return;
   var nodes=[{id:'VPS',type:'vps'}];
   var links=[];
@@ -648,7 +660,12 @@ function renderIPTable(filter,search){
     return d.ip.includes(search)||(d.country&&d.country.toLowerCase().includes(search.toLowerCase()));
   });
   rows.sort(function(a,b){return (b.vuln_high||0)-(a.vuln_high||0);});
-  document.getElementById('ip-tbody').innerHTML=rows.slice(0,200).map(function(d){
+  var limSel=document.getElementById('ip-limit');
+  var lim=(limSel&&limSel.value==='all')?rows.length:Math.max(1,parseInt((limSel&&limSel.value)||'200',10));
+  var shown=rows.slice(0,lim);
+  var meta=document.getElementById('ip-meta');
+  if(meta) meta.textContent='IPs affichées: '+shown.length.toLocaleString()+' / '+rows.length.toLocaleString()+(rows.length>D.length?' (filtré)':'');
+  document.getElementById('ip-tbody').innerHTML=shown.map(function(d){
     var badges='';
     if(d.nmap) badges+='<span class="badge ok">nmap</span>';
     if(d.dns) badges+='<span class="badge ok">dns</span>';
@@ -667,6 +684,9 @@ document.getElementById('ip-search').addEventListener('input',function(){
 });
 document.getElementById('ip-filter').addEventListener('change',function(){
   renderIPTable(this.value,document.getElementById('ip-search').value);
+});
+document.getElementById('ip-limit').addEventListener('change',function(){
+  renderIPTable(document.getElementById('ip-filter').value,document.getElementById('ip-search').value);
 });
 
 // ── Tooltip ────────────────────────────────────────────────────────────────
