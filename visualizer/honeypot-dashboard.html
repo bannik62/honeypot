@@ -213,6 +213,7 @@ var VPS={lon:1.85,lat:50.95};
 var D=[];   // array of {ip, country, lat, lon, nmap, dns, screenshot, nikto, vuln_high, ports}
 var sim=null, projection, pathGen, mapG, currentZoomK=1, mapZoomSvg, mapZoomBehavior;
 var worldLandFeature=null, ipGeoCache={};
+var detailPointCache=[];
 var W=960,H=500;
 
 function updateZoomPct(k){ var el=document.getElementById('zoom-pct'); if(el) el.textContent=Math.round((k||1)*100)+'%'; }
@@ -271,6 +272,27 @@ function hasValidLatLon(d){
     d.lat>=-90 && d.lat<=90 && d.lon>=-180 && d.lon<=180;
 }
 
+function rebuildDetailPointCache(){
+  var groups={}, keys=[], i, d, c, geo, p, key, rec, arr;
+  detailPointCache=[];
+  for(i=0;i<D.length;i++){
+    d=D[i];
+    c=d.country||'Unknown';
+    geo=hasValidLatLon(d) ? [d.lon,d.lat] : ipGeoPoint(d.ip,c);
+    if(!geo) continue;
+    p=projection(geo); if(!p) continue;
+    key=(hasValidLatLon(d)?'geo:':'est:')+geo[0].toFixed(3)+','+geo[1].toFixed(3);
+    rec={d:d,cx:p[0],cy:p[1],key:key,hash:ipHash(d.ip||'')};
+    if(!groups[key]){ groups[key]=[]; keys.push(key); }
+    groups[key].push(rec);
+  }
+  for(i=0;i<keys.length;i++){
+    arr=groups[keys[i]];
+    arr.sort(function(a,b){ return a.hash-b.hash; });
+    arr.forEach(function(item,idx){ item.clusterIndex=idx; item.clusterSize=arr.length; detailPointCache.push(item); });
+  }
+}
+
 // Load world map
 fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json')
   .then(function(r){return r.json();})
@@ -283,6 +305,7 @@ fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json')
       ? topojson.feature(world,world.objects.land)
       : {type:'FeatureCollection',features:countries.features};
     ipGeoCache={};
+    if(D.length>0) rebuildDetailPointCache();
     mapG.append('g').selectAll('path').data(countries.features).join('path')
       .attr('class','country').attr('d',pathGen);
     mapG.append('path')
@@ -351,11 +374,12 @@ function drawMapOverlay(){
       var co=CC[c];if(!co||c==='Unknown')return;
       var cp=projection(co);if(!cp)return;
     var cx=cp[0],cy=cp[1];
-    var r=(1+(cnt/maxC)*5)*invK,big=cnt>D.length*0.08;
+    var r=Math.max(4*invK,Math.sqrt(cnt)*2*invK),big=cnt>D.length*0.08;
+    var screenR=r*k;
     var dot=g.append('g').attr('class',big?'adot big':'adot');
-    dot.append('circle').attr('cx',cx).attr('cy',cy).attr('r',r+2).attr('class','rng');
+    dot.append('circle').attr('cx',cx).attr('cy',cy).attr('r',r+2*invK).attr('class','rng');
     dot.append('circle').attr('cx',cx).attr('cy',cy).attr('r',r).attr('class','m');
-    if(cnt>=3){
+    if(screenR>12){
       dot.append('text').attr('x',cx+r+2).attr('y',cy+2).attr('class','dlbl')
         .attr('fill',big?'var(--w)':'var(--tx)').attr('font-size',7*invK).text(c+'('+cnt+')');
     }
@@ -364,28 +388,16 @@ function drawMapOverlay(){
     });
   }else{
     // Vue détaillée : un point par IP (sans texte permanent)
-    var points=[], groups={};
-    D.forEach(function(d){
-      var c=d.country||'Unknown';
-      var geo=hasValidLatLon(d) ? [d.lon,d.lat] : ipGeoPoint(d.ip,c);
-      if(!geo)return;
-      var p=projection(geo);if(!p)return;
-      var key=(hasValidLatLon(d)?'geo:':'est:')+geo[0].toFixed(3)+','+geo[1].toFixed(3);
-      var rec={d:d,cx:p[0],cy:p[1],key:key};
-      points.push(rec);
-      if(!groups[key]) groups[key]=[];
-      groups[key].push(rec);
-    });
-
-    Object.keys(groups).forEach(function(key){
-      groups[key].sort(function(a,b){ return (a.d.ip||'').localeCompare(b.d.ip||''); });
-      groups[key].forEach(function(item,i){ item.clusterIndex=i; item.clusterSize=groups[key].length; });
-    });
-
-    points.forEach(function(rec){
+    if(!detailPointCache.length) rebuildDetailPointCache();
+    var maxDots=(k<4)?1200:((k<8)?3000:7000);
+    var step=Math.max(1,Math.ceil(detailPointCache.length/Math.max(1,maxDots)));
+    var zoomSpreadBoost=Math.min(22,Math.max(1,(k-1)*1.2));
+    var drawItems=[];
+    for(let pi=0;pi<detailPointCache.length;pi+=step){
+      let rec=detailPointCache[pi];
       var n=rec.clusterSize||1;
       var idx=(rec.clusterIndex===undefined)?0:rec.clusterIndex;
-      var cx=rec.cx, cy=rec.cy;
+      var cx=rec.cx, cy=rec.cy, ax=rec.cx, ay=rec.cy;
 
       // Dispersion en spirale pour les IPs qui partagent la même position.
       // Le rayon max augmente avec la taille du cluster pour éviter les paquets collés.
@@ -394,15 +406,54 @@ function drawMapOverlay(){
         var radiusPx=2.2*Math.sqrt(idx+1); // rayon ecran
         var clusterBoost=Math.min(90, 8 + Math.sqrt(n)*5.5); // rayon max ecran
         radiusPx=Math.min(radiusPx, clusterBoost);
-        var spread=radiusPx*invK; // conserve l'échelle visuelle quel que soit le zoom
+        var spread=radiusPx*zoomSpreadBoost*invK; // plus tu zoomes, plus on ecarte
         cx += Math.cos(angle)*spread;
         cy += Math.sin(angle)*spread;
       }
 
-      var ipRadius=0.95*invK;
+      var ipRadius=0.9*invK;
+      drawItems.push({d:rec.d,x:cx,y:cy,ax:ax,ay:ay,r:ipRadius});
+    }
+
+    // Désenchevêtrement local par proximité (même avec lat/lon légèrement différents)
+    var minScreenDist=Math.min(16,2.5+k*0.9); // pixels écran
+    var minDist=minScreenDist*invK;
+    var cellSize=Math.max(minDist*1.8,0.2*invK);
+    for(var it=0;it<3;it++){
+      var grid={};
+      drawItems.forEach(function(p){
+        var gx=Math.floor(p.x/cellSize), gy=Math.floor(p.y/cellSize);
+        var gk=gx+':'+gy;
+        if(!grid[gk]) grid[gk]=[];
+        grid[gk].push(p);
+      });
+      drawItems.forEach(function(p){
+        var gx=Math.floor(p.x/cellSize), gy=Math.floor(p.y/cellSize);
+        for(var ox=-1;ox<=1;ox++){
+          for(var oy=-1;oy<=1;oy++){
+            var arr=grid[(gx+ox)+':'+(gy+oy)];
+            if(!arr) continue;
+            arr.forEach(function(q){
+              if(p===q) return;
+              var dx=p.x-q.x, dy=p.y-q.y;
+              var dist=Math.sqrt(dx*dx+dy*dy)||1e-6;
+              if(dist>=minDist) return;
+              var push=(minDist-dist)*0.48;
+              var ux=dx/dist, uy=dy/dist;
+              p.x+=ux*push; p.y+=uy*push;
+            });
+          }
+        }
+        // ressort vers la position geo d'origine
+        p.x += (p.ax-p.x)*0.08;
+        p.y += (p.ay-p.y)*0.08;
+      });
+    }
+
+    drawItems.forEach(function(item){
       var dot=g.append('g').attr('class','adot');
-      dot.append('circle').attr('cx',cx).attr('cy',cy).attr('r',ipRadius).attr('class','m');
-      dot.on('mouseenter',function(e){showPointTip(e,rec.d);})
+      dot.append('circle').attr('cx',item.x).attr('cy',item.y).attr('r',item.r).attr('class','m');
+      dot.on('mouseenter',function(e){showPointTip(e,item.d);})
        .on('mousemove',moveTip).on('mouseleave',hideTip);
     });
   }
@@ -418,6 +469,7 @@ function drawMapOverlay(){
 // ── Load data ──────────────────────────────────────────────────────────────
 function loadJSON(data){
   D=data;
+  rebuildDetailPointCache();
   updateHeader();
   drawMapOverlay();
   renderStats();
