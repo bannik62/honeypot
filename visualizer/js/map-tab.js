@@ -1,5 +1,5 @@
 import { CC, ISO2_TO_N3, VPS, W, H } from './constants.js';
-import { state } from './state.js';
+import { state, getByCountry } from './state.js';
 import { showCountryTip, showPointTip, moveTip, hideTip } from './tooltip.js';
 
 let projection = d3.geoMercator().scale(153).translate([W / 2, H / 2 + 60]).center([0, 20]);
@@ -96,15 +96,6 @@ function ipGeoPoint(ip, countryCode) {
   return p;
 }
 
-function getByCountry() {
-  const bc = {};
-  state.D.forEach((d) => {
-    const c = d.country || 'Unknown';
-    bc[c] = (bc[c] || 0) + 1;
-  });
-  return bc;
-}
-
 function rebuildDetailPointCache() {
   const groups = {};
   const keys = [];
@@ -145,7 +136,7 @@ export function drawMapOverlay() {
   const vy = vp[1];
 
   if (k < 2) {
-    const bc = getByCountry();
+    const bc = getByCountry(state.D);
     const sorted = Object.entries(bc).sort((a, b) => b[1] - a[1]);
     const maxC = sorted[0] ? sorted[0][1] : 1;
     sorted.forEach((entry, i) => {
