@@ -364,17 +364,45 @@ function drawMapOverlay(){
     });
   }else{
     // Vue détaillée : un point par IP (sans texte permanent)
+    var points=[], groups={};
     D.forEach(function(d){
       var c=d.country||'Unknown';
       var geo=hasValidLatLon(d) ? [d.lon,d.lat] : ipGeoPoint(d.ip,c);
       if(!geo)return;
       var p=projection(geo);if(!p)return;
-      var cx=p[0],cy=p[1];
-      // Taille ecran quasi constante, volontairement petite en zone dense
+      var key=(hasValidLatLon(d)?'geo:':'est:')+geo[0].toFixed(3)+','+geo[1].toFixed(3);
+      var rec={d:d,cx:p[0],cy:p[1],key:key};
+      points.push(rec);
+      if(!groups[key]) groups[key]=[];
+      groups[key].push(rec);
+    });
+
+    Object.keys(groups).forEach(function(key){
+      groups[key].sort(function(a,b){ return (a.d.ip||'').localeCompare(b.d.ip||''); });
+      groups[key].forEach(function(item,i){ item.clusterIndex=i; item.clusterSize=groups[key].length; });
+    });
+
+    points.forEach(function(rec){
+      var n=rec.clusterSize||1;
+      var idx=(rec.clusterIndex===undefined)?0:rec.clusterIndex;
+      var cx=rec.cx, cy=rec.cy;
+
+      // Dispersion en spirale pour les IPs qui partagent la même position.
+      // Le rayon max augmente avec la taille du cluster pour éviter les paquets collés.
+      if(n>1){
+        var angle=idx*2.399963229728653; // golden angle
+        var radiusPx=2.2*Math.sqrt(idx+1); // rayon ecran
+        var clusterBoost=Math.min(90, 8 + Math.sqrt(n)*5.5); // rayon max ecran
+        radiusPx=Math.min(radiusPx, clusterBoost);
+        var spread=radiusPx*invK; // conserve l'échelle visuelle quel que soit le zoom
+        cx += Math.cos(angle)*spread;
+        cy += Math.sin(angle)*spread;
+      }
+
       var ipRadius=0.95*invK;
       var dot=g.append('g').attr('class','adot');
       dot.append('circle').attr('cx',cx).attr('cy',cy).attr('r',ipRadius).attr('class','m');
-      dot.on('mouseenter',function(e){showPointTip(e,d);})
+      dot.on('mouseenter',function(e){showPointTip(e,rec.d);})
        .on('mousemove',moveTip).on('mouseleave',hideTip);
     });
   }
