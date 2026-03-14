@@ -209,10 +209,23 @@ var CC={CN:[104,35],US:[-100,38],RU:[60,55],DE:[10,51],FR:[2,46],GB:[-2,54],NL:[
   MZ:[35,-18],TZ:[35,-6],KE:[38,1],ET:[40,9],SD:[30,15],MA:[6,32],DZ:[3,28],
   TN:[9,34],LY:[17,27],SN:[14,15],GH:[2,8],CD:[24,-3],VE:[-66,8],PE:[-76,-10]};
 
+// ISO2 -> ISO numeric (Natural Earth / world-atlas id)
+var ISO2_TO_N3={
+  AF:4, AM:51, AR:32, AT:40, AU:36, AE:784, BD:50, BE:56, BG:100, BR:76, BY:112,
+  CA:124, CH:756, CL:152, CN:156, CO:170, CZ:203, DE:276, DK:208, DZ:12, EE:233,
+  EG:818, ES:724, ET:231, FI:246, FR:250, GB:826, GE:268, GH:288, GR:300, HK:344,
+  HU:348, ID:360, IL:376, IN:356, IQ:368, IR:364, IT:380, JP:392, KE:404, KH:116,
+  KR:410, KZ:398, LK:144, LT:440, LV:428, LY:434, MA:504, MD:498, MM:104, MN:496,
+  MX:484, MY:458, NG:566, NL:528, NO:578, NP:524, PE:604, PH:608, PK:586, PL:616,
+  PT:620, RO:642, RU:643, SA:682, SD:729, SE:752, SG:702, SN:686, TH:764, TN:788,
+  TR:792, TW:158, TZ:834, UA:804, US:840, VE:862, VN:704, ZA:710, CD:180, MZ:508
+};
+
 var VPS={lon:1.85,lat:50.95};
 var D=[];   // array of {ip, country, lat, lon, nmap, dns, screenshot, nikto, vuln_high, ports}
 var sim=null, projection, pathGen, mapG, currentZoomK=1, mapZoomSvg, mapZoomBehavior;
 var worldLandFeature=null, ipGeoCache={};
+var countryFeatureByIso2={};
 var detailPointCache=[];
 var W=960,H=500;
 
@@ -226,6 +239,14 @@ function ipHash(ip){
   var h=2166136261;
   for(var i=0;i<ip.length;i++){ h^=ip.charCodeAt(i); h=(h*16777619)>>>0; }
   return h>>>0;
+}
+
+function seededRandFactory(seed){
+  var s=(seed>>>0)||1;
+  return function(){
+    s=(1664525*s+1013904223)>>>0;
+    return s/4294967296;
+  };
 }
 
 // Place un point près du pays, mais forcé sur terre (évite les points en mer)
@@ -258,6 +279,32 @@ function pointOnLandNear(baseLonLat,seed){
 }
 
 function ipGeoPoint(ip,countryCode){
+  var iso=(countryCode||'').toUpperCase().trim();
+  var cf=countryFeatureByIso2[iso];
+  if(cf){
+    var polyKey='poly:'+iso+'|'+ip;
+    if(ipGeoCache[polyKey]) return ipGeoCache[polyKey];
+    var rand=seededRandFactory(ipHash(polyKey));
+    var b=d3.geoBounds(cf), minLon=b[0][0], minLat=b[0][1], maxLon=b[1][0], maxLat=b[1][1];
+    if(maxLon<minLon){ minLon=-180; maxLon=180; } // antimeridian guard
+    var i, lon, lat, cand;
+    for(i=0;i<260;i++){
+      lon=minLon+rand()*(maxLon-minLon);
+      lat=minLat+rand()*(maxLat-minLat);
+      cand=[lon,lat];
+      if(d3.geoContains(cf,cand)){ ipGeoCache[polyKey]=cand; return cand; }
+    }
+    // Fallback: autour du centroide, mais toujours contraint au pays
+    var ctr=d3.geoCentroid(cf), a0=rand()*Math.PI*2;
+    for(i=0;i<180;i++){
+      var rr=0.08+i*0.05, a=a0+i*2.399963229728653;
+      cand=[ctr[0]+Math.cos(a)*rr, ctr[1]+Math.sin(a)*rr*0.62];
+      if(d3.geoContains(cf,cand)){ ipGeoCache[polyKey]=cand; return cand; }
+    }
+    ipGeoCache[polyKey]=ctr;
+    return ctr;
+  }
+
   var base=CC[countryCode];
   if(!base) return null;
   var key=countryCode+'|'+ip;
@@ -301,6 +348,13 @@ fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json')
     var svg=d3.select('#mapsvg');
     mapG=svg.append('g').attr('id','map-g');
     var countries=topojson.feature(world,world.objects.countries);
+    countryFeatureByIso2={};
+    var N3_TO_ISO2={};
+    Object.keys(ISO2_TO_N3).forEach(function(iso2){ N3_TO_ISO2[ISO2_TO_N3[iso2]]=iso2; });
+    countries.features.forEach(function(f){
+      var iso2=N3_TO_ISO2[Number(f.id)];
+      if(iso2) countryFeatureByIso2[iso2]=f;
+    });
     worldLandFeature=world.objects.land
       ? topojson.feature(world,world.objects.land)
       : {type:'FeatureCollection',features:countries.features};
