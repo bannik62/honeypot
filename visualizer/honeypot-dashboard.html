@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🍯 Honeypot Visual</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@700;900&display=swap');
+:root{--bg:#050a0f;--s:#0a1520;--s2:#0f1e2e;--b:#1a3a5c;--a:#00d4ff;--a2:#ff3e6c;--a3:#39ff14;--w:#ffaa00;--tx:#c8e6ff;--mu:#4a7a9b}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--tx);font-family:'Share Tech Mono',monospace;min-height:100vh;overflow-x:hidden}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--b);background:var(--s);position:sticky;top:0;z-index:50}
+.logo{font-family:'Orbitron',monospace;font-weight:900;font-size:clamp(.8rem,3.5vw,1.05rem);color:var(--a);letter-spacing:2px}
+.logo span{color:var(--a2)}
+.hs{display:flex;gap:14px;margin-left:auto}
+.hc{font-size:clamp(.55rem,2vw,.68rem);color:var(--mu);display:flex;flex-direction:column;align-items:center;line-height:1.3}
+.hc .v{font-size:clamp(.85rem,3vw,1rem);font-weight:bold;color:var(--a)}
+.hc.r .v{color:var(--a2)}.hc.g .v{color:var(--a3)}
+/* LOAD ZONE */
+#dz{margin:10px 14px;border:2px dashed var(--b);border-radius:8px;padding:12px 14px;background:var(--s);display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px}
+#dz p{font-size:clamp(.65rem,2.2vw,.78rem);color:var(--mu);text-align:center}
+#dz p strong{color:var(--a)}
+#fi{display:none}
+.btn{background:none;border:1px solid var(--b);color:var(--mu);padding:5px 12px;font-family:'Share Tech Mono',monospace;font-size:.72rem;cursor:pointer;border-radius:4px;transition:all .2s;white-space:nowrap}
+.btn:hover{border-color:var(--a3);color:var(--a3)}
+.btn.pri{border-color:var(--a);color:var(--a)}
+.btn.pri:hover{border-color:var(--a3);color:var(--a3)}
+/* TABS */
+.tabs{display:flex;border-bottom:1px solid var(--b);overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex-shrink:0;padding:9px 16px;font-family:'Orbitron',monospace;font-size:clamp(.58rem,2vw,.67rem);letter-spacing:1px;cursor:pointer;border:none;border-bottom:2px solid transparent;background:none;color:var(--mu);transition:all .2s;white-space:nowrap}
+.tab.active{color:var(--a);border-bottom-color:var(--a)}
+.panel{display:none;padding:10px 14px}.panel.active{display:block}
+/* MAP */
+#mapwrap{position:relative;width:100%;background:var(--s);border:1px solid var(--b);border-radius:8px;overflow:hidden}
+#mapsvg{display:block;width:100%;height:auto}
+.country{fill:#0d2535;stroke:#1c3d58;stroke-width:.4}
+.country.hit{fill:#182a18}
+.atk-line{fill:none;stroke:var(--a2);stroke-width:.9;opacity:0;stroke-dasharray:400;animation:drawl 2.5s ease forwards}
+@keyframes drawl{0%{stroke-dashoffset:400;opacity:.6}100%{stroke-dashoffset:0;opacity:.14}}
+.adot{cursor:pointer}
+.adot .m{fill:var(--a2)}.adot.big .m{fill:var(--w)}
+.adot .rng{fill:none;stroke:var(--a2);stroke-width:.9}
+.adot.big .rng{stroke:var(--w);animation:rp 2.5s ease-out infinite}
+@keyframes rp{0%{r:3;opacity:.7}100%{r:18;opacity:0}}
+.vdot .m{fill:var(--a3);filter:drop-shadow(0 0 4px var(--a3))}
+.vdot .rng{fill:none;stroke:var(--a3);stroke-width:1.2;animation:vr 1.8s ease-out infinite}
+@keyframes vr{0%{r:5;opacity:.9}100%{r:22;opacity:0}}
+.vlbl{fill:var(--a3);font-family:'Orbitron',monospace;font-weight:700;font-size:9px;pointer-events:none}
+.dlbl{fill:var(--tx);font-size:7px;pointer-events:none;opacity:.85}
+.mleg{position:absolute;bottom:8px;right:8px;background:rgba(5,10,15,.92);border:1px solid var(--b);border-radius:6px;padding:7px 11px;font-size:.64rem}
+.lr{display:flex;align-items:center;gap:6px;margin:3px 0}
+.ld{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+#map-loader{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--s);font-size:.8rem;color:var(--mu);font-family:'Orbitron',monospace;letter-spacing:2px}
+/* GRAPH */
+#gwrap{position:relative;width:100%;height:clamp(320px,65vw,560px);background:var(--s);border:1px solid var(--b);border-radius:8px;overflow:hidden}
+#gsvg{width:100%;height:100%}
+.gctl{position:absolute;top:8px;right:8px;display:flex;gap:6px}
+.nv circle{fill:var(--a3);filter:drop-shadow(0 0 6px var(--a3))}
+.na circle{fill:var(--a2);opacity:.8;cursor:pointer}
+.na:hover circle{opacity:1;filter:drop-shadow(0 0 4px var(--a2))}
+.nl{fill:var(--tx);font-family:'Share Tech Mono',monospace;font-size:10px;pointer-events:none}
+.nl.vp{fill:var(--a3);font-family:'Orbitron',monospace;font-weight:700;font-size:11px}
+.edge{stroke:var(--a2);stroke-opacity:.18;fill:none}
+.edge.hot{stroke-opacity:.5;animation:ep 3s ease-in-out infinite}
+@keyframes ep{0%,100%{stroke-opacity:.18}50%{stroke-opacity:.6}}
+.ah{fill:var(--a2)}
+/* STATS */
+.cards{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px}
+@media(min-width:580px){.cards{grid-template-columns:repeat(4,1fr)}}
+.card{background:var(--s);border:1px solid var(--b);border-radius:8px;padding:11px 13px}
+.card .lb{font-family:'Orbitron',monospace;font-size:clamp(.5rem,1.6vw,.61rem);letter-spacing:1px;color:var(--mu);margin-bottom:5px}
+.card .vl{font-family:'Orbitron',monospace;font-size:clamp(1.1rem,5vw,1.7rem);font-weight:700;color:var(--a)}
+.card.r .vl{color:var(--a2)}.card.g .vl{color:var(--a3)}.card.w .vl{color:var(--w);font-size:clamp(.85rem,3.5vw,1.2rem)}
+.stitle{font-family:'Orbitron',monospace;font-size:.62rem;letter-spacing:2px;color:var(--mu);margin:14px 0 7px;padding-bottom:4px;border-bottom:1px solid var(--b)}
+table{width:100%;border-collapse:collapse;font-size:clamp(.62rem,2vw,.76rem)}
+th{text-align:left;padding:5px 7px;font-family:'Orbitron',monospace;font-size:.58rem;letter-spacing:1px;color:var(--mu);border-bottom:1px solid var(--b)}
+td{padding:5px 7px;border-bottom:1px solid rgba(26,58,92,.3)}
+tr:hover td{background:rgba(0,212,255,.03)}
+.cv{color:var(--a2);font-weight:bold}.mv{color:var(--mu);font-size:.7rem}.av{color:var(--a);font-family:'Orbitron',monospace;font-size:.66rem}
+.bt{height:5px;background:var(--s2);border-radius:3px;overflow:hidden;min-width:50px}
+.bf{height:100%;background:linear-gradient(90deg,var(--a2),var(--w));border-radius:3px;transition:width .6s}
+.badge{display:inline-block;padding:2px 6px;border-radius:3px;font-size:.6rem;margin:1px;background:var(--s2);border:1px solid var(--b)}
+.badge.ok{border-color:var(--a3);color:var(--a3)}
+.badge.warn{border-color:var(--w);color:var(--w)}
+.badge.err{border-color:var(--a2);color:var(--a2)}
+#empty{text-align:center;padding:40px 20px;color:var(--mu)}
+#empty .ei{font-size:2.2rem;margin-bottom:10px;opacity:.4}
+#empty h2{font-family:'Orbitron',monospace;font-size:.82rem;margin-bottom:5px}
+#tip{position:fixed;background:var(--s2);border:1px solid var(--a);border-radius:6px;padding:8px 12px;font-size:.72rem;pointer-events:none;z-index:200;display:none;box-shadow:0 0 14px rgba(0,212,255,.25)}
+#tip .ti{color:var(--a);font-size:.85rem;margin-bottom:2px}
+#tip .tc{color:var(--w)}#tip .tn{color:var(--a3)}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--b);border-radius:2px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🍯 HONEY<span>TRAP</span></div>
+  <div class="hs">
+    <div class="hc">IPs<span class="v" id="ht">—</span></div>
+    <div class="hc r">PAYS<span class="v" id="hi">—</span></div>
+    <div class="hc g">VULNS<span class="v" id="hc2">—</span></div>
+  </div>
+</header>
+
+<div id="dz">
+  <span style="font-size:1.4rem">📂</span>
+  <p id="dzt">Charge <strong>data.json</strong> (data/visualizer-dashboard/data.json)<br>
+  <span style="font-size:.65rem">généré par generate-data.sh — ou importe manuellement</span></p>
+  <button class="btn pri" onclick="document.getElementById('fi').click()">📁 data.json</button>
+  <button class="btn" onclick="document.getElementById('fi2').click()">📄 CSV</button>
+  <button class="btn" onclick="loadDemo()">⚡ Démo</button>
+  <input type="file" id="fi" accept=".json">
+  <input type="file" id="fi2" accept=".csv">
+</div>
+
+<nav class="tabs">
+  <button class="tab active" data-tab="map">🌍 CARTE</button>
+  <button class="tab" data-tab="graph">🕸 RÉSEAU</button>
+  <button class="tab" data-tab="stats">📊 STATS</button>
+  <button class="tab" data-tab="ips">🔎 IPs</button>
+</nav>
+
+<div id="panel-map" class="panel active">
+  <div id="mapwrap">
+    <div id="map-loader">CHARGEMENT CARTE...</div>
+    <svg id="mapsvg" viewBox="0 0 960 500"></svg>
+    <div class="mleg">
+      <div class="lr"><div class="ld" style="background:var(--a3)"></div>Votre VPS</div>
+      <div class="lr"><div class="ld" style="background:var(--a2)"></div>Attaquant</div>
+      <div class="lr"><div class="ld" style="background:var(--w)"></div>Top attaquant</div>
+    </div>
+  </div>
+</div>
+
+<div id="panel-graph" class="panel">
+  <div id="gwrap">
+    <svg id="gsvg"></svg>
+    <div class="gctl"><button class="btn" onclick="resetSim()">↺ Reset</button></div>
+  </div>
+</div>
+
+<div id="panel-stats" class="panel">
+  <div id="empty">
+    <div class="ei">🍯</div>
+    <h2>EN ATTENTE DE DONNÉES</h2>
+    <p style="font-size:.73rem">Charge data.json ou connections.csv</p>
+  </div>
+  <div id="sb" style="display:none">
+    <div class="cards" id="cards"></div>
+    <div class="stitle">TOP PAYS ATTAQUANTS</div>
+    <table><thead><tr><th>#</th><th>PAYS</th><th>IPs</th><th>%</th><th>BAR</th></tr></thead><tbody id="ctb"></tbody></table>
+  </div>
+</div>
+
+<div id="panel-ips" class="panel">
+  <div id="ip-empty" style="text-align:center;padding:40px 20px;color:var(--mu)">
+    <div style="font-size:2rem;opacity:.4;margin-bottom:10px">🔎</div>
+    <p style="font-family:'Orbitron',monospace;font-size:.82rem">Aucune donnée</p>
+  </div>
+  <div id="ip-content" style="display:none">
+    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+      <input id="ip-search" type="text" placeholder="Filtrer IP / pays..."
+        style="background:var(--s);border:1px solid var(--b);color:var(--tx);padding:6px 10px;border-radius:4px;font-family:'Share Tech Mono',monospace;font-size:.75rem;flex:1;min-width:140px">
+      <select id="ip-filter" style="background:var(--s);border:1px solid var(--b);color:var(--mu);padding:6px 8px;border-radius:4px;font-family:'Share Tech Mono',monospace;font-size:.72rem">
+        <option value="all">Tous</option>
+        <option value="nmap">Nmap</option>
+        <option value="vuln">Vulns HIGH</option>
+        <option value="screenshot">Screenshot</option>
+      </select>
+    </div>
+    <table><thead><tr><th>IP</th><th>PAYS</th><th>PORTS</th><th>RAPPORTS</th><th>VULNS</th></tr></thead>
+    <tbody id="ip-tbody"></tbody></table>
+  </div>
+</div>
+
+<div id="tip"><div class="ti" id="tiip"></div><div class="tc" id="tico"></div><div class="tn" id="tict"></div></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+<script>
+var CC={CN:[104,35],US:[-100,38],RU:[60,55],DE:[10,51],FR:[2,46],GB:[-2,54],NL:[5,52],
+  BR:[-50,-10],IN:[78,20],JP:[138,37],KR:[128,36],SG:[104,1],HK:[114,22],TW:[121,24],
+  AU:[134,-26],CA:[-97,56],IT:[12,42],ES:[-3,40],PL:[20,52],UA:[31,48],TR:[35,39],
+  ID:[118,-2],VN:[108,14],TH:[101,13],MX:[-102,24],AR:[-64,-34],ZA:[25,-29],NG:[8,10],
+  EG:[30,27],IR:[53,32],PK:[70,30],BD:[90,24],MY:[110,4],PH:[122,13],CL:[-72,-35],
+  CO:[-74,4],RO:[25,46],CZ:[16,50],HU:[19,47],SE:[18,60],NO:[9,60],DK:[10,56],
+  FI:[26,64],AT:[14,47],CH:[8,47],BE:[4,51],PT:[-8,39],GR:[22,39],BG:[25,43],
+  BY:[28,54],KZ:[68,47],IL:[35,31],SA:[44,24],AE:[54,24],IQ:[44,33],
+  LT:[24,56],LV:[25,57],EE:[25,59],MD:[28,47],GE:[44,42],AM:[44,40],
+  MN:[105,46],AF:[67,34],MM:[96,17],KH:[105,12],NP:[84,28],LK:[81,8],
+  MZ:[35,-18],TZ:[35,-6],KE:[38,1],ET:[40,9],SD:[30,15],MA:[6,32],DZ:[3,28],
+  TN:[9,34],LY:[17,27],SN:[14,15],GH:[2,8],CD:[24,-3],VE:[-66,8],PE:[-76,-10]};
+
+var VPS={lon:1.85,lat:50.95};
+var D=[];   // array of {ip, country, nmap, dns, screenshot, nikto, vuln_high, ports}
+var sim=null, projection, pathGen;
+var W=960,H=500;
+
+projection=d3.geoMercator().scale(153).translate([W/2,H/2+60]).center([0,20]);
+pathGen=d3.geoPath().projection(projection);
+
+// Load world map
+fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json')
+  .then(function(r){return r.json();})
+  .then(function(world){
+    document.getElementById('map-loader').style.display='none';
+    var svg=d3.select('#mapsvg');
+    var countries=topojson.feature(world,world.objects.countries);
+    svg.append('g').selectAll('path').data(countries.features).join('path')
+      .attr('class','country').attr('d',pathGen);
+    svg.append('path')
+      .datum(topojson.mesh(world,world.objects.countries,function(a,b){return a!==b;}))
+      .attr('fill','none').attr('stroke','#1c3d58').attr('stroke-width','.4').attr('d',pathGen);
+    if(D.length>0) drawMapOverlay();
+  })
+  .catch(function(){document.getElementById('map-loader').textContent='Erreur carte';});
+
+// ── Compute byCountry from D ───────────────────────────────────────────────
+function getByCountry(){
+  var bc={};
+  D.forEach(function(d){
+    var c=d.country||'Unknown';
+    bc[c]=(bc[c]||0)+1;
+  });
+  return bc;
+}
+
+// ── Draw map overlay ───────────────────────────────────────────────────────
+function drawMapOverlay(){
+  var svg=d3.select('#mapsvg');
+  svg.selectAll('.atk-line,.adot,.vdot').remove();
+  if(!D.length) return;
+  var bc=getByCountry();
+  var sorted=Object.entries(bc).sort(function(a,b){return b[1]-a[1];});
+  var maxC=sorted[0]?sorted[0][1]:1;
+  var vp=projection([VPS.lon,VPS.lat]),vx=vp[0],vy=vp[1];
+
+  sorted.forEach(function(entry,i){
+    var c=entry[0],cnt=entry[1];
+    var co=CC[c];if(!co||c==='Unknown')return;
+    var ap=projection(co);if(!ap)return;
+    var ax=ap[0],ay=ap[1];
+    if(Math.abs(ax-vx)<15&&Math.abs(ay-vy)<15)return;
+    var mx=(ax+vx)/2,my=Math.min(ay,vy)-50-(cnt/maxC)*60;
+    svg.append('path').attr('class','atk-line')
+      .attr('d','M'+ax+','+ay+' Q'+mx+','+my+' '+vx+','+vy)
+      .style('animation-delay',(i*0.05)+'s');
+  });
+
+  sorted.forEach(function(entry){
+    var c=entry[0],cnt=entry[1];
+    var co=CC[c];if(!co||c==='Unknown')return;
+    var cp=projection(co);if(!cp)return;
+    var cx=cp[0],cy=cp[1];
+    var r=3+(cnt/maxC)*12,big=cnt>D.length*0.08;
+    var g=svg.append('g').attr('class',big?'adot big':'adot');
+    g.append('circle').attr('cx',cx).attr('cy',cy).attr('r',r+5).attr('class','rng');
+    g.append('circle').attr('cx',cx).attr('cy',cy).attr('r',r).attr('class','m');
+    if(cnt>=3){
+      g.append('text').attr('x',cx+r+3).attr('y',cy+3).attr('class','dlbl')
+        .attr('fill',big?'var(--w)':'var(--tx)').text(c+'('+cnt+')');
+    }
+    g.on('mouseenter',function(e){showTip(e,c,null,cnt);})
+     .on('mousemove',moveTip).on('mouseleave',hideTip);
+  });
+
+  var vg=svg.append('g').attr('class','vdot');
+  vg.append('circle').attr('cx',vx).attr('cy',vy).attr('r',10).attr('class','rng');
+  vg.append('circle').attr('cx',vx).attr('cy',vy).attr('r',6).attr('class','m');
+  vg.append('text').attr('x',vx+10).attr('y',vy-9).attr('class','vlbl').text('VPS');
+}
+
+// ── Load data ──────────────────────────────────────────────────────────────
+function loadJSON(data){
+  D=data;
+  updateHeader();
+  drawMapOverlay();
+  renderStats();
+  renderIPTable();
+  if(document.getElementById('panel-graph').classList.contains('active')) renderGraph();
+}
+
+function loadCSV(txt){
+  var lines=txt.trim().split('\n'),byIp={};
+  for(var i=1;i<lines.length;i++){
+    var p=lines[i].split(',');
+    if(p.length<4)continue;
+    var ip=p[1].trim(),country=p[3].trim();
+    if(!ip||!/^\d+\.\d+\.\d+\.\d+$/.test(ip))continue;
+    if(!byIp[ip])byIp[ip]={ip:ip,country:country,nmap:false,dns:false,screenshot:false,nikto:false,vuln_high:0,ports:'',count:0};
+    byIp[ip].count++;
+  }
+  loadJSON(Object.values(byIp));
+}
+
+function updateHeader(){
+  var bc=getByCountry();
+  var vulns=D.filter(function(d){return d.vuln_high>0;}).length;
+  document.getElementById('ht').textContent=D.length.toLocaleString();
+  document.getElementById('hi').textContent=Object.keys(bc).length;
+  document.getElementById('hc2').textContent=vulns;
+}
+
+// ── Graph ──────────────────────────────────────────────────────────────────
+function renderGraph(){
+  var wrap=document.getElementById('gwrap');
+  var W2=wrap.clientWidth||360,H2=wrap.clientHeight||400;
+  var svg=d3.select('#gsvg');svg.selectAll('*').remove();
+  svg.attr('viewBox','0 0 '+W2+' '+H2);
+  svg.append('defs').append('marker').attr('id','arr')
+    .attr('viewBox','0 -5 10 10').attr('refX',15).attr('refY',0)
+    .attr('markerWidth',5).attr('markerHeight',5).attr('orient','auto')
+    .append('path').attr('d','M0,-5L10,0L0,5').attr('class','ah');
+
+  var top=D.slice().sort(function(a,b){return (b.vuln_high||0)-(a.vuln_high||0);}).slice(0,40);
+  if(!top.length)return;
+  var nodes=[{id:'VPS',type:'vps'}];
+  var links=[];
+  top.forEach(function(d){
+    nodes.push({id:d.ip,type:'atk',country:d.country,vuln:d.vuln_high,ports:d.ports});
+    links.push({source:d.ip,target:'VPS',hot:d.vuln_high>0});
+  });
+
+  if(sim)sim.stop();
+  sim=d3.forceSimulation(nodes)
+    .force('link',d3.forceLink(links).id(function(d){return d.id;}).distance(80))
+    .force('charge',d3.forceManyBody().strength(-55))
+    .force('center',d3.forceCenter(W2/2,H2/2))
+    .force('collide',d3.forceCollide().radius(20));
+
+  var edge=svg.append('g').selectAll('line').data(links).join('line')
+    .attr('class',function(d){return 'edge'+(d.hot?' hot':'');})
+    .attr('marker-end','url(#arr)');
+  var node=svg.append('g').selectAll('g').data(nodes).join('g')
+    .attr('class',function(d){return d.type==='vps'?'nv':'na';})
+    .call(d3.drag()
+      .on('start',function(e,d){if(!e.active)sim.alphaTarget(.3).restart();d.fx=d.x;d.fy=d.y;})
+      .on('drag',function(e,d){d.fx=e.x;d.fy=e.y;})
+      .on('end',function(e,d){if(!e.active)sim.alphaTarget(0);d.fx=null;d.fy=null;}));
+  node.append('circle').attr('r',function(d){
+    return d.type==='vps'?17:(d.vuln>0?8:5);
+  });
+  node.append('text').attr('class',function(d){return d.type==='vps'?'nl vp':'nl';})
+    .attr('dx',function(d){return d.type==='vps'?-12:12;})
+    .attr('dy',function(d){return d.type==='vps'?-22:4;})
+    .text(function(d){return d.type==='vps'?'🍯 VPS':d.id;});
+  node.filter(function(d){return d.type==='atk';})
+    .on('mouseenter',function(e,d){showTip(e,d.country,d.id,d.vuln+' vuln(s) | '+d.ports);})
+    .on('mousemove',moveTip).on('mouseleave',hideTip);
+  sim.on('tick',function(){
+    edge.attr('x1',function(d){return d.source.x;}).attr('y1',function(d){return d.source.y;})
+        .attr('x2',function(d){return d.target.x;}).attr('y2',function(d){return d.target.y;});
+    node.attr('transform',function(d){return 'translate('+d.x+','+d.y+')';});
+  });
+}
+function resetSim(){if(sim)sim.alpha(1).restart();}
+
+// ── Stats ──────────────────────────────────────────────────────────────────
+function renderStats(){
+  if(!D.length)return;
+  document.getElementById('empty').style.display='none';
+  document.getElementById('sb').style.display='block';
+  var bc=getByCountry();
+  var sorted=Object.entries(bc).sort(function(a,b){return b[1]-a[1];});
+  var topC=sorted[0]||['—',0];
+  var vulns=D.filter(function(d){return d.vuln_high>0;}).length;
+  var withNmap=D.filter(function(d){return d.nmap;}).length;
+  document.getElementById('cards').innerHTML=
+    '<div class="card"><div class="lb">IPs SCANNÉES</div><div class="vl">'+D.length.toLocaleString()+'</div></div>'+
+    '<div class="card r"><div class="lb">AVEC VULNS</div><div class="vl">'+vulns+'</div></div>'+
+    '<div class="card g"><div class="lb">PAYS</div><div class="vl">'+Object.keys(bc).length+'</div></div>'+
+    '<div class="card w"><div class="lb">TOP PAYS</div><div class="vl">'+topC[0]+'</div></div>';
+  var mx=sorted[0]?sorted[0][1]:1;
+  document.getElementById('ctb').innerHTML=sorted.map(function(e,i){
+    return '<tr><td class="mv">'+(i+1)+'</td><td>'+e[0]+'</td><td class="cv">'+e[1]+'</td>'+
+      '<td class="mv">'+(e[1]/D.length*100).toFixed(1)+'%</td>'+
+      '<td><div class="bt"><div class="bf" style="width:'+(e[1]/mx*100).toFixed(1)+'%"></div></div></td></tr>';
+  }).join('');
+}
+
+// ── IP Table ───────────────────────────────────────────────────────────────
+function renderIPTable(filter,search){
+  if(!D.length)return;
+  document.getElementById('ip-empty').style.display='none';
+  document.getElementById('ip-content').style.display='block';
+  var rows=D.slice();
+  if(filter==='nmap') rows=rows.filter(function(d){return d.nmap;});
+  else if(filter==='vuln') rows=rows.filter(function(d){return d.vuln_high>0;});
+  else if(filter==='screenshot') rows=rows.filter(function(d){return d.screenshot;});
+  if(search) rows=rows.filter(function(d){
+    return d.ip.includes(search)||(d.country&&d.country.toLowerCase().includes(search.toLowerCase()));
+  });
+  rows.sort(function(a,b){return (b.vuln_high||0)-(a.vuln_high||0);});
+  document.getElementById('ip-tbody').innerHTML=rows.slice(0,200).map(function(d){
+    var badges='';
+    if(d.nmap) badges+='<span class="badge ok">nmap</span>';
+    if(d.dns) badges+='<span class="badge ok">dns</span>';
+    if(d.screenshot) badges+='<span class="badge ok">📸</span>';
+    if(d.nikto) badges+='<span class="badge warn">nikto</span>';
+    var vuln=d.vuln_high>0?'<span class="badge err">HIGH:'+d.vuln_high+'</span>':'<span class="mv">—</span>';
+    return '<tr><td class="av">'+d.ip+'</td><td>'+( d.country||'?')+'</td>'+
+      '<td class="mv" style="font-size:.65rem">'+(d.ports||'—')+'</td>'+
+      '<td>'+badges+'</td><td>'+vuln+'</td></tr>';
+  }).join('');
+}
+
+// ── Search/filter ──────────────────────────────────────────────────────────
+document.getElementById('ip-search').addEventListener('input',function(){
+  renderIPTable(document.getElementById('ip-filter').value,this.value);
+});
+document.getElementById('ip-filter').addEventListener('change',function(){
+  renderIPTable(this.value,document.getElementById('ip-search').value);
+});
+
+// ── Tooltip ────────────────────────────────────────────────────────────────
+function showTip(e,country,ip,info){
+  document.getElementById('tiip').textContent=ip||country;
+  document.getElementById('tico').textContent=ip?'Pays: '+country:'';
+  document.getElementById('tict').textContent=info||'';
+  document.getElementById('tip').style.display='block';
+  moveTip(e);
+}
+function moveTip(e){var t=document.getElementById('tip');t.style.left=(e.clientX+14)+'px';t.style.top=(e.clientY-10)+'px';}
+function hideTip(){document.getElementById('tip').style.display='none';}
+
+// ── Tabs ───────────────────────────────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
+    document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('active');});
+    btn.classList.add('active');
+    var id=btn.dataset.tab;
+    document.getElementById('panel-'+id).classList.add('active');
+    if(id==='graph'&&D.length>0) setTimeout(renderGraph,60);
+    if(id==='ips'&&D.length>0) renderIPTable();
+  });
+});
+
+// ── File inputs ────────────────────────────────────────────────────────────
+document.getElementById('fi').addEventListener('change',function(e){
+  if(!e.target.files[0])return;
+  var r=new FileReader();
+  r.onload=function(ev){
+    try{
+      loadJSON(JSON.parse(ev.target.result));
+      document.getElementById('dzt').innerHTML='<strong>✅ data.json chargé</strong>';
+    }catch(err){alert('JSON invalide: '+err);}
+  };
+  r.readAsText(e.target.files[0]);
+});
+document.getElementById('fi2').addEventListener('change',function(e){
+  if(!e.target.files[0])return;
+  var r=new FileReader();
+  r.onload=function(ev){
+    loadCSV(ev.target.result);
+    document.getElementById('dzt').innerHTML='<strong>✅ CSV chargé</strong>';
+  };
+  r.readAsText(e.target.files[0]);
+});
+
+// ── Demo ───────────────────────────────────────────────────────────────────
+function loadDemo(){
+  var countries=['CN','RU','DE','NL','US','UA','VN','FR','SE','RO','GB','BG','HK','IN'];
+  var demo=[];
+  for(var i=0;i<80;i++){
+    var c=countries[i%countries.length];
+    var a=Math.floor(Math.random()*220)+1,b=Math.floor(Math.random()*255),cc=Math.floor(Math.random()*255),dd=Math.floor(Math.random()*255);
+    demo.push({
+      ip:a+'.'+b+'.'+cc+'.'+dd,
+      country:c,
+      nmap:Math.random()>.3,
+      dns:Math.random()>.4,
+      screenshot:Math.random()>.5,
+      nikto:Math.random()>.7,
+      vuln_high:Math.random()>.8?Math.floor(Math.random()*5):0,
+      ports:Math.random()>.5?'80,443':'22'
+    });
+  }
+  loadJSON(demo);
+  document.getElementById('dzt').innerHTML='<strong>⚡ Démo chargée — '+demo.length+' IPs</strong>';
+}
+</script>
+</body>
+</html>

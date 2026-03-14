@@ -84,7 +84,7 @@ echo "5️⃣  Suppression des alias dans ~/.bashrc..."
 
 if [ -f "$BASHRC" ]; then
     # Vérifier si des alias existent (utiliser grep -E pour les expressions régulières)
-    if grep -qE "alias honeypot-stats|alias honeypot-dashboard|alias honeypot-monitor|alias scan-web|alias capture-web|alias vuln-scan|alias honeypot-dig|alias honeypot-search-nikto|alias honeypot-logs|alias setup-auto-scan|alias count-ips|alias piegeAbot|# Honeypot Monitor Aliases" "$BASHRC" 2>/dev/null; then
+    if grep -qE "alias honeypot-stats|alias honeypot-dashboard|alias honeypot-monitor|alias scan-web|alias capture-web|alias vuln-scan|alias honeypot-dig|alias honeypot-search-nikto|alias honeypot-logs|alias setup-auto-scan|alias count-ips|alias piegeAbot|alias honeypot-make-visualizer-data|# Honeypot Monitor Aliases" "$BASHRC" 2>/dev/null; then
         echo "   📋 Alias trouvés dans ~/.bashrc"
         if ask_confirmation "   ❓ Supprimer les alias du .bashrc ?"; then
             # Créer une backup
@@ -103,6 +103,7 @@ if [ -f "$BASHRC" ]; then
             sed -i '/^alias setup-auto-scan/d' "$BASHRC"
             sed -i '/^alias count-ips/d' "$BASHRC"
             sed -i '/^alias piegeAbot/d' "$BASHRC"
+            sed -i '/^alias honeypot-make-visualizer-data/d' "$BASHRC"
             sed -i '/# Honeypot Monitor Aliases/d' "$BASHRC"
             
             # Nettoyer les lignes vides multiples
@@ -112,7 +113,7 @@ if [ -f "$BASHRC" ]; then
             echo "   💾 Backup créé automatiquement"
             
             # Vérifier que c'est bien supprimé
-            if grep -qE "alias honeypot-stats|alias honeypot-dashboard|alias honeypot-monitor|alias scan-web|alias capture-web|alias vuln-scan|alias honeypot-dig|alias honeypot-search-nikto|alias honeypot-logs|alias setup-auto-scan|alias count-ips|alias piegeAbot" "$BASHRC" 2>/dev/null; then
+            if grep -qE "alias honeypot-stats|alias honeypot-dashboard|alias honeypot-monitor|alias scan-web|alias capture-web|alias vuln-scan|alias honeypot-dig|alias honeypot-search-nikto|alias honeypot-logs|alias setup-auto-scan|alias count-ips|alias piegeAbot|alias honeypot-make-visualizer-data" "$BASHRC" 2>/dev/null; then
                 echo "   ⚠️  Attention : certains alias semblent toujours présents"
                 echo "   💡 Essayez de recharger le .bashrc : source ~/.bashrc"
             fi
@@ -130,7 +131,7 @@ fi
 echo ""
 echo "6️⃣  Suppression des alias de la session actuelle..."
 if ask_confirmation "   ❓ Supprimer les alias de la session actuelle ?"; then
-    unalias honeypot-stats honeypot-dashboard honeypot-monitor scan-web capture-web vuln-scan honeypot-dig honeypot-search-nikto 2>/dev/null || true
+    unalias honeypot-stats honeypot-dashboard honeypot-monitor scan-web capture-web vuln-scan honeypot-dig honeypot-search-nikto honeypot-make-visualizer-data 2>/dev/null || true
     echo "   ✅ Alias supprimés de la session"
 else
     echo "   ℹ️  Alias de session conservés"

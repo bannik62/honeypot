@@ -32,7 +32,7 @@ log "Démarrage de la séquence de scans"
 log "========================================="
 
 # 1. scan-web (nmap-to-csv)
-log "1/4 - Démarrage de scan-web..."
+log "1/6 - Démarrage de scan-web..."
 cd "$SCRIPT_DIR"
 if "$SCRIPT_DIR/nmap-to-csv.sh" >> "$LOG_DIR/run-all-scans.log" 2>&1; then
     log "✅ scan-web terminé"
@@ -43,7 +43,7 @@ else
 fi
 
 # 2. capture-web (web-capture)
-log "2/4 - Démarrage de capture-web..."
+log "2/6 - Démarrage de capture-web..."
 if "$SCRIPT_DIR/web-capture.sh" >> "$LOG_DIR/run-all-scans.log" 2>&1; then
     log "✅ capture-web terminé"
 sleep 30
@@ -53,7 +53,7 @@ else
 fi
 
 # 3. dig-ip
-log "3/4 - Démarrage de dig-ip..."
+log "3/6 - Démarrage de dig-ip..."
 if "$SCRIPT_DIR/dig-ip.sh" >> "$LOG_DIR/run-all-scans.log" 2>&1; then
     log "✅ dig-ip terminé"
 sleep 30
@@ -63,7 +63,7 @@ else
 fi
 
 # 4. vuln-scan
-log "4/4 - Démarrage de vuln-scan..."
+log "4/6 - Démarrage de vuln-scan..."
 if "$SCRIPT_DIR/vuln-scan.sh" >> "$LOG_DIR/run-all-scans.log" 2>&1; then
     log "✅ vuln-scan terminé"
 else
@@ -76,7 +76,7 @@ log "Tous les scans sont terminés"
 log "========================================="
 
 # 5. Nettoyage du cache et des anciennes données
-log "5/5 - Nettoyage du cache et des anciennes données..."
+log "5/6 - Nettoyage du cache et des anciennes données..."
 if [ -f "$SCRIPT_DIR/cleanup-old-data.sh" ]; then
     if "$SCRIPT_DIR/cleanup-old-data.sh" >> "$LOG_DIR/run-all-scans.log" 2>&1; then
         log "✅ Nettoyage terminé"
@@ -85,4 +85,18 @@ if [ -f "$SCRIPT_DIR/cleanup-old-data.sh" ]; then
     fi
 else
     log "⚠️  Script cleanup-old-data.sh non trouvé"
+fi
+
+# 6. Attente 10 min puis génération data.json pour le visualizer
+log "Attente 10 min avant génération data.json..."
+sleep 600
+log "6/6 - Génération data.json (visualizer)..."
+if [ -f "$SCRIPT_DIR/generate-data.sh" ]; then
+    if "$SCRIPT_DIR/generate-data.sh" >> "$LOG_DIR/run-all-scans.log" 2>&1; then
+        log "✅ data.json généré (data/visualizer-dashboard/data.json)"
+    else
+        log "⚠️  Erreur lors de la génération data.json (non bloquant)"
+    fi
+else
+    log "⚠️  Script generate-data.sh non trouvé"
 fi
