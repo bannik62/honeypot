@@ -50,23 +50,30 @@ document.getElementById('panel-ips').addEventListener('click', (e) => {
   titleEl.textContent = `${labels[type] || type} — ${ip}`;
   bodyEl.innerHTML = '<span class="ip-modal-loading">Chargement…</span>';
   modal.classList.add('open');
-  const url = `/data/visualizer-dashboard/ip/${encodeURIComponent(ip)}/${type}`;
+  const urlType = type === 'screenshot' ? 'png' : type;
+  const url = `/data/screenshotAndLog/${encodeURIComponent(ip)}/${urlType}`;
   fetch(url)
     .then((r) => {
       if (!r.ok) {
         const msg = r.status === 404
-          ? `Fichier ou dossier absent (404). Vérifiez sur le VPS : data/screenshotAndLog/${ip}/<br><br>Diagnostic : <a href="/data/visualizer-dashboard/debug" target="_blank">/data/visualizer-dashboard/debug</a>`
+          ? `Fichier ou dossier absent (404). Vérifiez sur le VPS : data/screenshotAndLog/${ip}/<br><br>Diagnostic : <a href="/data/screenshotAndLog/debug" target="_blank">/data/screenshotAndLog/debug</a>`
           : `Erreur serveur (${r.status}).`;
         bodyEl.innerHTML = `<span class="ip-modal-loading">${msg}</span>`;
         return;
       }
-      return type === 'screenshot' ? r.blob() : r.text();
+      if (type === 'screenshot') {
+        const timestamp = r.headers.get('X-Capture-Timestamp') || '';
+        return r.blob().then((blob) => ({ blob, timestamp }));
+      }
+      return r.text();
     })
     .then((data) => {
       if (!data) return;
       if (type === 'screenshot') {
-        const blobUrl = URL.createObjectURL(data);
-        bodyEl.innerHTML = `<img src="${blobUrl}" alt="Capture ${ip}"/>`;
+        const { blob, timestamp } = data;
+        const blobUrl = URL.createObjectURL(blob);
+        const tsHtml = timestamp ? `<p class="ip-modal-ts">${escapeHtml(timestamp)}</p>` : '';
+        bodyEl.innerHTML = `${tsHtml}<img src="${blobUrl}" alt="Capture ${ip}"/>`;
         bodyEl.querySelector('img').onload = () => URL.revokeObjectURL(blobUrl);
       } else {
         bodyEl.innerHTML = `<pre>${escapeHtml(data)}</pre>`;

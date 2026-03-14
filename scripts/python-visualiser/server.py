@@ -30,7 +30,8 @@ VISUALIZER_DIR = ROOT / "visualizer"
 SCAN_DIR = ROOT / "data" / "screenshotAndLog"
 DATA_JSON_PATH = ROOT / "data" / "visualizer-dashboard" / "data.json"
 DATA_JSON_URL = "/data/visualizer-dashboard/data.json"
-IP_PREFIX = "/data/visualizer-dashboard/ip/"
+# Chemin réel des rapports/screenshots (aligné avec data/screenshotAndLog/<ip>/)
+IP_PREFIX = "/data/screenshotAndLog/"
 
 PORT = 8765
 IP_RE = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$")
@@ -48,7 +49,7 @@ class VisualizerHandler(SimpleHTTPRequestHandler):
         if path == DATA_JSON_URL:
             self.serve_data_json()
             return
-        if path == "/data/visualizer-dashboard/debug":
+        if path == "/data/visualizer-dashboard/debug" or path == "/data/screenshotAndLog/debug":
             self.serve_debug()
             return
         if path.startswith(IP_PREFIX):
@@ -68,14 +69,14 @@ class VisualizerHandler(SimpleHTTPRequestHandler):
             self.send_error(404)
             return
         ip, resource_type = parts
-        if not IP_RE.match(ip) or resource_type not in ("nmap", "dns", "nikto", "screenshot"):
+        if not IP_RE.match(ip) or resource_type not in ("nmap", "dns", "nikto", "screenshot", "png"):
             self.send_error(400)
             return
         ip_dir = SCAN_DIR / ip
         if not ip_dir.is_dir():
             self.send_error(404)
             return
-        if resource_type == "screenshot":
+        if resource_type in ("screenshot", "png"):
             pngs = list(ip_dir.glob("*.png"))
             if not pngs:
                 self.send_error(404)
@@ -89,6 +90,18 @@ class VisualizerHandler(SimpleHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", "image/png")
             self.send_header("Content-Length", str(len(body)))
+            # Timestamp depuis le nom : <ip>_<port>_YYYYMMDD_HHMMSS.png
+            stem = file_path.stem
+            parts = stem.split("_")
+            if len(parts) >= 4:
+                date_part = parts[-2]
+                time_part = parts[-1]
+                if len(date_part) == 8 and len(time_part) == 6:
+                    try:
+                        ts = f"{date_part[0:4]}-{date_part[4:6]}-{date_part[6:8]} {time_part[0:2]}:{time_part[2:4]}:{time_part[4:6]}"
+                        self.send_header("X-Capture-Timestamp", ts)
+                    except Exception:
+                        pass
             self.end_headers()
             self.wfile.write(body)
         else:
