@@ -2,20 +2,24 @@
 """
 Serveur minimal pour le visualiseur honeypot.
 Écoute sur 127.0.0.1 uniquement. Sert visualizer/ et data/visualizer-dashboard/data.json.
+Expose aussi les rapports par IP (nmap, dns, nikto, screenshot).
 """
-import os
+import re
 import sys
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 
 # Racine du projet honeypot (scripts/python-visualiser -> scripts -> honeypot)
 SCRIPT_DIR = Path(__file__).resolve().parent
-ROOT = SCRIPT_DIR.parent.parent  # python-visualiser -> scripts; parent.parent = honeypot
+ROOT = SCRIPT_DIR.parent.parent
 VISUALIZER_DIR = ROOT / "visualizer"
+SCAN_DIR = ROOT / "data" / "screenshotAndLog"
 DATA_JSON_PATH = ROOT / "data" / "visualizer-dashboard" / "data.json"
 DATA_JSON_URL = "/data/visualizer-dashboard/data.json"
+IP_PREFIX = "/data/visualizer-dashboard/ip/"
 
 PORT = 8765
+IP_RE = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$")
 
 
 class VisualizerHandler(SimpleHTTPRequestHandler):
@@ -30,14 +34,61 @@ class VisualizerHandler(SimpleHTTPRequestHandler):
         if path == DATA_JSON_URL:
             self.serve_data_json()
             return
+        if path.startswith(IP_PREFIX):
+            self.serve_ip_resource(path[len(IP_PREFIX):].strip("/"))
+            return
         if path.startswith("/visualizer/"):
             self.path = path.replace("/visualizer", "", 1) or "/honeypot-dashboard.html"
             return super().do_GET()
         if path.startswith("/"):
-            # Fichiers sous / → visualizer/
             self.path = path
             return super().do_GET()
         self.send_error(404)
+
+    def serve_ip_resource(self, subpath):
+        parts = subpath.split("/")
+        if len(parts) != 2:
+            self.send_error(404)
+            return
+        ip, resource_type = parts
+        if not IP_RE.match(ip) or resource_type not in ("nmap", "dns", "nikto", "screenshot"):
+            self.send_error(400)
+            return
+        ip_dir = SCAN_DIR / ip
+        if not ip_dir.is_dir():
+            self.send_error(404)
+            return
+        if resource_type == "screenshot":
+            pngs = list(ip_dir.glob("*.png"))
+            if not pngs:
+                self.send_error(404)
+                return
+            file_path = sorted(pngs)[0]
+            try:
+                body = file_path.read_bytes()
+            except OSError:
+                self.send_error(500)
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "image/png")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        else:
+            file_path = ip_dir / f"{ip}_{resource_type}.txt"
+            if not file_path.is_file():
+                self.send_error(404)
+                return
+            try:
+                body = file_path.read_bytes()
+            except OSError:
+                self.send_error(500)
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
 
     def serve_data_json(self):
         if not DATA_JSON_PATH.is_file():

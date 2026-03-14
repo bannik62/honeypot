@@ -99,6 +99,19 @@ tr:hover td{background:rgba(0,212,255,.03)}
 #tip .tr{display:flex;justify-content:space-between;gap:10px;line-height:1.35}
 #tip .k{color:var(--mu)}
 #tip .v{color:var(--tx);text-align:right;max-width:170px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.badge-detail{cursor:pointer}
+.badge-detail:hover{opacity:.9}
+.ip-modal{position:fixed;inset:0;z-index:300;display:none;align-items:center;justify-content:center;padding:20px}
+.ip-modal.open{display:flex}
+.ip-modal-backdrop{position:absolute;inset:0;background:rgba(5,10,15,.85);cursor:pointer}
+.ip-modal-box{position:relative;background:var(--s2);border:1px solid var(--b);border-radius:10px;max-width:90vw;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 0 30px rgba(0,212,255,.15)}
+.ip-modal-title{font-family:'Orbitron',monospace;font-size:.85rem;color:var(--a);padding:12px 14px;border-bottom:1px solid var(--b);display:flex;align-items:center;justify-content:space-between;gap:10px}
+.ip-modal-close{background:none;border:none;color:var(--mu);cursor:pointer;font-size:1.2rem;line-height:1;padding:4px}
+.ip-modal-close:hover{color:var(--a)}
+.ip-modal-body{overflow:auto;padding:14px;flex:1;min-height:0}
+.ip-modal-body pre{margin:0;font-size:.7rem;white-space:pre-wrap;word-break:break-all;color:var(--tx);font-family:'Share Tech Mono',monospace}
+.ip-modal-body img{max-width:100%;height:auto;display:block;border-radius:4px}
+.ip-modal-loading{color:var(--mu);padding:20px}
 ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--b);border-radius:2px}
 </style>
 </head>
@@ -217,6 +230,14 @@ tr:hover td{background:rgba(0,212,255,.03)}
   <div class="tr"><span class="k">Vuln HIGH</span><span class="v" id="tip-vuln">—</span></div>
   <div class="tr"><span class="k">Ports</span><span class="v" id="tip-ports">—</span></div>
   <div class="tr"><span class="k">Rapports</span><span class="v" id="tip-reports">—</span></div>
+</div>
+
+<div id="ip-detail-modal" class="ip-modal" aria-hidden="true">
+  <div class="ip-modal-backdrop"></div>
+  <div class="ip-modal-box">
+    <div class="ip-modal-title"><span id="ip-modal-title">—</span><button type="button" class="ip-modal-close" title="Fermer">&times;</button></div>
+    <div class="ip-modal-body" id="ip-modal-body"><span class="ip-modal-loading">Chargement…</span></div>
+  </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>

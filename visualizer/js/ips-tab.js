@@ -20,13 +20,14 @@ export function renderIPTable(filter, search) {
   const shown = rows.slice(0, lim);
   const meta = document.getElementById('ip-meta');
   if (meta) meta.textContent = `IPs affichées: ${shown.length.toLocaleString()} / ${rows.length.toLocaleString()}${rows.length > D.length ? ' (filtré)' : ''}`;
+  const esc = (s) => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
   document.getElementById('ip-tbody').innerHTML = shown.map((d) => {
     let badges = '';
-    if (d.nmap) badges += '<span class="badge ok">nmap</span>';
-    if (d.dns) badges += '<span class="badge ok">dns</span>';
-    if (d.screenshot) badges += '<span class="badge ok">📸</span>';
-    if (d.nikto) badges += '<span class="badge warn">nikto</span>';
+    if (d.nmap) badges += `<span class="badge ok badge-detail" data-ip="${esc(d.ip)}" data-type="nmap" title="Voir le rapport">nmap</span>`;
+    if (d.dns) badges += `<span class="badge ok badge-detail" data-ip="${esc(d.ip)}" data-type="dns" title="Voir le rapport">dns</span>`;
+    if (d.screenshot) badges += `<span class="badge ok badge-detail" data-ip="${esc(d.ip)}" data-type="screenshot" title="Voir la capture">📸</span>`;
+    if (d.nikto) badges += `<span class="badge warn badge-detail" data-ip="${esc(d.ip)}" data-type="nikto" title="Voir le rapport">nikto</span>`;
     const vuln = d.vuln_high > 0 ? `<span class="badge err">HIGH:${d.vuln_high}</span>` : '<span class="mv">—</span>';
-    return `<tr><td class="av">${d.ip}</td><td>${d.country || '?'}</td><td class="mv" style="font-size:.65rem">${d.ports || '—'}</td><td>${badges}</td><td>${vuln}</td></tr>`;
+    return `<tr><td class="av">${esc(d.ip)}</td><td>${esc(d.country) || '?'}</td><td class="mv" style="font-size:.65rem">${esc(d.ports) || '—'}</td><td>${badges}</td><td>${vuln}</td></tr>`;
   }).join('');
 }

@@ -37,6 +37,53 @@ document.getElementById('ip-limit').addEventListener('change', () => {
   renderIPTable(document.getElementById('ip-filter').value, document.getElementById('ip-search').value);
 });
 
+document.getElementById('panel-ips').addEventListener('click', (e) => {
+  const badge = e.target.closest('.badge-detail');
+  if (!badge) return;
+  const ip = badge.dataset.ip;
+  const type = badge.dataset.type;
+  if (!ip || !type) return;
+  const modal = document.getElementById('ip-detail-modal');
+  const titleEl = document.getElementById('ip-modal-title');
+  const bodyEl = document.getElementById('ip-modal-body');
+  const labels = { nmap: 'Rapport Nmap', dns: 'Rapport DNS', nikto: 'Rapport Nikto', screenshot: 'Capture d\'écran' };
+  titleEl.textContent = `${labels[type] || type} — ${ip}`;
+  bodyEl.innerHTML = '<span class="ip-modal-loading">Chargement…</span>';
+  modal.classList.add('open');
+  const url = `/data/visualizer-dashboard/ip/${encodeURIComponent(ip)}/${type}`;
+  fetch(url)
+    .then((r) => {
+      if (!r.ok) throw new Error(r.status);
+      return type === 'screenshot' ? r.blob() : r.text();
+    })
+    .then((data) => {
+      if (type === 'screenshot') {
+        const blobUrl = URL.createObjectURL(data);
+        bodyEl.innerHTML = `<img src="${blobUrl}" alt="Capture ${ip}"/>`;
+        bodyEl.querySelector('img').onload = () => URL.revokeObjectURL(blobUrl);
+      } else {
+        bodyEl.innerHTML = `<pre>${escapeHtml(data)}</pre>`;
+      }
+    })
+    .catch(() => {
+      bodyEl.innerHTML = '<span class="ip-modal-loading">Ressource indisponible (fichier absent ou serveur local).</span>';
+    });
+});
+
+function escapeHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+function closeIpModal() {
+  document.getElementById('ip-detail-modal').classList.remove('open');
+}
+
+document.getElementById('ip-detail-modal').querySelector('.ip-modal-close').addEventListener('click', closeIpModal);
+document.getElementById('ip-detail-modal').querySelector('.ip-modal-backdrop').addEventListener('click', closeIpModal);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeIpModal(); });
+
 document.querySelectorAll('.tab').forEach((btn) => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tab').forEach((t) => t.classList.remove('active'));
