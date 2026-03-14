@@ -13,6 +13,7 @@ export function renderIPTable(filter, search) {
   if (filter === 'nmap') rows = rows.filter((d) => d.nmap);
   else if (filter === 'vuln') rows = rows.filter((d) => d.vuln_high > 0);
   else if (filter === 'screenshot') rows = rows.filter((d) => d.screenshot);
+  else if (filter === 'traceroute') rows = rows.filter((d) => d.traceroute);
   if (search) rows = rows.filter((d) => d.ip.includes(search) || (d.country && d.country.toLowerCase().includes(search.toLowerCase())));
   rows.sort((a, b) => (b.vuln_high || 0) - (a.vuln_high || 0));
   const limSel = document.getElementById('ip-limit');
@@ -25,6 +26,7 @@ export function renderIPTable(filter, search) {
     let badges = '';
     if (d.nmap) badges += `<span class="badge ok badge-detail" data-ip="${esc(d.ip)}" data-type="nmap" title="Voir le rapport">nmap</span>`;
     if (d.dns) badges += `<span class="badge ok badge-detail" data-ip="${esc(d.ip)}" data-type="dns" title="Voir le rapport">dns</span>`;
+    if (d.traceroute) badges += `<span class="badge ok badge-detail" data-ip="${esc(d.ip)}" data-type="traceroute" title="Voir le traceroute">tr</span>`;
     if (d.screenshot) badges += `<span class="badge ok badge-detail" data-ip="${esc(d.ip)}" data-type="screenshot" title="Voir la capture">📸</span>`;
     if (d.nikto) badges += `<span class="badge warn badge-detail" data-ip="${esc(d.ip)}" data-type="nikto" title="Voir le rapport">nikto</span>`;
     const vuln = d.vuln_high > 0 ? `<span class="badge err">HIGH:${d.vuln_high}</span>` : '<span class="mv">—</span>';

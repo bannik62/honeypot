@@ -65,6 +65,8 @@ header{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 14px;
 .nv circle{fill:var(--a3);filter:drop-shadow(0 0 6px var(--a3))}
 .na circle{fill:var(--a2);opacity:.8;cursor:pointer}
 .na:hover circle{opacity:1;filter:drop-shadow(0 0 4px var(--a2))}
+.na.nh circle{fill:var(--mu);opacity:.7}
+.na.nh:hover circle{opacity:.9}
 .nl{fill:var(--tx);font-family:'Share Tech Mono',monospace;font-size:10px;pointer-events:none}
 .nl.vp{fill:var(--a3);font-family:'Orbitron',monospace;font-weight:700;font-size:11px}
 .edge{stroke:var(--a2);stroke-opacity:.18;fill:none}
@@ -213,6 +215,7 @@ tr:hover td{background:rgba(0,212,255,.03)}
         <option value="all">Tous</option>
         <option value="nmap">Nmap</option>
         <option value="vuln">Vulns HIGH</option>
+        <option value="traceroute">Traceroute</option>
         <option value="screenshot">Screenshot</option>
       </select>
       <select id="ip-limit" style="background:var(--s);border:1px solid var(--b);color:var(--mu);padding:6px 8px;border-radius:4px;font-family:'Share Tech Mono',monospace;font-size:.72rem">

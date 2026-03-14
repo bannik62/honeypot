@@ -2,13 +2,14 @@
 """
 Serveur minimal pour le visualiseur honeypot.
 Écoute sur 127.0.0.1 uniquement. Sert visualizer/ et data/visualizer-dashboard/data.json.
-Expose aussi les rapports par IP (nmap, dns, nikto, screenshot).
+Expose aussi les rapports par IP (nmap, dns, nikto, traceroute, screenshot).
 
 Pattern des fichiers (aligné avec les scripts) :
-  data/screenshotAndLog/<IP>/<IP>_nmap.txt    (vuln-scan.sh)
-  data/screenshotAndLog/<IP>/<IP>_dns.txt     (dig-ip.sh)
-  data/screenshotAndLog/<IP>/<IP>_nikto.txt   (si présent)
-  data/screenshotAndLog/<IP>/*.png            (web-capture.sh : <IP>_<port>_<date>_<time>.png)
+  data/screenshotAndLog/<IP>/<IP>_nmap.txt       (vuln-scan.sh)
+  data/screenshotAndLog/<IP>/<IP>_dns.txt        (dig-ip.sh)
+  data/screenshotAndLog/<IP>/<IP>_nikto.txt      (si présent)
+  data/screenshotAndLog/<IP>/<IP>_traceroute.txt (vuln-scan.sh, extrait nmap --traceroute)
+  data/screenshotAndLog/<IP>/*.png               (web-capture.sh : <IP>_<port>_<date>_<time>.png)
 """
 import os
 import re
@@ -124,8 +125,8 @@ class VisualizerHandler(SimpleHTTPRequestHandler):
                 return
             self.send_error(404)
             return
-        # Rapports texte nmap / dns / nikto
-        if second not in ("nmap", "dns", "nikto"):
+        # Rapports texte nmap / dns / nikto / traceroute
+        if second not in ("nmap", "dns", "nikto", "traceroute"):
             self.send_error(404)
             return
         file_path = ip_dir / f"{ip}_{second}.txt"

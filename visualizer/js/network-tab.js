@@ -5,7 +5,7 @@ import { showTip, moveTip, hideTip } from './tooltip.js';
 let sim = null;
 
 function attackerScore(d) {
-  return (d.vuln_high || 0) * 100 + (d.nikto ? 35 : 0) + (d.nmap ? 20 : 0) + (d.screenshot ? 8 : 0) + (d.dns ? 5 : 0);
+  return (d.vuln_high || 0) * 100 + (d.nikto ? 35 : 0) + (d.nmap ? 20 : 0) + (d.screenshot ? 8 : 0) + (d.dns ? 5 : 0) + (d.traceroute ? 3 : 0);
 }
 
 export function renderGraph() {
@@ -35,9 +35,32 @@ export function renderGraph() {
 
   const nodes = [{ id: 'VPS', type: 'vps' }];
   const links = [];
+  const nodeIds = new Set(['VPS']);
   top.forEach((d) => {
-    nodes.push({ id: d.ip, type: 'atk', country: d.country, vuln: d.vuln_high, ports: d.ports });
-    links.push({ source: d.ip, target: 'VPS', hot: d.vuln_high > 0 });
+    if (!nodeIds.has(d.ip)) {
+      nodes.push({ id: d.ip, type: 'atk', country: d.country, vuln: d.vuln_high, ports: d.ports });
+      nodeIds.add(d.ip);
+    }
+    let hops = Array.isArray(d.hops) ? d.hops : [];
+    if (hops.length > 0) {
+      const deduped = [];
+      let prev = null;
+      hops.forEach((h) => { if (h !== prev) { deduped.push(h); prev = h; } });
+      hops = deduped;
+      hops.forEach((hopIp) => {
+        if (!nodeIds.has(hopIp)) {
+          nodes.push({ id: hopIp, type: 'hop' });
+          nodeIds.add(hopIp);
+        }
+      });
+      links.push({ source: 'VPS', target: hops[0], hot: false });
+      for (let i = 0; i < hops.length - 1; i++) {
+        links.push({ source: hops[i], target: hops[i + 1], hot: false });
+      }
+      links.push({ source: hops[hops.length - 1], target: d.ip, hot: d.vuln_high > 0 });
+    } else {
+      links.push({ source: d.ip, target: 'VPS', hot: d.vuln_high > 0 });
+    }
   });
 
   if (sim) sim.stop();
@@ -51,18 +74,21 @@ export function renderGraph() {
     .attr('class', (d) => `edge${d.hot ? ' hot' : ''}`)
     .attr('marker-end', 'url(#arr)');
   const node = svg.append('g').selectAll('g').data(nodes).join('g')
-    .attr('class', (d) => (d.type === 'vps' ? 'nv' : 'na'))
+    .attr('class', (d) => (d.type === 'vps' ? 'nv' : d.type === 'hop' ? 'na nh' : 'na'))
     .call(d3.drag()
       .on('start', (e, d) => { if (!e.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
       .on('drag', (e, d) => { d.fx = e.x; d.fy = e.y; })
       .on('end', (e, d) => { if (!e.active) sim.alphaTarget(0); d.fx = null; d.fy = null; }));
-  node.append('circle').attr('r', (d) => (d.type === 'vps' ? 17 : (d.vuln > 0 ? 8 : 5)));
+  node.append('circle').attr('r', (d) => (d.type === 'vps' ? 17 : d.type === 'hop' ? 4 : (d.vuln > 0 ? 8 : 5)));
   node.append('text').attr('class', (d) => (d.type === 'vps' ? 'nl vp' : 'nl'))
     .attr('dx', (d) => (d.type === 'vps' ? -12 : 12))
-    .attr('dy', (d) => (d.type === 'vps' ? -22 : 4))
-    .text((d) => (d.type === 'vps' ? '🍯 VPS' : d.id));
+    .attr('dy', (d) => (d.type === 'vps' ? -22 : d.type === 'hop' ? 0 : 4))
+    .text((d) => (d.type === 'vps' ? '🍯 VPS' : d.type === 'hop' ? '' : d.id));
   node.filter((d) => d.type === 'atk')
     .on('mouseenter', (e, d) => showTip(e, d.country, d.id, `${d.vuln} vuln(s) | ${d.ports}`))
+    .on('mousemove', moveTip).on('mouseleave', hideTip);
+  node.filter((d) => d.type === 'hop')
+    .on('mouseenter', (e, d) => showTip(e, '', d.id, 'Relais traceroute'))
     .on('mousemove', moveTip).on('mouseleave', hideTip);
   sim.on('tick', () => {
     edge.attr('x1', (d) => d.source.x).attr('y1', (d) => d.source.y)

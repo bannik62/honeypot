@@ -92,9 +92,18 @@ scan_one_ip() {
     mkdir -p "$ip_dir"
     local report_file="${ip_dir}/${ip}_nmap.txt"
     
-    # Scan nmap avec vulnérabilités (100 ports communs)
-    nmap -F -sV --script vuln --max-rtt-timeout "${NMAP_MAX_RTT_TIMEOUT:-500ms}" --host-timeout "${NMAP_HOST_TIMEOUT:-600s}" "$ip" > "$report_file" 2>&1
-    
+    # Scan nmap avec vulnérabilités + traceroute (100 ports communs)
+    nmap -F -sV --traceroute --script vuln --max-rtt-timeout "${NMAP_MAX_RTT_TIMEOUT:-500ms}" --host-timeout "${NMAP_HOST_TIMEOUT:-600s}" "$ip" > "$report_file" 2>&1
+
+    # Extraire la section TRACEROUTE dans un fichier à part
+    local traceroute_file="${ip_dir}/${ip}_traceroute.txt"
+    if [ -f "$report_file" ] && [ -s "$report_file" ]; then
+        awk '/^TRACEROUTE$/ { found=1; next } found { print }' "$report_file" > "$traceroute_file"
+        if [ ! -s "$traceroute_file" ]; then
+            rm -f "$traceroute_file"
+        fi
+    fi
+
     if [ $? -eq 0 ]; then
         echo "  ✅ Terminé: $ip"
     else

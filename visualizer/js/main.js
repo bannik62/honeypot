@@ -46,7 +46,7 @@ document.getElementById('panel-ips').addEventListener('click', (e) => {
   const modal = document.getElementById('ip-detail-modal');
   const titleEl = document.getElementById('ip-modal-title');
   const bodyEl = document.getElementById('ip-modal-body');
-  const labels = { nmap: 'Rapport Nmap', dns: 'Rapport DNS', nikto: 'Rapport Nikto', screenshot: 'Capture d\'écran' };
+  const labels = { nmap: 'Rapport Nmap', dns: 'Rapport DNS', nikto: 'Rapport Nikto', traceroute: 'Traceroute', screenshot: 'Capture d\'écran' };
   titleEl.textContent = `${labels[type] || type} — ${ip}`;
   bodyEl.innerHTML = '<span class="ip-modal-loading">Chargement…</span>';
   modal.classList.add('open');

@@ -24,7 +24,7 @@ export function loadCSV(txt, loadJSON) {
     const ip = p[1].trim();
     const country = p[3].trim();
     if (!ip || !/^\d+\.\d+\.\d+\.\d+$/.test(ip)) continue;
-    if (!byIp[ip]) byIp[ip] = { ip, country, nmap: false, dns: false, screenshot: false, nikto: false, vuln_high: 0, ports: '', count: 0 };
+    if (!byIp[ip]) byIp[ip] = { ip, country, nmap: false, dns: false, screenshot: false, nikto: false, traceroute: false, hops: [], vuln_high: 0, ports: '', count: 0 };
     byIp[ip].count += 1;
   }
   loadJSON(Object.values(byIp));

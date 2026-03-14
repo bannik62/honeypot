@@ -12,6 +12,7 @@ export function showPointTip(e, d) {
   const reports = [];
   if (d.nmap) reports.push('nmap');
   if (d.dns) reports.push('dns');
+  if (d.traceroute) reports.push('tr');
   if (d.screenshot) reports.push('shot');
   if (d.nikto) reports.push('nikto');
   document.getElementById('tiip').textContent = d.ip || 'Unknown';
@@ -33,6 +34,7 @@ export function showTip(e, country, ip, info) {
     dns: false,
     screenshot: false,
     nikto: false,
+    traceroute: false,
   });
 }
 

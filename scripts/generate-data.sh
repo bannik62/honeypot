@@ -102,11 +102,22 @@ for ip_dir in "$SCAN_DIR"/*/; do
     has_dns=false
     has_screenshot=false
     has_nikto=false
+    has_traceroute=false
 
-    [ -f "$ip_dir/${ip}_nmap.txt" ]   && has_nmap=true
-    [ -f "$ip_dir/${ip}_dns.txt" ]    && has_dns=true
-    [ -f "$ip_dir/${ip}_nikto.txt" ]  && has_nikto=true
+    [ -f "$ip_dir/${ip}_nmap.txt" ]       && has_nmap=true
+    [ -f "$ip_dir/${ip}_dns.txt" ]        && has_dns=true
+    [ -f "$ip_dir/${ip}_nikto.txt" ]      && has_nikto=true
+    [ -f "$ip_dir/${ip}_traceroute.txt" ] && has_traceroute=true
     ls "$ip_dir"/*.png 2>/dev/null | head -1 | grep -q . && has_screenshot=true
+
+    # Hops du traceroute (ordre des IPs) pour l'onglet Réseau
+    hops_json="[]"
+    if [ "$has_traceroute" = true ] && [ -f "$ip_dir/${ip}_traceroute.txt" ]; then
+        hop_ips=($(grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' "$ip_dir/${ip}_traceroute.txt" 2>/dev/null))
+        if [ ${#hop_ips[@]} -gt 0 ]; then
+            hops_json="[$(printf '"%s"' "${hop_ips[0]}"; for i in "${hop_ips[@]:1}"; do printf ',"%s"' "$i"; done)]"
+        fi
+    fi
 
     # Compter les vulnérabilités HIGH dans le rapport nmap
     vuln_high=0
@@ -138,6 +149,8 @@ for ip_dir in "$SCAN_DIR"/*/; do
     "dns": $has_dns,
     "screenshot": $has_screenshot,
     "nikto": $has_nikto,
+    "traceroute": $has_traceroute,
+    "hops": $hops_json,
     "vuln_high": $vuln_high,
     "ports": "$ports_safe"
   }
