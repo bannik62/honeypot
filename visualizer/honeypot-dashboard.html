@@ -106,13 +106,8 @@ tr:hover td{background:rgba(0,212,255,.03)}
 
 <div id="dz">
   <span style="font-size:1.4rem">📂</span>
-  <p id="dzt">Charge <strong>data.json</strong> (data/visualizer-dashboard/data.json)<br>
-  <span style="font-size:.65rem">généré par generate-data.sh — ou importe manuellement</span></p>
-  <button class="btn pri" onclick="document.getElementById('fi').click()">📁 data.json</button>
-  <button class="btn" onclick="document.getElementById('fi2').click()">📄 CSV</button>
+  <p id="dzt">Chargement…</p>
   <button class="btn" onclick="loadDemo()">⚡ Démo</button>
-  <input type="file" id="fi" accept=".json">
-  <input type="file" id="fi2" accept=".csv">
 </div>
 
 <nav class="tabs">
@@ -282,6 +277,12 @@ function loadJSON(data){
   if(document.getElementById('panel-graph').classList.contains('active')) renderGraph();
 }
 
+// Chargement automatique au démarrage (quand servi par honeypot-start-server)
+fetch('/data/visualizer-dashboard/data.json')
+  .then(function(r){ if(!r.ok) throw new Error(); return r.json(); })
+  .then(function(data){ loadJSON(data); document.getElementById('dzt').innerHTML='<strong>✅ data.json chargé</strong>'; })
+  .catch(function(){ document.getElementById('dzt').innerHTML='Aucune donnée (ouvrir via <code>honeypot-start-server start</code>)'; });
+
 function loadCSV(txt){
   var lines=txt.trim().split('\n'),byIp={};
   for(var i=1;i<lines.length;i++){
@@ -436,28 +437,6 @@ document.querySelectorAll('.tab').forEach(function(btn){
     if(id==='graph'&&D.length>0) setTimeout(renderGraph,60);
     if(id==='ips'&&D.length>0) renderIPTable();
   });
-});
-
-// ── File inputs ────────────────────────────────────────────────────────────
-document.getElementById('fi').addEventListener('change',function(e){
-  if(!e.target.files[0])return;
-  var r=new FileReader();
-  r.onload=function(ev){
-    try{
-      loadJSON(JSON.parse(ev.target.result));
-      document.getElementById('dzt').innerHTML='<strong>✅ data.json chargé</strong>';
-    }catch(err){alert('JSON invalide: '+err);}
-  };
-  r.readAsText(e.target.files[0]);
-});
-document.getElementById('fi2').addEventListener('change',function(e){
-  if(!e.target.files[0])return;
-  var r=new FileReader();
-  r.onload=function(ev){
-    loadCSV(ev.target.result);
-    document.getElementById('dzt').innerHTML='<strong>✅ CSV chargé</strong>';
-  };
-  r.readAsText(e.target.files[0]);
 });
 
 // ── Demo ───────────────────────────────────────────────────────────────────
