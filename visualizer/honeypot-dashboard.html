@@ -39,9 +39,9 @@ header{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 14px;
 .atk-line{fill:none;stroke:var(--a2);stroke-width:.9;opacity:0;stroke-dasharray:400;animation:drawl 2.5s ease forwards}
 @keyframes drawl{0%{stroke-dashoffset:400;opacity:.6}100%{stroke-dashoffset:0;opacity:.14}}
 .adot{cursor:pointer}
-.adot .m{fill:var(--a2)}.adot.big .m{fill:var(--w)}
-.adot .rng{fill:none;stroke:var(--a2);stroke-width:.9}
-.adot.big .rng{stroke:var(--w);animation:rp 2.5s ease-out infinite}
+.adot .m{fill:var(--w)}.adot.big .m{fill:var(--a2)}
+.adot .rng{fill:none;stroke:var(--w);stroke-width:.9}
+.adot.big .rng{stroke:var(--a2);animation:rp 2.5s ease-out infinite}
 @keyframes rp{0%{r:3;opacity:.7}100%{r:18;opacity:0}}
 .vdot .m{fill:var(--a3);filter:drop-shadow(0 0 4px var(--a3))}
 .vdot .rng{fill:none;stroke:var(--a3);stroke-width:1.2;animation:vr 1.8s ease-out infinite}
@@ -137,8 +137,8 @@ tr:hover td{background:rgba(0,212,255,.03)}
     <svg id="mapsvg" viewBox="0 0 960 500"></svg>
     <div class="mleg">
       <div class="lr"><div class="ld" style="background:var(--a3)"></div>Votre VPS</div>
-      <div class="lr"><div class="ld" style="background:var(--a2)"></div>Attaquant</div>
-      <div class="lr"><div class="ld" style="background:var(--w)"></div>Top attaquant</div>
+      <div class="lr"><div class="ld" style="background:var(--w)"></div>Attaquant</div>
+      <div class="lr"><div class="ld" style="background:var(--a2)"></div>Top attaquant</div>
     </div>
     <div id="zoom-pct">100%</div>
   </div>
@@ -374,7 +374,7 @@ function drawMapOverlay(){
       var co=CC[c];if(!co||c==='Unknown')return;
       var cp=projection(co);if(!cp)return;
     var cx=cp[0],cy=cp[1];
-    var r=Math.max(4*invK,Math.sqrt(cnt)*2*invK),big=cnt>D.length*0.08;
+    var r=Math.max(3.2*invK,Math.sqrt(cnt)*1.7*invK),big=cnt>D.length*0.08;
     var screenR=r*k;
     var dot=g.append('g').attr('class',big?'adot big':'adot');
     dot.append('circle').attr('cx',cx).attr('cy',cy).attr('r',r+2*invK).attr('class','rng');
