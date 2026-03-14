@@ -237,6 +237,7 @@ var sim=null, projection, pathGen, mapG, currentZoomK=1, mapZoomSvg, mapZoomBeha
 var worldLandFeature=null, ipGeoCache={};
 var countryFeatureByIso2={};
 var detailPointCache=[];
+var GRAPH_TOP_ATTACKERS_LIMIT=120;
 var W=960,H=500;
 
 function updateZoomPct(k){ var el=document.getElementById('zoom-pct'); if(el) el.textContent=Math.round((k||1)*100)+'%'; }
@@ -579,9 +580,18 @@ function renderGraph(){
     .attr('markerWidth',5).attr('markerHeight',5).attr('orient','auto')
     .append('path').attr('d','M0,-5L10,0L0,5').attr('class','ah');
 
-  var top=D.slice().sort(function(a,b){return (b.vuln_high||0)-(a.vuln_high||0);}).slice(0,40);
+  function attackerScore(d){
+    return (d.vuln_high||0)*100 + (d.nikto?35:0) + (d.nmap?20:0) + (d.screenshot?8:0) + (d.dns?5:0);
+  }
+  var top=D.slice().sort(function(a,b){
+    var s=attackerScore(b)-attackerScore(a);
+    if(s!==0) return s;
+    var v=(b.vuln_high||0)-(a.vuln_high||0);
+    if(v!==0) return v;
+    return (a.ip||'').localeCompare(b.ip||'');
+  }).slice(0,GRAPH_TOP_ATTACKERS_LIMIT);
   var gm=document.getElementById('graph-meta');
-  if(gm) gm.textContent='Réseau: '+top.length.toLocaleString()+' / '+D.length.toLocaleString()+' (top vuln)';
+  if(gm) gm.textContent='Réseau: '+top.length.toLocaleString()+' / '+D.length.toLocaleString()+' (top attaquants)';
   if(!top.length)return;
   var nodes=[{id:'VPS',type:'vps'}];
   var links=[];
