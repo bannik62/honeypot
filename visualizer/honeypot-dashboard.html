@@ -49,7 +49,7 @@ header{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 14px;
 .vlbl{fill:var(--a3);font-family:'Orbitron',monospace;font-weight:700;font-size:9px;pointer-events:none}
 .dlbl{fill:var(--tx);font-size:7px;pointer-events:none;opacity:.85}
 .mleg{position:absolute;bottom:8px;right:8px;background:rgba(5,10,15,.92);border:1px solid var(--b);border-radius:6px;padding:7px 11px;font-size:.64rem}
-#zoom-pct{position:absolute;bottom:42px;right:8px;background:rgba(5,10,15,.92);border:1px solid var(--b);border-radius:6px;padding:5px 9px;font-size:.7rem;font-family:'Orbitron',monospace;color:var(--a);pointer-events:none}
+#zoom-pct{position:absolute;bottom:8px;left:8px;background:rgba(5,10,15,.92);border:1px solid var(--b);border-radius:6px;padding:5px 9px;font-size:.7rem;font-family:'Orbitron',monospace;color:var(--a);pointer-events:none}
 #map-ctl{position:absolute;top:8px;left:8px;display:flex;flex-direction:column;gap:4px;z-index:10}
 #map-ctl button{width:32px;height:28px;background:var(--s);border:1px solid var(--b);color:var(--mu);cursor:pointer;font-size:1rem;line-height:1;border-radius:4px;display:flex;align-items:center;justify-content:center}
 #map-ctl button:hover{border-color:var(--a);color:var(--a)}
@@ -322,7 +322,8 @@ function drawMapOverlay(){
       var lon=co[0]+j[0],lat=co[1]+j[1];
       var p=projection([lon,lat]);if(!p)return;
       var cx=p[0],cy=p[1];
-      var ipRadius=Math.max(0.6,1.6*invK);
+      // Taille ecran quasi constante, volontairement petite en zone dense
+      var ipRadius=0.95*invK;
       var dot=g.append('g').attr('class','adot');
       dot.append('circle').attr('cx',cx).attr('cy',cy).attr('r',ipRadius).attr('class','m');
       dot.on('mouseenter',function(e){showPointTip(e,d);})
@@ -331,9 +332,11 @@ function drawMapOverlay(){
   }
 
   var vg=g.append('g').attr('class','vdot');
-  vg.append('circle').attr('cx',vx).attr('cy',vy).attr('r',10*invK).attr('class','rng').style('animation','none');
-  vg.append('circle').attr('cx',vx).attr('cy',vy).attr('r',6*invK).attr('class','m');
-  vg.append('text').attr('x',vx+10*invK).attr('y',vy-9*invK).attr('class','vlbl').attr('font-size',9*invK).text('VPS');
+  vg.append('circle').attr('cx',vx).attr('cy',vy).attr('r',6*invK).attr('class','rng').style('animation','none');
+  vg.append('circle').attr('cx',vx).attr('cy',vy).attr('r',3.4*invK).attr('class','m');
+  if(k<3){
+    vg.append('text').attr('x',vx+6*invK).attr('y',vy-6*invK).attr('class','vlbl').attr('font-size',6*invK).text('VPS');
+  }
 }
 
 // ── Load data ──────────────────────────────────────────────────────────────
