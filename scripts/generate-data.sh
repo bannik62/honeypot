@@ -25,6 +25,36 @@ fi
 
 echo "🔍 Scan de $SCAN_DIR..."
 
+# Tente d'extraire pays + coords depuis geoiplookup (si base City dispo)
+geoip_resolve() {
+    local ip="$1"
+    local out="" country="" lat="" lon=""
+
+    if ! command -v geoiplookup &>/dev/null; then
+        echo "||"
+        return
+    fi
+
+    out="$(geoiplookup "$ip" 2>/dev/null | head -1)"
+    [ -z "$out" ] && { echo "||"; return; }
+
+    # Exemple: GeoIP Country Edition: US, United States
+    country="$(echo "$out" | sed -n 's/^GeoIP Country Edition: \([^,]*\),.*$/\1/p' | head -1)"
+
+    # Exemple City (legacy): GeoIP City Edition, Rev 1: US, CA, City, 12345, 37.78, -122.41, ...
+    if [ -z "$country" ]; then
+        country="$(echo "$out" | sed -n 's/^GeoIP City Edition[^:]*: \([^,]*\),.*$/\1/p' | head -1)"
+    fi
+
+    lat="$(echo "$out" | awk -F',' '{gsub(/^ +| +$/,"",$6); print $6}')"
+    lon="$(echo "$out" | awk -F',' '{gsub(/^ +| +$/,"",$7); print $7}')"
+
+    [[ "$lat" =~ ^-?[0-9]+(\.[0-9]+)?$ ]] || lat=""
+    [[ "$lon" =~ ^-?[0-9]+(\.[0-9]+)?$ ]] || lon=""
+
+    echo "${country}|${lat}|${lon}"
+}
+
 # Construire un index pays depuis connections.csv
 declare -A IP_COUNTRY
 if [ -f "$CSV_FILE" ]; then
@@ -43,12 +73,22 @@ for ip_dir in "$SCAN_DIR"/*/; do
     # Vérifier que c'est bien une IP
     [[ "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || continue
 
-    # Pays depuis CSV ou geoiplookup
+    # Pays depuis CSV ou GeoIP + coords (si dispo)
     country="${IP_COUNTRY[$ip]}"
-    if [ -z "$country" ] && command -v geoiplookup &>/dev/null; then
-        country=$(geoiplookup "$ip" 2>/dev/null | grep -oP 'GeoIP Country Edition: \K[^,]+' | head -1)
-    fi
+    geo_raw="$(geoip_resolve "$ip")"
+    geo_country="${geo_raw%%|*}"
+    geo_tail="${geo_raw#*|}"
+    geo_lat="${geo_tail%%|*}"
+    geo_lon="${geo_tail#*|}"
+    [ -z "$country" ] && country="$geo_country"
     [ -z "$country" ] && country="Unknown"
+
+    lat_json="null"
+    lon_json="null"
+    if [[ "$geo_lat" =~ ^-?[0-9]+(\.[0-9]+)?$ ]] && [[ "$geo_lon" =~ ^-?[0-9]+(\.[0-9]+)?$ ]]; then
+        lat_json="$geo_lat"
+        lon_json="$geo_lon"
+    fi
 
     # Détecter les rapports disponibles
     has_nmap=false
@@ -85,6 +125,8 @@ for ip_dir in "$SCAN_DIR"/*/; do
   {
     "ip": "$ip",
     "country": "$country_safe",
+    "lat": $lat_json,
+    "lon": $lon_json,
     "nmap": $has_nmap,
     "dns": $has_dns,
     "screenshot": $has_screenshot,

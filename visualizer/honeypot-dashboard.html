@@ -210,8 +210,9 @@ var CC={CN:[104,35],US:[-100,38],RU:[60,55],DE:[10,51],FR:[2,46],GB:[-2,54],NL:[
   TN:[9,34],LY:[17,27],SN:[14,15],GH:[2,8],CD:[24,-3],VE:[-66,8],PE:[-76,-10]};
 
 var VPS={lon:1.85,lat:50.95};
-var D=[];   // array of {ip, country, nmap, dns, screenshot, nikto, vuln_high, ports}
+var D=[];   // array of {ip, country, lat, lon, nmap, dns, screenshot, nikto, vuln_high, ports}
 var sim=null, projection, pathGen, mapG, currentZoomK=1, mapZoomSvg, mapZoomBehavior;
+var worldLandFeature=null, ipGeoCache={};
 var W=960,H=500;
 
 function updateZoomPct(k){ var el=document.getElementById('zoom-pct'); if(el) el.textContent=Math.round((k||1)*100)+'%'; }
@@ -219,11 +220,55 @@ function updateZoomPct(k){ var el=document.getElementById('zoom-pct'); if(el) el
 projection=d3.geoMercator().scale(153).translate([W/2,H/2+60]).center([0,20]);
 pathGen=d3.geoPath().projection(projection);
 
-// Jitter déterministe à partir de l'IP (pour répartir les points par pays au zoom)
-function ipJitter(ip){
-  var h=0;
-  for(var i=0;i<ip.length;i++) h=((h<<5)-h)+ip.charCodeAt(i)|0;
-  return [((h%1000)/500-1)*1.5,((Math.abs(h)>>10)%1000)/500-1];
+// Hash déterministe d'IP (seed pour dispersion stable)
+function ipHash(ip){
+  var h=2166136261;
+  for(var i=0;i<ip.length;i++){ h^=ip.charCodeAt(i); h=(h*16777619)>>>0; }
+  return h>>>0;
+}
+
+// Place un point près du pays, mais forcé sur terre (évite les points en mer)
+function pointOnLandNear(baseLonLat,seed){
+  if(!worldLandFeature) return baseLonLat;
+  var a0=(seed%360)*Math.PI/180;
+  var ga=2.399963229728653; // golden angle
+  var i,r,a,lon,lat,cand;
+
+  // Recherche locale (dispersion courte)
+  for(i=0;i<80;i++){
+    r=0.10+(i%16)*0.08; // ~0.10 -> 1.30 deg
+    a=a0+i*ga;
+    lon=baseLonLat[0]+Math.cos(a)*r;
+    lat=baseLonLat[1]+Math.sin(a)*r*0.62;
+    cand=[lon,lat];
+    if(d3.geoContains(worldLandFeature,cand)) return cand;
+  }
+
+  // Recherche plus large si centroid/coord pays tombe en mer
+  for(i=0;i<220;i++){
+    r=1.3+i*0.06; // ~1.3 -> 14.5 deg
+    a=a0+i*ga;
+    lon=baseLonLat[0]+Math.cos(a)*r;
+    lat=baseLonLat[1]+Math.sin(a)*r*0.62;
+    cand=[lon,lat];
+    if(d3.geoContains(worldLandFeature,cand)) return cand;
+  }
+  return baseLonLat;
+}
+
+function ipGeoPoint(ip,countryCode){
+  var base=CC[countryCode];
+  if(!base) return null;
+  var key=countryCode+'|'+ip;
+  if(ipGeoCache[key]) return ipGeoCache[key];
+  var p=pointOnLandNear(base,ipHash(ip));
+  ipGeoCache[key]=p;
+  return p;
+}
+
+function hasValidLatLon(d){
+  return d && Number.isFinite(d.lat) && Number.isFinite(d.lon) &&
+    d.lat>=-90 && d.lat<=90 && d.lon>=-180 && d.lon<=180;
 }
 
 // Load world map
@@ -234,6 +279,10 @@ fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json')
     var svg=d3.select('#mapsvg');
     mapG=svg.append('g').attr('id','map-g');
     var countries=topojson.feature(world,world.objects.countries);
+    worldLandFeature=world.objects.land
+      ? topojson.feature(world,world.objects.land)
+      : {type:'FeatureCollection',features:countries.features};
+    ipGeoCache={};
     mapG.append('g').selectAll('path').data(countries.features).join('path')
       .attr('class','country').attr('d',pathGen);
     mapG.append('path')
@@ -317,10 +366,9 @@ function drawMapOverlay(){
     // Vue détaillée : un point par IP (sans texte permanent)
     D.forEach(function(d){
       var c=d.country||'Unknown';
-      var co=CC[c];if(!co)return;
-      var j=ipJitter(d.ip);
-      var lon=co[0]+j[0],lat=co[1]+j[1];
-      var p=projection([lon,lat]);if(!p)return;
+      var geo=hasValidLatLon(d) ? [d.lon,d.lat] : ipGeoPoint(d.ip,c);
+      if(!geo)return;
+      var p=projection(geo);if(!p)return;
       var cx=p[0],cy=p[1];
       // Taille ecran quasi constante, volontairement petite en zone dense
       var ipRadius=0.95*invK;
