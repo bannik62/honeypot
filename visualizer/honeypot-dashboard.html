@@ -269,6 +269,7 @@ function drawMapOverlay(){
   g.selectAll('.atk-line,.adot,.vdot').remove();
   if(!D.length) return;
   var k=currentZoomK||1;
+  var invK=1/Math.max(k,1);
   var vp=projection([VPS.lon,VPS.lat]),vx=vp[0],vy=vp[1];
 
   if(k<2){
@@ -285,6 +286,7 @@ function drawMapOverlay(){
       var mx=(ax+vx)/2,my=Math.min(ay,vy)-50-(cnt/maxC)*60;
       g.append('path').attr('class','atk-line')
         .attr('d','M'+ax+','+ay+' Q'+mx+','+my+' '+vx+','+vy)
+        .style('stroke-width',(0.9*invK).toFixed(3))
         .style('animation-delay',(i*0.05)+'s');
     });
     sorted.forEach(function(entry){
@@ -292,13 +294,13 @@ function drawMapOverlay(){
       var co=CC[c];if(!co||c==='Unknown')return;
       var cp=projection(co);if(!cp)return;
     var cx=cp[0],cy=cp[1];
-    var r=1+(cnt/maxC)*5,big=cnt>D.length*0.08;
+    var r=(1+(cnt/maxC)*5)*invK,big=cnt>D.length*0.08;
     var dot=g.append('g').attr('class',big?'adot big':'adot');
     dot.append('circle').attr('cx',cx).attr('cy',cy).attr('r',r+2).attr('class','rng');
     dot.append('circle').attr('cx',cx).attr('cy',cy).attr('r',r).attr('class','m');
     if(cnt>=3){
       dot.append('text').attr('x',cx+r+2).attr('y',cy+2).attr('class','dlbl')
-        .attr('fill',big?'var(--w)':'var(--tx)').attr('font-size',7).text(c+'('+cnt+')');
+        .attr('fill',big?'var(--w)':'var(--tx)').attr('font-size',7*invK).text(c+'('+cnt+')');
     }
       dot.on('mouseenter',function(e){showTip(e,c,null,cnt);})
        .on('mousemove',moveTip).on('mouseleave',hideTip);
@@ -313,20 +315,25 @@ function drawMapOverlay(){
       var p=projection([lon,lat]);if(!p)return;
       var cx=p[0],cy=p[1];
       var parts=d.ip.split('.');
-      var shortIp=parts.length>=2?parts.slice(-2).join('.'):d.ip;
+      var shortIp=parts.length===4?parts[3]:d.ip;
+      var ipRadius=Math.max(0.6,1.6*invK);
+      var ipFont=Math.max(1.8,2.8*invK);
       var dot=g.append('g').attr('class','adot');
-      dot.append('circle').attr('cx',cx).attr('cy',cy).attr('r',3).attr('class','m');
-      dot.append('text').attr('x',cx).attr('y',cy).attr('text-anchor','middle').attr('dominant-baseline','central')
-        .attr('fill','var(--tx)').attr('font-size',3).attr('pointer-events','none').text(shortIp);
+      dot.append('circle').attr('cx',cx).attr('cy',cy).attr('r',ipRadius).attr('class','m');
+      if(k>=8){
+        dot.append('text').attr('x',cx+ipRadius+0.8*invK).attr('y',cy+0.3*invK)
+          .attr('text-anchor','start').attr('dominant-baseline','central')
+          .attr('fill','var(--tx)').attr('font-size',ipFont).attr('pointer-events','none').text(shortIp);
+      }
       dot.on('mouseenter',function(e){showTip(e,d.country,d.ip,d.vuln_high?'Vulns: '+d.vuln_high:'');})
        .on('mousemove',moveTip).on('mouseleave',hideTip);
     });
   }
 
   var vg=g.append('g').attr('class','vdot');
-  vg.append('circle').attr('cx',vx).attr('cy',vy).attr('r',10).attr('class','rng');
-  vg.append('circle').attr('cx',vx).attr('cy',vy).attr('r',6).attr('class','m');
-  vg.append('text').attr('x',vx+10).attr('y',vy-9).attr('class','vlbl').text('VPS');
+  vg.append('circle').attr('cx',vx).attr('cy',vy).attr('r',10*invK).attr('class','rng').style('animation','none');
+  vg.append('circle').attr('cx',vx).attr('cy',vy).attr('r',6*invK).attr('class','m');
+  vg.append('text').attr('x',vx+10*invK).attr('y',vy-9*invK).attr('class','vlbl').attr('font-size',9*invK).text('VPS');
 }
 
 // ── Load data ──────────────────────────────────────────────────────────────
