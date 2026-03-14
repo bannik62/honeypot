@@ -63,62 +63,85 @@ class VisualizerHandler(SimpleHTTPRequestHandler):
             return super().do_GET()
         self.send_error(404)
 
+    def _parse_png_name(self, stem, ip):
+        """Extrait port et timestamp depuis <ip>_<port>_YYYYMMDD_HHMMSS."""
+        parts = stem.split("_")
+        if len(parts) < 4:
+            return None, None
+        port = parts[1] if parts[0] == ip else None
+        date_part = parts[-2]
+        time_part = parts[-1]
+        if len(date_part) != 8 or len(time_part) != 6:
+            return port, None
+        try:
+            ts = f"{date_part[0:4]}-{date_part[4:6]}-{date_part[6:8]} {time_part[0:2]}:{time_part[2:4]}:{time_part[4:6]}"
+            return port, ts
+        except Exception:
+            return port, None
+
     def serve_ip_resource(self, subpath):
         parts = subpath.split("/")
         if len(parts) != 2:
             self.send_error(404)
             return
-        ip, resource_type = parts
-        if not IP_RE.match(ip) or resource_type not in ("nmap", "dns", "nikto", "screenshot", "png"):
+        ip, second = parts
+        if not IP_RE.match(ip):
             self.send_error(400)
             return
         ip_dir = SCAN_DIR / ip
         if not ip_dir.is_dir():
             self.send_error(404)
             return
-        if resource_type in ("screenshot", "png"):
-            pngs = list(ip_dir.glob("*.png"))
-            if not pngs:
-                self.send_error(404)
-                return
-            file_path = sorted(pngs)[0]
-            try:
-                body = file_path.read_bytes()
-            except OSError:
-                self.send_error(500)
-                return
+        # Liste des PNG pour cette IP (JSON)
+        if second == "list":
+            import json
+            pngs = sorted(ip_dir.glob("*.png"))
+            out = []
+            for f in pngs:
+                port, ts = self._parse_png_name(f.stem, ip)
+                out.append({"file": f.name, "port": port or "?", "timestamp": ts or "?"})
+            body = json.dumps({"pngs": out}).encode("utf-8")
             self.send_response(200)
-            self.send_header("Content-Type", "image/png")
-            self.send_header("Content-Length", str(len(body)))
-            # Timestamp depuis le nom : <ip>_<port>_YYYYMMDD_HHMMSS.png
-            stem = file_path.stem
-            parts = stem.split("_")
-            if len(parts) >= 4:
-                date_part = parts[-2]
-                time_part = parts[-1]
-                if len(date_part) == 8 and len(time_part) == 6:
-                    try:
-                        ts = f"{date_part[0:4]}-{date_part[4:6]}-{date_part[6:8]} {time_part[0:2]}:{time_part[2:4]}:{time_part[4:6]}"
-                        self.send_header("X-Capture-Timestamp", ts)
-                    except Exception:
-                        pass
-            self.end_headers()
-            self.wfile.write(body)
-        else:
-            file_path = ip_dir / f"{ip}_{resource_type}.txt"
-            if not file_path.is_file():
-                self.send_error(404)
-                return
-            try:
-                body = file_path.read_bytes()
-            except OSError:
-                self.send_error(500)
-                return
-            self.send_response(200)
-            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
+            return
+        # Fichier PNG par nom : <ip>_<port>_*.png
+        if second.endswith(".png") and second.startswith(ip + "_") and ".." not in second:
+            file_path = ip_dir / second
+            if file_path.is_file():
+                try:
+                    body = file_path.read_bytes()
+                except OSError:
+                    self.send_error(500)
+                    return
+                self.send_response(200)
+                self.send_header("Content-Type", "image/png")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+            self.send_error(404)
+            return
+        # Rapports texte nmap / dns / nikto
+        if second not in ("nmap", "dns", "nikto"):
+            self.send_error(404)
+            return
+        file_path = ip_dir / f"{ip}_{second}.txt"
+        if not file_path.is_file():
+            self.send_error(404)
+            return
+        try:
+            body = file_path.read_bytes()
+        except OSError:
+            self.send_error(500)
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def serve_debug(self):
         """Aide au diagnostic : chemin SCAN_DIR et existence du dossier data."""

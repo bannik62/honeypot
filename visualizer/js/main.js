@@ -50,37 +50,59 @@ document.getElementById('panel-ips').addEventListener('click', (e) => {
   titleEl.textContent = `${labels[type] || type} — ${ip}`;
   bodyEl.innerHTML = '<span class="ip-modal-loading">Chargement…</span>';
   modal.classList.add('open');
-  const urlType = type === 'screenshot' ? 'png' : type;
-  const url = `/data/screenshotAndLog/${encodeURIComponent(ip)}/${urlType}`;
+  if (type === 'screenshot') {
+    const listUrl = `/data/screenshotAndLog/${encodeURIComponent(ip)}/list`;
+    fetch(listUrl)
+      .then((r) => {
+        if (!r.ok) {
+          const msg = r.status === 404
+            ? `Aucune capture pour cette IP. Vérifiez sur le VPS : data/screenshotAndLog/${escapeHtml(ip)}/<br><br><a href="/data/screenshotAndLog/debug" target="_blank">Diagnostic</a>`
+            : `Erreur serveur (${r.status}).`;
+          bodyEl.innerHTML = `<span class="ip-modal-loading">${msg}</span>`;
+          return null;
+        }
+        return r.json();
+      })
+      .then((data) => {
+        if (!data) return;
+        const pngs = data.pngs || [];
+        if (pngs.length === 0) {
+          bodyEl.innerHTML = '<span class="ip-modal-loading">Aucune capture .png pour cette IP.</span>';
+          return;
+        }
+        const base = `/data/screenshotAndLog/${encodeURIComponent(ip)}/`;
+        bodyEl.innerHTML = pngs
+          .map(
+            (p) =>
+              `<figure class="ip-modal-figure"><figcaption class="ip-modal-ts">Port ${escapeHtml(p.port)} — ${escapeHtml(p.timestamp)}</figcaption><img src="${base}${encodeURIComponent(p.file)}" alt="Capture ${escapeHtml(p.port)}"/></figure>`
+          )
+          .join('');
+      })
+      .catch(() => {
+        bodyEl.innerHTML =
+          '<span class="ip-modal-loading">Ressource indisponible (réseau ou serveur). Utilisez le dashboard via honeypot-start-server sur le VPS + tunnel SSH.</span>';
+      });
+    return;
+  }
+  const url = `/data/screenshotAndLog/${encodeURIComponent(ip)}/${type}`;
   fetch(url)
     .then((r) => {
       if (!r.ok) {
         const msg = r.status === 404
-          ? `Fichier ou dossier absent (404). Vérifiez sur le VPS : data/screenshotAndLog/${ip}/<br><br>Diagnostic : <a href="/data/screenshotAndLog/debug" target="_blank">/data/screenshotAndLog/debug</a>`
+          ? `Fichier absent (404). Vérifiez sur le VPS : data/screenshotAndLog/${ip}/<br><br><a href="/data/screenshotAndLog/debug" target="_blank">Diagnostic</a>`
           : `Erreur serveur (${r.status}).`;
         bodyEl.innerHTML = `<span class="ip-modal-loading">${msg}</span>`;
         return;
-      }
-      if (type === 'screenshot') {
-        const timestamp = r.headers.get('X-Capture-Timestamp') || '';
-        return r.blob().then((blob) => ({ blob, timestamp }));
       }
       return r.text();
     })
     .then((data) => {
       if (!data) return;
-      if (type === 'screenshot') {
-        const { blob, timestamp } = data;
-        const blobUrl = URL.createObjectURL(blob);
-        const tsHtml = timestamp ? `<p class="ip-modal-ts">${escapeHtml(timestamp)}</p>` : '';
-        bodyEl.innerHTML = `${tsHtml}<img src="${blobUrl}" alt="Capture ${ip}"/>`;
-        bodyEl.querySelector('img').onload = () => URL.revokeObjectURL(blobUrl);
-      } else {
-        bodyEl.innerHTML = `<pre>${escapeHtml(data)}</pre>`;
-      }
+      bodyEl.innerHTML = `<pre>${escapeHtml(data)}</pre>`;
     })
     .catch(() => {
-      bodyEl.innerHTML = '<span class="ip-modal-loading">Ressource indisponible (réseau ou serveur). Utilisez le dashboard via honeypot-start-server sur le VPS + tunnel SSH.</span>';
+      bodyEl.innerHTML =
+        '<span class="ip-modal-loading">Ressource indisponible (réseau ou serveur). Utilisez le dashboard via honeypot-start-server sur le VPS + tunnel SSH.</span>';
     });
 });
 
