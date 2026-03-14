@@ -1,7 +1,11 @@
 #!/bin/bash
 # Traceroute dédié : basé sur connections.csv (IPs récentes).
-# Lance uniquement nmap --traceroute pour les IPs qui n'ont pas encore _traceroute.txt.
-# Permet de remplir le traceroute sans attendre un nouveau vuln-scan.
+# Ce script est hors réglage du cron / installation. Usage ponctuel et manuel uniquement
+# (ex. backfill après mise en place du traceroute). Une fois que le traceroute via
+# vuln-scan.sh (nmap --traceroute) fonctionne bien en production, ce fichier peut
+# être supprimé.
+#
+# ⚠️  À lancer avec sudo : sudo bash scripts/traceroute-ip.sh
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_FILE="$SCRIPT_DIR/../config/config"
@@ -25,6 +29,15 @@ if ! command -v nmap &> /dev/null; then
     echo "❌ nmap n'est pas installé" >&2
     exit 1
 fi
+
+if [ "$(id -u)" -ne 0 ]; then
+    echo "⚠️  Traceroute nécessite souvent les droits root (raw sockets)." >&2
+    echo "   Relancez avec : sudo bash $0" >&2
+fi
+
+echo "📁 DATA_DIR   : $DATA_DIR"
+echo "📁 Enregistrement des traceroutes : $OUTPUT_DIR"
+echo ""
 
 # IPs uniques depuis connections.csv (colonne 2, sans l'en-tête)
 all_ips=$(tail -n +2 "$CSV_FILE" | cut -d',' -f2 | sort -u | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$')
