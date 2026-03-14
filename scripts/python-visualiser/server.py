@@ -10,14 +10,22 @@ Pattern des fichiers (aligné avec les scripts) :
   data/screenshotAndLog/<IP>/<IP>_nikto.txt   (si présent)
   data/screenshotAndLog/<IP>/*.png            (web-capture.sh : <IP>_<port>_<date>_<time>.png)
 """
+import os
 import re
 import sys
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 
-# Racine du projet honeypot (scripts/python-visualiser -> scripts -> honeypot)
-SCRIPT_DIR = Path(__file__).resolve().parent
-ROOT = SCRIPT_DIR.parent.parent
+# Racine honeypot : priorité au cwd (server.sh fait "cd $HONEYPOT_ROOT" avant de lancer)
+# sinon déduit depuis __file__ (scripts/python-visualiser -> parent.parent = honeypot)
+_cwd = Path(os.getcwd()).resolve()
+_file_root = Path(__file__).resolve().parent.parent.parent  # script -> python-visualiser -> scripts -> honeypot
+if (_cwd / "data" / "screenshotAndLog").is_dir():
+    ROOT = _cwd
+elif (_cwd / "data" / "visualizer-dashboard").is_dir():
+    ROOT = _cwd
+else:
+    ROOT = _file_root
 VISUALIZER_DIR = ROOT / "visualizer"
 SCAN_DIR = ROOT / "data" / "screenshotAndLog"
 DATA_JSON_PATH = ROOT / "data" / "visualizer-dashboard" / "data.json"
