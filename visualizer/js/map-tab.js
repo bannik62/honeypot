@@ -171,7 +171,7 @@ export function drawMapOverlay() {
       const dot = g.append('g').attr('class', big ? 'adot big' : 'adot');
       dot.append('circle').attr('cx', cx).attr('cy', cy).attr('r', r + 2 * invK).attr('class', 'rng');
       dot.append('circle').attr('cx', cx).attr('cy', cy).attr('r', r).attr('class', 'm');
-      const iconScale = (2 * r) / 24;
+      const iconScale = ((2 * r) / 24) * 0.5;
       dot.append('g').attr('class', 'atk-icon').attr('transform', `translate(${cx},${cy}) scale(${iconScale}) translate(-12,-12)`)
         .append('use').attr('href', '#attacker-icon').attr('x', 0).attr('y', 0).attr('width', 24).attr('height', 24);
       if (screenR > 12) {
@@ -250,7 +250,7 @@ export function drawMapOverlay() {
     drawItems.forEach((item) => {
       const dot = g.append('g').attr('class', 'adot');
       dot.append('circle').attr('cx', item.x).attr('cy', item.y).attr('r', item.r).attr('class', 'm');
-      const iconScale = (2 * item.r) / 24;
+      const iconScale = ((2 * item.r) / 24) * 0.5;
       dot.append('g').attr('class', 'atk-icon').attr('transform', `translate(${item.x},${item.y}) scale(${iconScale}) translate(-12,-12)`)
         .append('use').attr('href', '#attacker-icon').attr('x', 0).attr('y', 0).attr('width', 24).attr('height', 24);
       dot.on('mouseenter', (e) => showPointTip(e, item.d))
