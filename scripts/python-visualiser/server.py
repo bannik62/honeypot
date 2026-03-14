@@ -3,6 +3,12 @@
 Serveur minimal pour le visualiseur honeypot.
 Écoute sur 127.0.0.1 uniquement. Sert visualizer/ et data/visualizer-dashboard/data.json.
 Expose aussi les rapports par IP (nmap, dns, nikto, screenshot).
+
+Pattern des fichiers (aligné avec les scripts) :
+  data/screenshotAndLog/<IP>/<IP>_nmap.txt    (vuln-scan.sh)
+  data/screenshotAndLog/<IP>/<IP>_dns.txt     (dig-ip.sh)
+  data/screenshotAndLog/<IP>/<IP>_nikto.txt   (si présent)
+  data/screenshotAndLog/<IP>/*.png            (web-capture.sh : <IP>_<port>_<date>_<time>.png)
 """
 import re
 import sys
