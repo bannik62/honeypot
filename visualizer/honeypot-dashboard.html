@@ -640,6 +640,20 @@ function showPointTip(e,d){
   document.getElementById('tip').style.display='block';
   moveTip(e);
 }
+
+// Compat: certains handlers (graph) utilisent encore showTip(...)
+function showTip(e,country,ip,info){
+  showPointTip(e,{
+    ip:ip,
+    country:country,
+    vuln_high:0,
+    ports:info||'',
+    nmap:false,
+    dns:false,
+    screenshot:false,
+    nikto:false
+  });
+}
 function moveTip(e){var t=document.getElementById('tip');t.style.left=(e.clientX+14)+'px';t.style.top=(e.clientY-10)+'px';}
 function hideTip(){document.getElementById('tip').style.display='none';}
 
