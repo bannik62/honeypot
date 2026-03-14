@@ -91,9 +91,11 @@ tr:hover td{background:rgba(0,212,255,.03)}
 #empty{text-align:center;padding:40px 20px;color:var(--mu)}
 #empty .ei{font-size:2.2rem;margin-bottom:10px;opacity:.4}
 #empty h2{font-family:'Orbitron',monospace;font-size:.82rem;margin-bottom:5px}
-#tip{position:fixed;background:var(--s2);border:1px solid var(--a);border-radius:6px;padding:8px 12px;font-size:.72rem;pointer-events:none;z-index:200;display:none;box-shadow:0 0 14px rgba(0,212,255,.25)}
-#tip .ti{color:var(--a);font-size:.85rem;margin-bottom:2px}
-#tip .tc{color:var(--w)}#tip .tn{color:var(--a3)}
+#tip{position:fixed;background:var(--s2);border:1px solid var(--a);border-radius:6px;padding:8px 12px;font-size:.72rem;pointer-events:none;z-index:200;display:none;box-shadow:0 0 14px rgba(0,212,255,.25);min-width:210px}
+#tip .ti{color:var(--a);font-size:.85rem;margin-bottom:4px}
+#tip .tr{display:flex;justify-content:space-between;gap:10px;line-height:1.35}
+#tip .k{color:var(--mu)}
+#tip .v{color:var(--tx);text-align:right;max-width:170px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--b);border-radius:2px}
 </style>
 </head>
@@ -183,7 +185,13 @@ tr:hover td{background:rgba(0,212,255,.03)}
   </div>
 </div>
 
-<div id="tip"><div class="ti" id="tiip"></div><div class="tc" id="tico"></div><div class="tn" id="tict"></div></div>
+<div id="tip">
+  <div class="ti" id="tiip"></div>
+  <div class="tr"><span class="k">Pays</span><span class="v" id="tip-country">—</span></div>
+  <div class="tr"><span class="k">Vuln HIGH</span><span class="v" id="tip-vuln">—</span></div>
+  <div class="tr"><span class="k">Ports</span><span class="v" id="tip-ports">—</span></div>
+  <div class="tr"><span class="k">Rapports</span><span class="v" id="tip-reports">—</span></div>
+</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
@@ -302,11 +310,11 @@ function drawMapOverlay(){
       dot.append('text').attr('x',cx+r+2).attr('y',cy+2).attr('class','dlbl')
         .attr('fill',big?'var(--w)':'var(--tx)').attr('font-size',7*invK).text(c+'('+cnt+')');
     }
-      dot.on('mouseenter',function(e){showTip(e,c,null,cnt);})
+      dot.on('mouseenter',function(e){showCountryTip(e,c,cnt);})
        .on('mousemove',moveTip).on('mouseleave',hideTip);
     });
   }else{
-    // Vue détaillée : un point par IP, pastille plus petite avec IP écrite dedans
+    // Vue détaillée : un point par IP (sans texte permanent)
     D.forEach(function(d){
       var c=d.country||'Unknown';
       var co=CC[c];if(!co)return;
@@ -314,18 +322,10 @@ function drawMapOverlay(){
       var lon=co[0]+j[0],lat=co[1]+j[1];
       var p=projection([lon,lat]);if(!p)return;
       var cx=p[0],cy=p[1];
-      var parts=d.ip.split('.');
-      var shortIp=parts.length===4?parts[3]:d.ip;
       var ipRadius=Math.max(0.6,1.6*invK);
-      var ipFont=Math.max(1.8,2.8*invK);
       var dot=g.append('g').attr('class','adot');
       dot.append('circle').attr('cx',cx).attr('cy',cy).attr('r',ipRadius).attr('class','m');
-      if(k>=8){
-        dot.append('text').attr('x',cx+ipRadius+0.8*invK).attr('y',cy+0.3*invK)
-          .attr('text-anchor','start').attr('dominant-baseline','central')
-          .attr('fill','var(--tx)').attr('font-size',ipFont).attr('pointer-events','none').text(shortIp);
-      }
-      dot.on('mouseenter',function(e){showTip(e,d.country,d.ip,d.vuln_high?'Vulns: '+d.vuln_high:'');})
+      dot.on('mouseenter',function(e){showPointTip(e,d);})
        .on('mousemove',moveTip).on('mouseleave',hideTip);
     });
   }
@@ -485,10 +485,27 @@ document.getElementById('ip-filter').addEventListener('change',function(){
 });
 
 // ── Tooltip ────────────────────────────────────────────────────────────────
-function showTip(e,country,ip,info){
-  document.getElementById('tiip').textContent=ip||country;
-  document.getElementById('tico').textContent=ip?'Pays: '+country:'';
-  document.getElementById('tict').textContent=info||'';
+function showCountryTip(e,country,count){
+  document.getElementById('tiip').textContent=country||'Unknown';
+  document.getElementById('tip-country').textContent=country||'Unknown';
+  document.getElementById('tip-vuln').textContent='—';
+  document.getElementById('tip-ports').textContent='—';
+  document.getElementById('tip-reports').textContent=(count||0)+' IP(s)';
+  document.getElementById('tip').style.display='block';
+  moveTip(e);
+}
+
+function showPointTip(e,d){
+  var reports=[];
+  if(d.nmap) reports.push('nmap');
+  if(d.dns) reports.push('dns');
+  if(d.screenshot) reports.push('shot');
+  if(d.nikto) reports.push('nikto');
+  document.getElementById('tiip').textContent=d.ip||'Unknown';
+  document.getElementById('tip-country').textContent=d.country||'Unknown';
+  document.getElementById('tip-vuln').textContent=(d.vuln_high||0).toString();
+  document.getElementById('tip-ports').textContent=(d.ports&&d.ports.trim())?d.ports:'—';
+  document.getElementById('tip-reports').textContent=reports.length?reports.join(', '):'—';
   document.getElementById('tip').style.display='block';
   moveTip(e);
 }
