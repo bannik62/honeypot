@@ -64,6 +64,13 @@ if [ -f "$CSV_FILE" ]; then
     done < <(tail -n +2 "$CSV_FILE")
 fi
 
+# Compter le total pour la progression
+total_dirs=0
+for _ in "$SCAN_DIR"/*/; do
+    [[ -d "$_" ]] && total_dirs=$((total_dirs + 1))
+done
+echo "🔍 Parse de $total_dirs IPs en cours..."
+
 echo "[" > "$OUTPUT"
 first=1
 total=0
@@ -137,8 +144,12 @@ for ip_dir in "$SCAN_DIR"/*/; do
 JSONLINE
 
     total=$((total + 1))
+    # Afficher la progression tous les 50 IPs (défilement dans les logs)
+    if [ $((total % 50)) -eq 0 ]; then
+        echo "  … $total / $total_dirs IPs parsées"
+    fi
 done
 
 echo "]" >> "$OUTPUT"
 
-echo "✅ $total IPs exportées → $OUTPUT"
+echo "✅ Parse data.json terminé — $total IPs parsées ($OUTPUT)"
