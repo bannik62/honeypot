@@ -26,8 +26,20 @@ case "$cmd" in
         echo $! > "$PID_FILE"
         sleep 0.5
         if is_running; then
-            echo "✅ Serveur visualiseur démarré (http://127.0.0.1:$PORT)"
-            echo "   Arrêt: honeypot-start-server stop"
+            echo ""
+            echo "✅ Serveur visualiseur démarré"
+            echo ""
+            echo "  À quoi ça sert ?"
+            echo "  Le dashboard affiche la carte des IPs, les stats et la liste des attaques."
+            echo "  Les données (data.json) se chargent toutes seules au démarrage de la page."
+            echo ""
+            echo "  Ouvrir la page :"
+            echo "  → Dans un navigateur (sur ce VPS ou après connexion SSH) :"
+            echo "     http://127.0.0.1:$PORT"
+            echo ""
+            echo "  Quand vous avez fini, pensez à éteindre le serveur :"
+            echo "  → honeypot-start-server stop"
+            echo ""
         else
             rm -f "$PID_FILE"
             echo "❌ Échec du démarrage du serveur"
