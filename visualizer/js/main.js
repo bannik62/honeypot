@@ -53,10 +53,17 @@ document.getElementById('panel-ips').addEventListener('click', (e) => {
   const url = `/data/visualizer-dashboard/ip/${encodeURIComponent(ip)}/${type}`;
   fetch(url)
     .then((r) => {
-      if (!r.ok) throw new Error(r.status);
+      if (!r.ok) {
+        const msg = r.status === 404
+          ? `Fichier ou dossier absent (404). Vérifiez sur le VPS : data/screenshotAndLog/${ip}/<br><br>Diagnostic : <a href="/data/visualizer-dashboard/debug" target="_blank">/data/visualizer-dashboard/debug</a>`
+          : `Erreur serveur (${r.status}).`;
+        bodyEl.innerHTML = `<span class="ip-modal-loading">${msg}</span>`;
+        return;
+      }
       return type === 'screenshot' ? r.blob() : r.text();
     })
     .then((data) => {
+      if (!data) return;
       if (type === 'screenshot') {
         const blobUrl = URL.createObjectURL(data);
         bodyEl.innerHTML = `<img src="${blobUrl}" alt="Capture ${ip}"/>`;
@@ -66,7 +73,7 @@ document.getElementById('panel-ips').addEventListener('click', (e) => {
       }
     })
     .catch(() => {
-      bodyEl.innerHTML = '<span class="ip-modal-loading">Ressource indisponible (fichier absent ou serveur local).</span>';
+      bodyEl.innerHTML = '<span class="ip-modal-loading">Ressource indisponible (réseau ou serveur). Utilisez le dashboard via honeypot-start-server sur le VPS + tunnel SSH.</span>';
     });
 });
 

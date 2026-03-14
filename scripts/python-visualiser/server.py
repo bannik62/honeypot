@@ -34,6 +34,9 @@ class VisualizerHandler(SimpleHTTPRequestHandler):
         if path == DATA_JSON_URL:
             self.serve_data_json()
             return
+        if path == "/data/visualizer-dashboard/debug":
+            self.serve_debug()
+            return
         if path.startswith(IP_PREFIX):
             self.serve_ip_resource(path[len(IP_PREFIX):].strip("/"))
             return
@@ -89,6 +92,21 @@ class VisualizerHandler(SimpleHTTPRequestHandler):
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
+
+    def serve_debug(self):
+        """Aide au diagnostic : chemin SCAN_DIR et existence du dossier data."""
+        import json
+        info = {
+            "SCAN_DIR": str(SCAN_DIR),
+            "SCAN_DIR_exists": SCAN_DIR.is_dir(),
+            "ROOT": str(ROOT),
+        }
+        body = json.dumps(info, indent=2).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def serve_data_json(self):
         if not DATA_JSON_PATH.is_file():
