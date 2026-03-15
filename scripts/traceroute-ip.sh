@@ -94,3 +94,7 @@ done <<< "$ips_to_do"
 
 echo ""
 echo "✅ Traceroute terminé. Relancez generate-data.sh pour mettre à jour data.json."
+if [ "$(id -u)" -eq 0 ] && [ -n "${SUDO_UID:-}" ] && [ -n "${SUDO_GID:-}" ]; then
+    echo "🔧 Remise des droits sur $OUTPUT_DIR à l'utilisateur (pour que le cron puisse écrire)."
+    chown -R "${SUDO_UID}:${SUDO_GID}" "$OUTPUT_DIR"
+fi
