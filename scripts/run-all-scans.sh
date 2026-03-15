@@ -87,9 +87,9 @@ else
     log "⚠️  Script cleanup-old-data.sh non trouvé"
 fi
 
-# 6. Attente 10 min puis génération data.json pour le visualizer
-log "Attente 10 min avant génération data.json..."
-sleep 600
+# 6. Génération data.json pour le visualizer (tout est déjà terminé ; 30 s de marge au cas où)
+log "Courte pause puis génération data.json..."
+sleep 30
 log "6/6 - Début parse / génération data.json (visualizer)..."
 if [ -f "$SCRIPT_DIR/generate-data.sh" ]; then
     bash "$SCRIPT_DIR/generate-data.sh" >> "$LOG_DIR/run-all-scans.log" 2>&1
