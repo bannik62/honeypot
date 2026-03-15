@@ -21,6 +21,8 @@ export function renderGraph() {
     .attr('markerWidth', 5).attr('markerHeight', 5).attr('orient', 'auto')
     .append('path').attr('d', 'M0,-5L10,0L0,5').attr('class', 'ah');
 
+  const zoomGroup = svg.append('g');
+
   const top = D.slice().sort((a, b) => {
     const s = attackerScore(b) - attackerScore(a);
     if (s !== 0) return s;
@@ -70,15 +72,19 @@ export function renderGraph() {
     .force('center', d3.forceCenter(W2 / 2, H2 / 2))
     .force('collide', d3.forceCollide().radius(20));
 
-  const edge = svg.append('g').selectAll('line').data(links).join('line')
+  const edge = zoomGroup.append('g').selectAll('line').data(links).join('line')
     .attr('class', (d) => `edge${d.hot ? ' hot' : ''}`)
     .attr('marker-end', 'url(#arr)');
-  const node = svg.append('g').selectAll('g').data(nodes).join('g')
+  const node = zoomGroup.append('g').selectAll('g').data(nodes).join('g')
     .attr('class', (d) => (d.type === 'vps' ? 'nv' : d.type === 'hop' ? 'na nh' : 'na'))
     .call(d3.drag()
       .on('start', (e, d) => { if (!e.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
       .on('drag', (e, d) => { d.fx = e.x; d.fy = e.y; })
-      .on('end', (e, d) => { if (!e.active) sim.alphaTarget(0); d.fx = null; d.fy = null; }));
+      .on('end', (e, d) => { if (!e.active) sim.alphaTarget(0); d.fx = d.x; d.fy = d.y; }));
+  svg.call(d3.zoom()
+    .scaleExtent([0.2, 4])
+    .filter((event) => !event.target.closest('.na') && !event.target.closest('.nv'))
+    .on('zoom', (event) => zoomGroup.attr('transform', event.transform)));
   node.append('circle').attr('r', (d) => (d.type === 'vps' ? 17 : d.type === 'hop' ? 4 : (d.vuln > 0 ? 8 : 5)));
   node.append('text').attr('class', (d) => (d.type === 'vps' ? 'nl vp' : 'nl'))
     .attr('dx', (d) => (d.type === 'vps' ? -12 : 12))
