@@ -75,7 +75,7 @@ do_traceroute() {
     tmp_report=$(mktemp)
     nmap -sn --traceroute -n --max-rtt-timeout 500ms --host-timeout 90s "$ip" > "$tmp_report" 2>&1
     if [ -s "$tmp_report" ]; then
-        awk '/^TRACEROUTE$/ { found=1; next } found { print }' "$tmp_report" > "$out_file"
+        awk '/^TRACEROUTE/ { found=1; next } found { print }' "$tmp_report" > "$out_file"
         [ -s "$out_file" ] || rm -f "$out_file"
     fi
     rm -f "$tmp_report"
