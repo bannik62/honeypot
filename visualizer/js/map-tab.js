@@ -343,7 +343,21 @@ export function initMap() {
         .attr('fill', 'none').attr('stroke', '#1c3d58').attr('stroke-width', '.4').attr('d', pathGen);
       const zoom = d3.zoom().scaleExtent([1, 24])
         .filter((event) => event.type === 'wheel' || event.type === 'dblclick')
-        .on('zoom', (e) => { mapG.attr('transform', e.transform); updateZoomPct(e.transform.k); })
+        .on('zoom', (e) => {
+          let t = e.transform;
+          const k = t.k;
+          const minX = -W * (k - 1);
+          const maxX = 0;
+          const minY = -H * (k - 1);
+          const maxY = 0;
+          const clampedX = Math.max(minX, Math.min(maxX, t.x));
+          const clampedY = Math.max(minY, Math.min(maxY, t.y));
+          if (clampedX !== t.x || clampedY !== t.y) {
+            t = d3.zoomIdentity.translate(clampedX, clampedY).scale(k);
+          }
+          mapG.attr('transform', t);
+          updateZoomPct(t.k);
+        })
         .on('end', (e) => { currentZoomK = e.transform.k; drawMapOverlay(); });
       svg.call(zoom);
       updateZoomPct(1);
