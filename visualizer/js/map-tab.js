@@ -189,15 +189,15 @@ export function drawMapOverlay() {
       dot.on('mouseenter', (e) => showCountryTip(e, c, cnt))
         .on('mousemove', moveTip).on('mouseleave', hideTip)
         .call(d3.drag()
-          .on('start', (event) => {
-            event.sourceEvent.stopPropagation();
+          .on('start', function dragStart(event) {
+            if (event.sourceEvent && typeof event.sourceEvent.stopPropagation === 'function') {
+              event.sourceEvent.stopPropagation();
+            }
           })
-          .on('drag', (event, node) => {
-            const gEl = event.subject || event.sourceEvent.currentTarget || event.sourceEvent.target.closest('g.adot');
-            const sel = d3.select(gEl);
-            const kDrag = dragOffsets.get(key) || { dx: dx, dy: dy };
-            const nx = (px + (event.x - px));
-            const ny = (py + (event.y - py));
+          .on('drag', function dragMove(event) {
+            const sel = d3.select(this);
+            const nx = event.x;
+            const ny = event.y;
             const shiftX = nx - cx;
             const shiftY = ny - cy;
             dragOffsets.set(key, { dx: shiftX, dy: shiftY });
@@ -292,11 +292,13 @@ export function drawMapOverlay() {
       dot.on('mouseenter', (e) => showPointTip(e, item.d))
         .on('mousemove', moveTip).on('mouseleave', hideTip)
         .call(d3.drag()
-          .on('start', (event) => {
-            event.sourceEvent.stopPropagation();
+          .on('start', function dragStart(event) {
+            if (event.sourceEvent && typeof event.sourceEvent.stopPropagation === 'function') {
+              event.sourceEvent.stopPropagation();
+            }
           })
-          .on('drag', (event) => {
-            const sel = d3.select(event.sourceEvent.currentTarget.closest('g.adot'));
+          .on('drag', function dragMove(event) {
+            const sel = d3.select(this);
             const nx = event.x;
             const ny = event.y;
             const shiftX = nx - item.x;
@@ -340,6 +342,11 @@ export function initMap() {
         .datum(topojson.mesh(world, world.objects.countries, (a, b) => a !== b))
         .attr('fill', 'none').attr('stroke', '#1c3d58').attr('stroke-width', '.4').attr('d', pathGen);
       const zoom = d3.zoom().scaleExtent([1, 24])
+        .filter((event) => {
+          const t = event.target;
+          if (!t || typeof t.closest !== 'function') return true;
+          return !t.closest('g.adot');
+        })
         .on('zoom', (e) => { mapG.attr('transform', e.transform); updateZoomPct(e.transform.k); })
         .on('end', (e) => { currentZoomK = e.transform.k; drawMapOverlay(); });
       svg.call(zoom);
