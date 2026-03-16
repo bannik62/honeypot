@@ -34,7 +34,7 @@ Internet
 │     (chromium headless)                             │
 │                                                     │
 │  3. dig-ip.sh         → screenshotAndLog/<IP>/*_dns.txt │
-│     (DNS + WHOIS)                                   │
+│     (DNS WHOIS)                                   │
 │                                                     │
 │  4. vuln-scan.sh      → screenshotAndLog/<IP>/*_nmap.txt │
 │     (nmap --script vuln)                            │
