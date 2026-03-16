@@ -6,6 +6,7 @@ let projection = d3.geoMercator().scale(153).translate([W / 2, H / 2 + 60]).cent
 let pathGen = d3.geoPath().projection(projection);
 
 let mapG;
+const dragOffsets = new Map();
 let currentZoomK = 1;
 let worldLandFeature = null;
 let ipGeoCache = {};
@@ -168,18 +169,46 @@ export function drawMapOverlay() {
       const r = Math.max(3.2 * invK, Math.sqrt(cnt) * 1.7 * invK);
       const screenR = r * k;
       const big = cnt > state.D.length * 0.08;
-      const dot = g.append('g').attr('class', big ? 'adot big' : 'adot');
-      dot.append('circle').attr('cx', cx).attr('cy', cy).attr('r', r + 2 * invK).attr('class', 'rng');
-      dot.append('circle').attr('cx', cx).attr('cy', cy).attr('r', r).attr('class', 'm');
+      const key = `country:${c}`;
+      let dx = 0;
+      let dy = 0;
+      const saved = dragOffsets.get(key);
+      if (saved) { dx = saved.dx; dy = saved.dy; }
+      const px = cx + dx;
+      const py = cy + dy;
+      const dot = g.append('g').attr('class', big ? 'adot big' : 'adot').attr('data-key', key);
+      dot.append('circle').attr('cx', px).attr('cy', py).attr('r', r + 2 * invK).attr('class', 'rng');
+      dot.append('circle').attr('cx', px).attr('cy', py).attr('r', r).attr('class', 'm');
       const iconScale = ((2 * r) / 24) * 0.5;
-      dot.append('g').attr('class', 'atk-icon').attr('transform', `translate(${cx},${cy}) scale(${iconScale}) translate(-12,-12)`)
+      dot.append('g').attr('class', 'atk-icon').attr('transform', `translate(${px},${py}) scale(${iconScale}) translate(-12,-12)`)
         .append('use').attr('href', '#attacker-icon').attr('x', 0).attr('y', 0).attr('width', 24).attr('height', 24).attr('fill', '#000');
       if (screenR > 12) {
         dot.append('text').attr('x', cx + r + 2).attr('y', cy + 2).attr('class', 'dlbl')
           .attr('fill', big ? 'var(--w)' : 'var(--tx)').attr('font-size', 7 * invK).text(`${c}(${cnt})`);
       }
       dot.on('mouseenter', (e) => showCountryTip(e, c, cnt))
-        .on('mousemove', moveTip).on('mouseleave', hideTip);
+        .on('mousemove', moveTip).on('mouseleave', hideTip)
+        .call(d3.drag()
+          .on('start', (event) => {
+            event.sourceEvent.stopPropagation();
+          })
+          .on('drag', (event, node) => {
+            const gEl = event.subject || event.sourceEvent.currentTarget || event.sourceEvent.target.closest('g.adot');
+            const sel = d3.select(gEl);
+            const kDrag = dragOffsets.get(key) || { dx: dx, dy: dy };
+            const nx = (px + (event.x - px));
+            const ny = (py + (event.y - py));
+            const shiftX = nx - cx;
+            const shiftY = ny - cy;
+            dragOffsets.set(key, { dx: shiftX, dy: shiftY });
+            sel.selectAll('circle.m').attr('cx', nx).attr('cy', ny);
+            sel.selectAll('circle.rng').attr('cx', nx).attr('cy', ny);
+            sel.selectAll('g.atk-icon').attr('transform', `translate(${nx},${ny}) scale(${iconScale}) translate(-12,-12)`);
+            const lbl = sel.select('text.dlbl');
+            if (!lbl.empty()) {
+              lbl.attr('x', nx + r + 2).attr('y', ny + 2);
+            }
+          }));
     });
   } else {
     if (!detailPointCache.length) rebuildDetailPointCache();
@@ -248,13 +277,34 @@ export function drawMapOverlay() {
     }
 
     drawItems.forEach((item) => {
-      const dot = g.append('g').attr('class', 'adot');
-      dot.append('circle').attr('cx', item.x).attr('cy', item.y).attr('r', item.r).attr('class', 'm');
+      const key = `ip:${item.d.ip}`;
+      let dx = 0;
+      let dy = 0;
+      const saved = dragOffsets.get(key);
+      if (saved) { dx = saved.dx; dy = saved.dy; }
+      const px = item.x + dx;
+      const py = item.y + dy;
+      const dot = g.append('g').attr('class', 'adot').attr('data-key', key);
+      dot.append('circle').attr('cx', px).attr('cy', py).attr('r', item.r).attr('class', 'm');
       const iconScale = ((2 * item.r) / 24) * 0.5;
-      dot.append('g').attr('class', 'atk-icon').attr('transform', `translate(${item.x},${item.y}) scale(${iconScale}) translate(-12,-12)`)
+      dot.append('g').attr('class', 'atk-icon').attr('transform', `translate(${px},${py}) scale(${iconScale}) translate(-12,-12)`)
         .append('use').attr('href', '#attacker-icon').attr('x', 0).attr('y', 0).attr('width', 24).attr('height', 24).attr('fill', '#000');
       dot.on('mouseenter', (e) => showPointTip(e, item.d))
-        .on('mousemove', moveTip).on('mouseleave', hideTip);
+        .on('mousemove', moveTip).on('mouseleave', hideTip)
+        .call(d3.drag()
+          .on('start', (event) => {
+            event.sourceEvent.stopPropagation();
+          })
+          .on('drag', (event) => {
+            const sel = d3.select(event.sourceEvent.currentTarget.closest('g.adot'));
+            const nx = event.x;
+            const ny = event.y;
+            const shiftX = nx - item.x;
+            const shiftY = ny - item.y;
+            dragOffsets.set(key, { dx: shiftX, dy: shiftY });
+            sel.selectAll('circle.m').attr('cx', nx).attr('cy', ny);
+            sel.selectAll('g.atk-icon').attr('transform', `translate(${nx},${ny}) scale(${iconScale}) translate(-12,-12)`);
+          }));
     });
   }
 
