@@ -151,7 +151,6 @@ export function drawMapOverlay() {
       if (!ap) return;
       const ax = ap[0];
       const ay = ap[1];
-      if (Math.abs(ax - vx) < 15 && Math.abs(ay - vy) < 15) return;
       const mx = (ax + vx) / 2;
       const my = Math.min(ay, vy) - 50 - (cnt / maxC) * 60;
       const key = `country:${c}`;
@@ -355,7 +354,6 @@ export function initMap() {
         .datum(topojson.mesh(world, world.objects.countries, (a, b) => a !== b))
         .attr('fill', 'none').attr('stroke', '#1c3d58').attr('stroke-width', '.4').attr('d', pathGen);
       const zoom = d3.zoom().scaleExtent([1, 24])
-        .filter((event) => event.type === 'wheel' || event.type === 'dblclick')
         .on('zoom', (e) => {
           let t = e.transform;
           const k = t.k;
