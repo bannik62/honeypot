@@ -2,8 +2,8 @@ import { CC, ISO2_TO_N3, VPS, W, H } from './constants.js';
 import { state, getByCountry } from './state.js';
 import { showCountryTip, showPointTip, moveTip, hideTip } from './tooltip.js';
 
-// Légèrement dé-zoomé et recentré pour voir plus du globe à 100 %
-let projection = d3.geoMercator().scale(140).translate([W / 2, H / 2 + 40]).center([0, 15]);
+// Légèrement plus dé-zoomé et recentré pour voir plus du globe à 100 %
+let projection = d3.geoMercator().scale(120).translate([W / 2, H / 2 + 40]).center([0, 15]);
 let pathGen = d3.geoPath().projection(projection);
 
 let mapG;
