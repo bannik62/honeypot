@@ -140,6 +140,7 @@ export function drawMapOverlay() {
     const bc = getByCountry(state.D);
     const sorted = Object.entries(bc).sort((a, b) => b[1] - a[1]);
     const maxC = sorted[0] ? sorted[0][1] : 1;
+    // Lignes animées VPS <-> pays
     sorted.forEach((entry, i) => {
       const c = entry[0];
       const cnt = entry[1];
@@ -152,11 +153,13 @@ export function drawMapOverlay() {
       if (Math.abs(ax - vx) < 15 && Math.abs(ay - vy) < 15) return;
       const mx = (ax + vx) / 2;
       const my = Math.min(ay, vy) - 50 - (cnt / maxC) * 60;
-      g.append('path').attr('class', 'atk-line')
+      const key = `country:${c}`;
+      g.append('path').attr('class', 'atk-line').attr('data-key', key)
         .attr('d', `M${ax},${ay} Q${mx},${my} ${vx},${vy}`)
         .style('stroke-width', (0.9 * invK).toFixed(3))
         .style('animation-delay', `${i * 0.05}s`);
     });
+    // Points pays
     sorted.forEach((entry) => {
       const c = entry[0];
       const cnt = entry[1];
@@ -207,6 +210,15 @@ export function drawMapOverlay() {
             const lbl = sel.select('text.dlbl');
             if (!lbl.empty()) {
               lbl.attr('x', nx + r + 2).attr('y', ny + 2);
+            }
+            // recalcule la ligne d'attaque pour coller au nouveau point
+            if (mapG) {
+              const link = mapG.select(`.atk-line[data-key="${key}"]`);
+              if (!link.empty()) {
+                const mx2 = (nx + vx) / 2;
+                const my2 = Math.min(ny, vy) - 50 - (cnt / maxC) * 60;
+                link.attr('d', `M${nx},${ny} Q${mx2},${my2} ${vx},${vy}`);
+              }
             }
           }));
     });
