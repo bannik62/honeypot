@@ -4,6 +4,36 @@ import { showTip, moveTip, hideTip } from './tooltip.js';
 
 let sim = null;
 
+const POS_KEY = 'honeypot-network-positions-v1';
+
+function loadSavedPositions() {
+  try {
+    const raw = localStorage.getItem(POS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object') return parsed;
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.warn('Impossible de lire les positions réseau depuis localStorage', e);
+  }
+  return null;
+}
+
+function savePositions(nodes) {
+  try {
+    const out = {};
+    nodes.forEach((n) => {
+      if (typeof n.x === 'number' && typeof n.y === 'number') {
+        out[n.id] = { x: n.x, y: n.y };
+      }
+    });
+    localStorage.setItem(POS_KEY, JSON.stringify(out));
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.warn('Impossible de sauvegarder les positions réseau dans localStorage', e);
+  }
+}
+
 function attackerScore(d) {
   return (d.vuln_high || 0) * 100 + (d.nikto ? 35 : 0) + (d.nmap ? 20 : 0) + (d.screenshot ? 8 : 0) + (d.dns ? 5 : 0) + (d.traceroute ? 3 : 0);
 }
@@ -65,6 +95,17 @@ export function renderGraph() {
     }
   });
 
+  const savedPos = loadSavedPositions();
+  if (savedPos) {
+    nodes.forEach((n) => {
+      const sp = savedPos[n.id];
+      if (sp && typeof sp.x === 'number' && typeof sp.y === 'number') {
+        n.x = sp.x;
+        n.y = sp.y;
+      }
+    });
+  }
+
   if (sim) sim.stop();
   sim = d3.forceSimulation(nodes)
     .force('link', d3.forceLink(links).id((d) => d.id).distance(80))
@@ -100,6 +141,10 @@ export function renderGraph() {
     edge.attr('x1', (d) => d.source.x).attr('y1', (d) => d.source.y)
       .attr('x2', (d) => d.target.x).attr('y2', (d) => d.target.y);
     node.attr('transform', (d) => `translate(${d.x},${d.y})`);
+  });
+
+  sim.on('end', () => {
+    savePositions(nodes);
   });
 }
 
