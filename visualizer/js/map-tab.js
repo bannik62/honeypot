@@ -342,11 +342,7 @@ export function initMap() {
         .datum(topojson.mesh(world, world.objects.countries, (a, b) => a !== b))
         .attr('fill', 'none').attr('stroke', '#1c3d58').attr('stroke-width', '.4').attr('d', pathGen);
       const zoom = d3.zoom().scaleExtent([1, 24])
-        .filter((event) => {
-          const t = event.target;
-          if (!t || typeof t.closest !== 'function') return true;
-          return !t.closest('g.adot');
-        })
+        .filter((event) => event.type === 'wheel' || event.type === 'dblclick')
         .on('zoom', (e) => { mapG.attr('transform', e.transform); updateZoomPct(e.transform.k); })
         .on('end', (e) => { currentZoomK = e.transform.k; drawMapOverlay(); });
       svg.call(zoom);
