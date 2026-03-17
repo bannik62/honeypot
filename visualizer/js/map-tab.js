@@ -281,8 +281,8 @@ export function drawMapOverlay() {
         cx += Math.cos(angle) * spread;
         cy += Math.sin(angle) * spread;
       }
-      const ipRadius = Math.max(0.5, 3 * invK);
-      drawItems.push({ d: rec.d, x: cx, y: cy, ax, ay, r: ipRadius });
+      const baseRadius = Math.max(0.5, 3 * invK);
+      drawItems.push({ d: rec.d, x: cx, y: cy, ax, ay, r: baseRadius });
     }
 
     const minScreenDist = Math.min(16, 2.5 + k * 0.9);
@@ -332,8 +332,14 @@ export function drawMapOverlay() {
       const px = item.x + dx;
       const py = item.y + dy;
       const dot = g.append('g').attr('class', 'adot ip').attr('data-key', key);
-      dot.append('circle').attr('cx', px).attr('cy', py).attr('r', item.r).attr('class', 'm');
-      const iconScale = ((2 * item.r) / 24) * 0.5;
+      const hasVuln = Number.parseInt(item.d.vuln_high, 10) > 0;
+      const r = hasVuln ? Math.max(item.r * 1.8, item.r + 0.4) : item.r;
+      dot.append('circle')
+        .attr('cx', px).attr('cy', py)
+        .attr('r', r)
+        .attr('class', 'm')
+        .style('fill', hasVuln ? 'var(--a2)' : '#000');
+      const iconScale = ((2 * r) / 24) * 0.5;
       dot.append('g')
         .attr('class', 'atk-icon')
         .attr('transform', `translate(${px},${py}) scale(${iconScale}) translate(-12,-12)`)
