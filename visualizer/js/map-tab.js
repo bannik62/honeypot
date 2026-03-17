@@ -181,7 +181,8 @@ export function drawMapOverlay() {
       const py = cy + dy;
       const dotClass = big ? 'adot country-top' : 'adot country';
       const dot = g.append('g').attr('class', dotClass).attr('data-key', key);
-      dot.append('circle').attr('cx', px).attr('cy', py).attr('r', r + 2 * invK).attr('class', 'rng');
+      const ringExtra = 4 * invK;
+      dot.append('circle').attr('cx', px).attr('cy', py).attr('r', r + ringExtra).attr('class', 'rng');
       dot.append('circle').attr('cx', px).attr('cy', py).attr('r', r).attr('class', 'm');
       const iconScale = ((2 * r) / 24) * 0.5;
       dot.append('g')
