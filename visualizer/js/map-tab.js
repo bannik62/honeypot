@@ -183,6 +183,10 @@ export function drawMapOverlay() {
       const dot = g.append('g').attr('class', dotClass).attr('data-key', key);
       const ringExtra = 4 * invK;
       dot.append('circle').attr('cx', px).attr('cy', py).attr('r', r + ringExtra).attr('class', 'rng');
+      if (big) {
+        const outerExtra = 7 * invK;
+        dot.append('circle').attr('cx', px).attr('cy', py).attr('r', r + outerExtra).attr('class', 'rng-top');
+      }
       dot.append('circle').attr('cx', px).attr('cy', py).attr('r', r).attr('class', 'm');
       const iconScale = ((2 * r) / 24) * 0.5;
       dot.append('g')
