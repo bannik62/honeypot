@@ -36,8 +36,11 @@ header{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 14px;
 #mapsvg{display:block;width:100%;height:auto}
 .country{fill:#0d2535;stroke:#1c3d58;stroke-width:.4}
 .country.hit{fill:#182a18}
-.atk-line{fill:none;stroke:var(--a2);stroke-width:.9;opacity:0;stroke-dasharray:400;animation:drawl 2.5s ease forwards;filter:url(#atk-glow)}
-@keyframes drawl{0%{stroke-dashoffset:400;opacity:.6}100%{stroke-dashoffset:0;opacity:.14}}
+.atk-line{fill:none;stroke:var(--a2);stroke-width:1.1;opacity:0;stroke-dasharray:400;animation:drawl 2.5s ease forwards;filter:url(#atk-glow)}
+@keyframes drawl{
+  0%{stroke-dashoffset:400;opacity:.8}
+  100%{stroke-dashoffset:0;opacity:.35}
+}
 .adot{cursor:pointer}
 .adot .m{fill:#000}
 .adot.country .rng,
