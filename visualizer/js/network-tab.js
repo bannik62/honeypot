@@ -1,6 +1,6 @@
 import { GRAPH_TOP_ATTACKERS_LIMIT } from './constants.js';
 import { state } from './state.js';
-import { showTip, moveTip, hideTip } from './tooltip.js';
+import { showPointTip, moveTip, hideTip } from './tooltip.js';
 
 let sim = null;
 
@@ -85,11 +85,12 @@ export function renderGraph() {
           nodeIds.add(hopIp);
         }
       });
-      links.push({ source: 'VPS', target: hops[0], hot: false });
-      for (let i = 0; i < hops.length - 1; i++) {
-        links.push({ source: hops[i], target: hops[i + 1], hot: false });
+      // Toujours dans le sens attaquant -> VPS
+      links.push({ source: d.ip, target: hops[hops.length - 1], hot: d.vuln_high > 0 });
+      for (let i = hops.length - 1; i > 0; i -= 1) {
+        links.push({ source: hops[i], target: hops[i - 1], hot: false });
       }
-      links.push({ source: hops[hops.length - 1], target: d.ip, hot: d.vuln_high > 0 });
+      links.push({ source: hops[0], target: 'VPS', hot: false });
     } else {
       links.push({ source: d.ip, target: 'VPS', hot: d.vuln_high > 0 });
     }
@@ -106,7 +107,10 @@ export function renderGraph() {
     });
   }
 
-  if (sim) sim.stop();
+  if (sim) {
+    sim.stop();
+    sim.on('tick', null).on('end', null);
+  }
   sim = d3.forceSimulation(nodes)
     .force('link', d3.forceLink(links).id((d) => d.id).distance(80))
     .force('charge', d3.forceManyBody().strength(-55))
@@ -132,10 +136,30 @@ export function renderGraph() {
     .attr('dy', (d) => (d.type === 'vps' ? -22 : d.type === 'hop' ? 0 : 4))
     .text((d) => (d.type === 'vps' ? '🍯 VPS' : d.type === 'hop' ? '' : d.id));
   node.filter((d) => d.type === 'atk')
-    .on('mouseenter', (e, d) => showTip(e, d.country, d.id, `${d.vuln} vuln(s) | ${d.ports}`))
+    .on('mouseenter', (e, d) => showPointTip(e, {
+      ip: d.id,
+      country: d.country || 'Unknown',
+      vuln_high: d.vuln || 0,
+      ports: d.ports || '',
+      nmap: !!d.nmap,
+      dns: !!d.dns,
+      screenshot: !!d.screenshot,
+      nikto: !!d.nikto,
+      traceroute: !!d.traceroute,
+    }))
     .on('mousemove', moveTip).on('mouseleave', hideTip);
   node.filter((d) => d.type === 'hop')
-    .on('mouseenter', (e, d) => showTip(e, '', d.id, 'Relais traceroute'))
+    .on('mouseenter', (e, d) => showPointTip(e, {
+      ip: d.id,
+      country: '',
+      vuln_high: 0,
+      ports: 'Relais traceroute',
+      nmap: false,
+      dns: false,
+      screenshot: false,
+      nikto: false,
+      traceroute: true,
+    }))
     .on('mousemove', moveTip).on('mouseleave', hideTip);
   sim.on('tick', () => {
     edge.attr('x1', (d) => d.source.x).attr('y1', (d) => d.source.y)

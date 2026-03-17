@@ -47,20 +47,6 @@ export function showPointTip(e, d) {
   moveTip(e);
 }
 
-export function showTip(e, country, ip, info) {
-  showPointTip(e, {
-    ip,
-    country,
-    vuln_high: 0,
-    ports: info || '',
-    nmap: false,
-    dns: false,
-    screenshot: false,
-    nikto: false,
-    traceroute: false,
-  });
-}
-
 export function moveTip(e) {
   const t = document.getElementById('tip');
   t.style.left = `${e.clientX + 14}px`;
