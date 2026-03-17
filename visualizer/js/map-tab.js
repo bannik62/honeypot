@@ -197,10 +197,23 @@ export function drawMapOverlay() {
         .attr('y', 0)
         .attr('width', 24)
         .attr('height', 24);
-      // anneau animé EN DERNIER (au-dessus du disque + icône)
+      // anneau animé EN DERNIER (au-dessus du disque + icône) via SMIL
       if (big) {
         const outerExtra = 10 * invK;
-        dot.append('circle').attr('cx', px).attr('cy', py).attr('r', r + outerExtra).attr('class', 'rng-top');
+        const rBase = r + outerExtra;
+        const rEnd = rBase * 1.8;
+        const ring = dot.append('circle')
+          .attr('cx', px).attr('cy', py)
+          .attr('r', rBase)
+          .attr('class', 'rng-top');
+        ring.html(`
+          <animate attributeName="r"
+                   from="${rBase}" to="${rEnd}"
+                   dur="2.5s" repeatCount="indefinite" />
+          <animate attributeName="opacity"
+                   from="0.7" to="0"
+                   dur="2.5s" repeatCount="indefinite" />
+        `);
       }
       if (screenR > 12) {
         dot.append('text').attr('x', cx + r + 2).attr('y', cy + 2).attr('class', 'dlbl')
@@ -225,9 +238,8 @@ export function drawMapOverlay() {
             sel.selectAll('circle.rng').attr('cx', nx).attr('cy', ny);
             const topRing = sel.select('circle.rng-top');
             if (!topRing.empty()) {
-              topRing
-                .attr('cx', nx).attr('cy', ny)
-                .style('transform-origin', `${nx}px ${ny}px`);
+              // centre de l'onde suit le point, SMIL se charge du rayon
+              topRing.attr('cx', nx).attr('cy', ny);
             }
             sel.selectAll('g.atk-icon').attr('transform', `translate(${nx},${ny}) scale(${iconScale}) translate(-12,-12)`);
             const lbl = sel.select('text.dlbl');
