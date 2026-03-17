@@ -36,7 +36,7 @@ header{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 14px;
 #mapsvg{display:block;width:100%;height:auto}
 .country{fill:#0d2535;stroke:#1c3d58;stroke-width:.4}
 .country.hit{fill:#182a18}
-.atk-line{fill:none;stroke:var(--a2);stroke-width:.9;opacity:0;stroke-dasharray:400;animation:drawl 2.5s ease forwards}
+.atk-line{fill:none;stroke:var(--a2);stroke-width:.9;opacity:0;stroke-dasharray:400;animation:drawl 2.5s ease forwards;filter:url(#atk-glow)}
 @keyframes drawl{0%{stroke-dashoffset:400;opacity:.6}100%{stroke-dashoffset:0;opacity:.14}}
 .adot{cursor:pointer}
 .adot .m{fill:#000}
@@ -156,6 +156,18 @@ tr:hover td{background:rgba(0,212,255,.03)}
     <div id="map-loader">CHARGEMENT CARTE...</div>
     <svg id="mapsvg" viewBox="0 0 960 500">
       <defs>
+        <filter id="atk-glow" x="-40%" y="-40%" width="180%" height="180%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur" />
+          <feColorMatrix in="blur" type="matrix"
+            values="1 0 0 0 0
+                    0 0 0 0 0
+                    0 0 0 0 0
+                    0 0 0 1 0" result="glow" />
+          <feMerge>
+            <feMergeNode in="glow"/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
         <symbol id="attacker-icon" viewBox="0 0 206 206">
           <g fill="currentColor">
             <path d="M200.663,23.767c-1.125-1.125-2.651-1.758-4.243-1.758c-0.02-0.001-0.04,0-0.06,0c-4.237,0-8.227-1.651-11.234-4.652c-3.037-3.03-4.708-7.062-4.707-11.354c0.001-1.592-0.632-3.118-1.757-4.244C177.537,0.632,176.011,0,174.419,0H31.581c-1.592,0-3.118,0.632-4.243,1.758c-1.125,1.126-1.758,2.652-1.757,4.244c0.001,4.292-1.67,8.325-4.707,11.354c-3.009,3.001-6.996,4.652-11.234,4.652c-0.02,0-0.04-0.001-0.06,0c-1.592,0-3.118,0.632-4.243,1.758c-1.129,1.13-1.762,2.663-1.757,4.26c0.06,20.19,2.938,51.081,16.305,83.586c16.012,38.936,42.908,70.387,79.94,93.479c0.972,0.606,2.073,0.909,3.175,0.909s2.203-0.303,3.175-0.909c37.032-23.092,63.929-54.542,79.94-93.479c13.367-32.505,16.245-63.396,16.305-83.586C202.425,26.429,201.792,24.896,200.663,23.767z M103,192.891C30.521,145.934,16.802,75.074,15.661,33.36c5.143-1.127,9.867-3.697,13.688-7.509c3.865-3.856,6.465-8.64,7.594-13.852h132.113c1.129,5.212,3.729,9.996,7.594,13.852c3.821,3.813,8.546,6.382,13.688,7.509C189.198,75.074,175.479,145.934,103,192.891z"/>
