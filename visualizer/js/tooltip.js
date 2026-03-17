@@ -30,6 +30,8 @@ export function showCountryTip(e, country, count) {
 export function showPointTip(e, d) {
   const k1 = document.getElementById('tip-k1');
   if (k1) k1.textContent = 'Pays';
+  const vulnHigh = Number.parseInt(d.vuln_high, 10) || 0;
+  const ports = (d.ports && typeof d.ports === 'string') ? d.ports.trim() : '';
   const reports = [];
   if (d.nmap) reports.push('nmap');
   if (d.dns) reports.push('dns');
@@ -38,8 +40,8 @@ export function showPointTip(e, d) {
   if (d.nikto) reports.push('nikto');
   document.getElementById('tiip').textContent = d.ip || 'Unknown';
   document.getElementById('tip-country').textContent = d.country || 'Unknown';
-  document.getElementById('tip-vuln').textContent = (d.vuln_high || 0).toString();
-  document.getElementById('tip-ports').textContent = (d.ports && d.ports.trim()) ? d.ports : '—';
+  document.getElementById('tip-vuln').textContent = vulnHigh > 0 ? vulnHigh.toString() : '—';
+  document.getElementById('tip-ports').textContent = ports || '—';
   document.getElementById('tip-reports').textContent = reports.length ? reports.join(', ') : '—';
   document.getElementById('tip').style.display = 'block';
   moveTip(e);
