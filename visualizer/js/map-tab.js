@@ -169,7 +169,7 @@ export function drawMapOverlay() {
       if (!cp) return;
       const cx = cp[0];
       const cy = cp[1];
-      const r = Math.max(3.2 * invK, Math.sqrt(cnt) * 1.7 * invK);
+      const r = Math.max(1.5, Math.max(6 * invK, Math.sqrt(cnt) * 1.7 * invK));
       const screenR = r * k;
       const big = cnt > state.D.length * 0.08;
       const key = `country:${c}`;
@@ -281,7 +281,7 @@ export function drawMapOverlay() {
         cx += Math.cos(angle) * spread;
         cy += Math.sin(angle) * spread;
       }
-      const ipRadius = 0.9 * invK;
+      const ipRadius = Math.max(0.5, 3 * invK);
       drawItems.push({ d: rec.d, x: cx, y: cy, ax, ay, r: ipRadius });
     }
 
