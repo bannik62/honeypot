@@ -39,10 +39,13 @@ header{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 14px;
 .atk-line{fill:none;stroke:var(--a2);stroke-width:.9;opacity:0;stroke-dasharray:400;animation:drawl 2.5s ease forwards}
 @keyframes drawl{0%{stroke-dashoffset:400;opacity:.6}100%{stroke-dashoffset:0;opacity:.14}}
 .adot{cursor:pointer}
-.adot .m{fill:#000}.adot.big .m{fill:#000}
-.adot .atk-icon{fill:var(--a2)}.adot.big .atk-icon{fill:crimson}
-.adot .rng{fill:none;stroke:var(--a2);stroke-width:.9}
-.adot.big .rng{stroke:crimson;animation:rp 2.5s ease-out infinite}
+.adot .m{fill:#000}
+.adot.country .rng,
+.adot.ip .rng{fill:none;stroke:var(--a2);stroke-width:.9}
+.adot.country-top .rng{fill:none;stroke:crimson;stroke-width:.9;animation:rp 2.5s ease-out infinite}
+.adot.country .atk-icon,
+.adot.ip .atk-icon{color:var(--a2)}
+.adot.country-top .atk-icon{color:crimson}
 @keyframes rp{0%{r:3;opacity:.7}100%{r:18;opacity:0}}
 .vdot .m{fill:var(--a3);filter:drop-shadow(0 0 4px var(--a3))}
 .vdot .rng{fill:none;stroke:var(--a3);stroke-width:1.2;animation:vr 1.8s ease-out infinite}

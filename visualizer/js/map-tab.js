@@ -179,15 +179,14 @@ export function drawMapOverlay() {
       if (saved) { dx = saved.dx; dy = saved.dy; }
       const px = cx + dx;
       const py = cy + dy;
-      const dot = g.append('g').attr('class', big ? 'adot big' : 'adot').attr('data-key', key);
+      const dotClass = big ? 'adot country-top' : 'adot country';
+      const dot = g.append('g').attr('class', dotClass).attr('data-key', key);
       dot.append('circle').attr('cx', px).attr('cy', py).attr('r', r + 2 * invK).attr('class', 'rng');
       dot.append('circle').attr('cx', px).attr('cy', py).attr('r', r).attr('class', 'm');
       const iconScale = ((2 * r) / 24) * 0.5;
-      const iconColor = big ? 'crimson' : 'var(--a2)';
       dot.append('g')
         .attr('class', 'atk-icon')
         .attr('transform', `translate(${px},${py}) scale(${iconScale}) translate(-12,-12)`)
-        .style('color', iconColor)
         .append('use')
         .attr('href', '#attacker-icon')
         .attr('x', 0)
@@ -305,13 +304,12 @@ export function drawMapOverlay() {
       if (saved) { dx = saved.dx; dy = saved.dy; }
       const px = item.x + dx;
       const py = item.y + dy;
-      const dot = g.append('g').attr('class', 'adot').attr('data-key', key);
+      const dot = g.append('g').attr('class', 'adot ip').attr('data-key', key);
       dot.append('circle').attr('cx', px).attr('cy', py).attr('r', item.r).attr('class', 'm');
       const iconScale = ((2 * item.r) / 24) * 0.5;
       dot.append('g')
         .attr('class', 'atk-icon')
         .attr('transform', `translate(${px},${py}) scale(${iconScale}) translate(-12,-12)`)
-        .style('color', 'var(--a2)')
         .append('use')
         .attr('href', '#attacker-icon')
         .attr('x', 0)
