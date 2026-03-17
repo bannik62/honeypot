@@ -331,6 +331,21 @@ export function drawMapOverlay() {
       if (saved) { dx = saved.dx; dy = saved.dy; }
       const px = item.x + dx;
       const py = item.y + dy;
+
+      // Filtre de catégorie pour les IPs détaillées
+      const filterEl = document.getElementById('map-filter-cat');
+      const filterVal = filterEl ? filterEl.value : 'all';
+      if (filterVal === 'ports') {
+        const ports = (item.d.ports && typeof item.d.ports === 'string') ? item.d.ports.trim() : '';
+        if (!ports) return;
+      }
+      if (filterVal === 'vuln') {
+        if (!(Number.parseInt(item.d.vuln_high, 10) > 0)) return;
+      }
+      if (filterVal === 'reports') {
+        if (!(item.d.nmap || item.d.dns)) return;
+      }
+
       const dot = g.append('g').attr('class', 'adot ip').attr('data-key', key);
       const hasVuln = Number.parseInt(item.d.vuln_high, 10) > 0;
       const r = hasVuln ? Math.max(item.r * 1.8, item.r + 0.4) : item.r;
@@ -443,6 +458,10 @@ export function initMap() {
         btns[3].onclick = () => applyPan(0, -60);
         btns[4].onclick = () => applyPan(-60, 0);
         btns[5].onclick = () => applyPan(60, 0);
+      }
+      const filterEl = document.getElementById('map-filter-cat');
+      if (filterEl) {
+        filterEl.addEventListener('change', drawMapOverlay);
       }
       if (state.D.length > 0) drawMapOverlay();
     })

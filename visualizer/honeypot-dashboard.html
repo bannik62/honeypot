@@ -156,6 +156,17 @@ tr:hover td{background:rgba(0,212,255,.03)}
 
 <div id="panel-map" class="panel active">
   <div id="mapwrap">
+    <select id="map-filter-cat" style="
+      position:absolute;top:8px;left:8px;z-index:10;
+      background:rgba(5,10,15,.92);border:1px solid var(--b);
+      color:var(--a);padding:5px 9px;
+      font-family:'Share Tech Mono',monospace;font-size:.68rem;
+      border-radius:6px;cursor:pointer;outline:none;">
+      <option value="all">🌍 Tous</option>
+      <option value="ports">🔌 Avec ports</option>
+      <option value="vuln">💀 Avec vulns</option>
+      <option value="reports">📋 Avec rapports</option>
+    </select>
     <div id="map-loader">CHARGEMENT CARTE...</div>
     <svg id="mapsvg" viewBox="0 0 960 500">
       <defs>
