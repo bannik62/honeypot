@@ -1,37 +1,54 @@
 # 🍯 Honeypot Monitor
 
-Système de monitoring temps réel pour **Endlessh** (honeypot SSH) avec capture d'écran des interfaces web des attaquants, scan de vulnérabilités et analyse DNS/WHOIS.
+Système de monitoring temps réel pour **Endlessh** (honeypot SSH) avec géolocalisation, scan de vulnérabilités, analyse DNS/WHOIS, captures d'écran, et **dashboard web interactif** avec carte monde D3.js.
 
 > ⚠️ **Prérequis obligatoire** : Ce système nécessite **Endlessh** comme honeypot SSH. Assurez-vous qu'Endlessh est installé et configuré avant d'utiliser ce système.
 
+---
+
 ## 🎯 Fonctionnalités
 
-- ⚡ **Monitoring temps réel** des connexions au honeypot (parsing historique + suivi live)
-- 🌍 **Géolocalisation** des attaquants (base GeoIP locale)
-- 📊 **Dashboard ASCII** avec statistiques live
+### Collecte & monitoring
+- ⚡ **Monitoring temps réel** des connexions (parsing historique + suivi live via `journalctl -f`)
+- 🌍 **Géolocalisation** des attaquants (base GeoIP locale, cache 10 MB)
+- 📊 **Dashboard ASCII** avec statistiques live (terminal)
 - 📈 **Logs structurés** en CSV pour analyse
-- 🔍 **Scan des interfaces web** avec nmap
-- 📸 **Capture d'écran automatique** des interfaces web
-- 🛡️ **Scan de vulnérabilités** avec nmap et nikto
-- 🔎 **Recherche dans les rapports** de vulnérabilités (SQLite)
+
+### Scan & enrichissement
+- 🔍 **Scan des interfaces web** avec nmap (ports 80, 443, 8080…)
+- 📸 **Captures d'écran automatiques** des interfaces web (Google Chrome headless)
+- 🛡️ **Scan de vulnérabilités** avec nmap (`--script vuln`) + nikto (optionnel)
 - 🌐 **Analyse DNS/WHOIS** des IPs collectées
+- 🗺️ **Traceroute** par IP (`nmap --traceroute`, script manuel)
+- 🔎 **Recherche** dans les rapports de vulnérabilités (SQLite)
+
+### Dashboard web interactif *(nouveau)*
+- 🗺️ **Carte monde D3.js** avec points animés par pays et IPs individuelles au zoom
+- 📡 **Ondulations radar** sur les pays les plus actifs
+- 🔗 **Graphe réseau D3** (onglet Réseau) — traceroute des hops
+- 📋 **Tableau IPs** avec modales de détail (rapports nmap, DNS, screenshots)
+- 📊 **Onglet Statistiques** — top pays, top ports, timeline
+- 🖥️ **Serveur local** Python (`127.0.0.1:8765`), accès exclusivement via tunnel SSH
+- 🔌 **Filtre carte** par catégorie : tous, avec ports, avec vulns HIGH, avec rapports
+
+### Automatisation & maintenance
 - ⏰ **Scans automatiques** via cron (configurable)
 - 🧹 **Nettoyage automatique** du cache et des anciennes données
-- 💾 **Cache intelligent** pour limiter les lookups (limité à 10MB)
-- 🚀 **Léger** : <1% CPU, ~10MB RAM
+- 💾 **Cache intelligent** GeoIP (limité à 10 MB)
+- 🚀 **Léger** : <1% CPU, ~10 MB RAM
+
+---
 
 ## 📋 Prérequis
 
-### 1. Endlessh Installé et Configuré
+### 1. Endlessh installé et configuré
 
-Ce système nécessite Endlessh comme honeypot SSH. Assurez-vous que :
+- ✅ `sudo apt install endlessh`
+- ✅ Écoute sur le port 22
+- ✅ Service systemd actif : `sudo systemctl status endlessh`
+- ✅ Génère des logs `ACCEPT host=IP port=PORT`
 
-- ✅ Endlessh est installé : `sudo apt install endlessh`
-- ✅ Endlessh est configuré pour écouter sur le port 22
-- ✅ Le service systemd endlessh.service est actif : `sudo systemctl status endlessh`
-- ✅ Endlessh génère des logs avec le format ACCEPT host=IP port=PORT
-
-**Configuration Endlessh recommandée** (`/etc/endlessh/config`) :
+**Configuration recommandée** (`/etc/endlessh/config`) :
 ```
 Port 22
 Delay 10000
@@ -40,20 +57,20 @@ MaxClients 4096
 LogLevel 1
 ```
 
-**Service systemd** (`/usr/lib/systemd/system/endlessh.service`) :
-- Doit avoir `AmbientCapabilities=CAP_NET_BIND_SERVICE` pour écouter sur port 22
-- `PrivateUsers=true` doit être commenté
+Le service systemd doit avoir `AmbientCapabilities=CAP_NET_BIND_SERVICE` et `PrivateUsers=true` commenté.
 
-### 2. Système et Dépendances
+### 2. Système et dépendances
 
-- Ubuntu/Debian
-- `sudo` pour accéder aux logs systemd
-- `geoip-bin` et `geoip-database` (installés automatiquement)
-- `jq` pour parser JSON (installés automatiquement)
-- `chromium-browser` pour les captures d'écran (installé automatiquement)
-- `nmap` pour scanner les ports (installé automatiquement)
-- `sqlite3` pour la base de données des vulnérabilités (installé automatiquement)
-- `nikto` pour scanner les vulnérabilités (optionnel, installé manuellement)
+- Ubuntu/Debian récents (22.04/24.04, Debian 11/12 recommandés), `sudo` pour accéder aux logs systemd
+- `geoip-bin`, `geoip-database` — géolocalisation (installés automatiquement)
+- `jq` — manipulation JSON (installé automatiquement)
+- `google-chrome-stable` — captures d'écran headless (installé automatiquement via repo APT)
+- `nmap` — scan ports + vulnérabilités (installé automatiquement)
+- `sqlite3` — base de données vulnérabilités (installé automatiquement)
+- `python3` — serveur visualiseur (présent sur Ubuntu)
+- `nikto` — scan vulnérabilités web (optionnel, installation manuelle)
+
+---
 
 ## 🚀 Installation
 
@@ -61,396 +78,337 @@ LogLevel 1
 git clone https://github.com/bannik62/honeypot.git
 cd honeypot
 sudo ./install.sh
-cp config/config.example config/config
-nano config/config
 ```
 
 L'installation :
-- ✅ Installe toutes les dépendances
+- ✅ Installe toutes les dépendances (dont Google Chrome via repo APT officiel)
 - ✅ Crée la structure de répertoires
+- ✅ Copie `config/config.example` → `config/config`
 - ✅ Rend tous les scripts exécutables
 - ✅ Ajoute les alias dans `.bashrc`
 - ✅ Propose de configurer les scans automatiques (cron)
+- ✅ Propose de démarrer le monitoring immédiatement
 
-**Important** : Après l'installation, rechargez votre `.bashrc` :
+**Après l'installation, rechargez votre `.bashrc` :**
 ```bash
 source ~/.bashrc
 ```
 
+---
+
 ## 📊 Utilisation
 
-### Monitoring en Arrière-plan (Recommandé)
-
-Le monitoring en arrière-plan parse l'historique complet au démarrage puis suit les nouvelles connexions en temps réel :
+### Monitoring en arrière-plan
 
 ```bash
-# Démarrer le monitoring
-honeypot-monitor start
-
-# Arrêter le monitoring
-honeypot-monitor stop
-
-# Vérifier le statut
-honeypot-monitor status
-
-# Redémarrer
-honeypot-monitor restart
+honeypot-monitor start     # Démarre (parse l'historique + écoute en temps réel)
+honeypot-monitor stop      # Arrête
+honeypot-monitor status    # Vérifie le statut
+honeypot-monitor restart   # Redémarre
 ```
 
-**Fonctionnement** :
-- Au démarrage, parse tout l'historique des logs Endlessh
-- Affiche une barre de progression pendant le parsing
-- Après le parsing, suit les nouvelles connexions en temps réel
-- Écrit toutes les connexions dans `connections.csv`
+Au démarrage, le monitoring parse tout l'historique Endlessh (avec barre de progression), puis suit les nouvelles connexions via `journalctl -f`.
 
-### Commandes de Monitoring
+### Dashboard ASCII (terminal)
 
 ```bash
-# Stats rapides
-honeypot-stats
-
-# Dashboard temps réel (écoute live)
-honeypot-dashboard
-
-# Compter les IPs (journal vs connections.csv)
-count-ips
-
-# Suivre les connexions en temps réel (journalctl)
-piegeAbot
-
-# Suivre les logs des scans
-honeypot-logs
+honeypot-stats             # Stats rapides (top pays, dernières connexions)
+honeypot-dashboard         # Dashboard temps réel (rafraîchissement automatique)
+count-ips                  # Compte les IPs : journal vs connections.csv
+piegeAbot                  # Suit les connexions en temps réel (journalctl)
+honeypot-logs              # Logs des scans automatiques (tail -f)
 ```
 
-### Scan et Capture des Interfaces Web
+### Dashboard web interactif *(nouveau)*
 
 ```bash
-# Scanne les IPs avec nmap et crée un CSV avec les interfaces web
-scan-web
+# 1. Générer les données (après les scans)
+honeypot-make-visualizer-data
 
-# Capture les interfaces web + scan nikto (lance scan-web si nécessaire)
-capture-web
+# 2. Démarrer le serveur local
+honeypot-start-server start
 
-# Scan de vulnérabilités avec nmap
-vuln-scan
+# 3. Depuis votre PC : tunnel SSH (garder la fenêtre ouverte)
+ssh -L 8765:127.0.0.1:8765 ubuntu@IP_DU_VPS
 
-# Analyse DNS/WHOIS des IPs
-honeypot-dig
+# 4. Ouvrir dans le navigateur
+http://localhost:8765
 
-# Recherche dans les rapports de vulnérabilités
-honeypot-search-nikto
+# 5. Éteindre le serveur
+honeypot-start-server stop
+honeypot-start-server status
 ```
 
-### Scans Automatiques
+Le serveur écoute sur `127.0.0.1` uniquement — jamais exposé sur internet.
 
-Configurer les scans automatiques (exécution périodique via cron) :
+Le dashboard contient 4 onglets :
+- **Carte** — carte monde D3.js avec points animés, zoom, tooltips, ondulations radar sur les tops attaquants
+- **Réseau** — graphe de force D3 des traceroutes (hops entre routeurs)
+- **Statistiques** — top pays, top ports, timeline des connexions
+- **IPs** — tableau complet avec filtres et modales de détail (nmap, DNS, screenshots)
+
+En vue **pays**, le tooltip agrège automatiquement le nombre total de vulnérabilités HIGH, la liste des ports observés et les rapports disponibles (nmap, DNS, traceroute, screenshots, nikto) pour le pays survolé. En vue **IP individuelle**, le tooltip affiche les données précises de cette IP (pays, vulnérabilités, ports, rapports).
+
+### Scans & enrichissement
 
 ```bash
-# Configurer les scans automatiques
-setup-auto-scan
+scan-web                   # Scan nmap → détecte les interfaces web (web_interfaces.csv)
+capture-web                # Screenshots des interfaces web + scan nikto
+vuln-scan                  # Scan vulnérabilités nmap (--script vuln)
+honeypot-dig               # DNS/WHOIS sur toutes les IPs
+honeypot-search-nikto      # Recherche interactive dans la base SQLite
+honeypot-make-visualizer-data  # Agrège tout → data.json pour le dashboard
 ```
 
-Le script :
-- Lit la configuration (`AUTO_SCAN_ENABLED` et `AUTO_SCAN_HOUR`)
-- Configure le cron pour exécuter `run-all-scans.sh` périodiquement
-- Les scans incluent : scan-web, capture-web, dig-ip, vuln-scan
-- Le nettoyage automatique est exécuté après chaque série de scans
+### Traceroute (manuel, ponctuel)
 
-**Configuration dans `config/config`** :
-```bash
-AUTO_SCAN_ENABLED=true   # Activer/désactiver les scans automatiques
-AUTO_SCAN_HOUR=1         # Intervalle entre chaque exécution (1-23 heures)
-```
-
-### Alias Disponibles
+Le traceroute nécessite les droits root (raw sockets) et n'est pas inclus dans le cron :
 
 ```bash
-# Monitoring
-honeypot-stats           # Affiche les statistiques
-honeypot-dashboard       # Lance le dashboard temps réel
-honeypot-monitor         # Gère le monitoring (start/stop/status/restart)
-honeypot-logs            # Suit les logs des scans (tail -f)
-count-ips                # Compter les IPs (journal vs connections.csv)
-piegeAbot                # Suivre les connexions en temps réel (journalctl)
-
-# Scans
-scan-web                 # Scan nmap des interfaces web
-capture-web              # Capture d'écran + scan nikto
-vuln-scan                # Scan de vulnérabilités avec nmap
-honeypot-dig             # Requêtes DNS/WHOIS sur les IPs
-honeypot-search-nikto    # Recherche dans les rapports Nikto
-
-# Configuration
-setup-auto-scan          # Configurer les scans automatiques (cron)
+sudo bash scripts/traceroute-ip.sh
 ```
 
-## 📂 Structure du Projet
+Ce script backfille les `_traceroute.txt` manquants dans `data/screenshotAndLog/<IP>/`. Relancez ensuite `honeypot-make-visualizer-data` pour mettre à jour le graphe réseau.
+
+### Scans automatiques
+
+```bash
+setup-auto-scan            # Configure le cron (lit AUTO_SCAN_ENABLED et AUTO_SCAN_HOUR)
+```
+
+La séquence automatique (`run-all-scans.sh`) exécute dans l'ordre :
+1. `scan-web` (nmap → web_interfaces.csv)
+2. `capture-web` (screenshots + nikto)
+3. `dig-ip` (DNS/WHOIS)
+4. `vuln-scan` (nmap --script vuln)
+5. `cleanup-old-data` (nettoyage)
+6. `generate-data` (→ data.json pour le dashboard)
+
+---
+
+## 📂 Structure du projet
 
 ```
 honeypot/
 ├── data/
 │   ├── logs/
-│   │   ├── connections.csv      # Toutes les connexions Endlessh
-│   │   ├── web_interfaces.csv  # Interfaces web trouvées (créé par nmap)
-│   │   ├── run-all-scans.log   # Logs des scans automatiques
-│   │   ├── parser.log          # Logs du parser
-│   │   └── *.bak.gz            # Backups compressés (rotation automatique)
-│   ├── screenshotAndLog/             # Captures d'écran des interfaces web
-│   │   ├── 192.168.1.100_80_20251222_120430.png
-│   │   ├── 192.168.1.100_80_20251222_120430.txt
-│   │   └── 192.168.1.100_80_20251222_120430_nikto.txt
+│   │   ├── connections.csv          # Toutes les connexions Endlessh
+│   │   ├── web_interfaces.csv       # Interfaces web trouvées (nmap)
+│   │   ├── nikto.db                 # Base SQLite des vulnérabilités
+│   │   ├── run-all-scans.log        # Logs des scans automatiques
+│   │   └── *.bak.gz                 # Backups compressés (rotation auto)
+│   ├── screenshotAndLog/
+│   │   └── <IP>/
+│   │       ├── <IP>_nmap.txt        # Rapport vulnérabilités (vuln-scan.sh)
+│   │       ├── <IP>_traceroute.txt  # Hops traceroute (traceroute-ip.sh)
+│   │       ├── <IP>_dns.txt         # Reverse DNS + WHOIS (dig-ip.sh)
+│   │       ├── <IP>_<port>_<date>_<time>.png  # Screenshot (web-capture.sh)
+│   │       └── <IP>_nikto.txt       # Rapport nikto (optionnel)
 │   ├── cache/
-│   │   ├── geoip-cache.json    # Cache géolocalisation (limité à 10MB)
-│   │   ├── honeypot-monitor.pid # PID du monitoring
-│   │   └── honeypot-monitor.lock # Lock file du monitoring
-│   └── nikto.db                # Base SQLite des vulnérabilités
+│   │   ├── geoip-cache.json         # Cache géolocalisation (max 10 MB)
+│   │   ├── honeypot-monitor.pid
+│   │   └── honeypot-monitor.lock
+│   └── visualizer-dashboard/
+│       └── data.json                # Données agrégées pour le dashboard web
 ├── scripts/
-│   ├── monitor.sh              # Monitoring background (parse historique + temps réel)
-│   ├── parser.sh               # Parser de logs Endlessh
-│   ├── stats.sh                # Statistiques rapides
-│   ├── dashboard.sh            # Dashboard temps réel
-│   ├── nmap-to-csv.sh          # Scan nmap → CSV interfaces web
-│   ├── web-capture.sh          # Capture d'écran des interfaces web
-│   ├── vuln-scan.sh            # Scan de vulnérabilités avec nmap
-│   ├── dig-ip.sh               # Analyse DNS/WHOIS
-│   ├── parse-nikto.sh          # Parse les rapports nmap → SQLite
-│   ├── search-nikto.sh         # Recherche dans la base SQLite
-│   ├── run-all-scans.sh        # Orchestre tous les scans
-│   ├── setup-auto-scan.sh      # Configure les scans automatiques
-│   └── cleanup-old-data.sh     # Nettoyage automatique
+│   ├── monitor.sh                   # Daemon monitoring (historique + temps réel)
+│   ├── parser.sh                    # Parser logs Endlessh → connections.csv
+│   ├── stats.sh                     # Statistiques rapides (terminal)
+│   ├── dashboard.sh                 # Dashboard ASCII temps réel
+│   ├── nmap-to-csv.sh               # Scan nmap → web_interfaces.csv
+│   ├── web-capture.sh               # Screenshots + scan nikto
+│   ├── vuln-scan.sh                 # Scan vulnérabilités nmap
+│   ├── dig-ip.sh                    # DNS/WHOIS par IP
+│   ├── parse-nikto.sh               # Parse rapports nmap → SQLite
+│   ├── search-nikto.sh              # Recherche interactive SQLite
+│   ├── generate-data.sh             # Agrège tout → data.json (visualiseur)
+│   ├── traceroute-ip.sh             # Traceroute manuel (sudo, ponctuel)
+│   ├── run-all-scans.sh             # Orchestre tous les scans (cron)
+│   ├── setup-auto-scan.sh           # Configure le cron
+│   ├── cleanup-old-data.sh          # Nettoyage automatique
+│   └── python-visualiser/
+│       ├── server.py                # Serveur HTTP Python (127.0.0.1:8765)
+│       └── server.sh                # start|stop|status du serveur
+├── visualizer/
+│   ├── honeypot-dashboard.html      # Dashboard web (D3.js)
+│   └── js/
+│       ├── main.js                  # Orchestration
+│       ├── map-tab.js               # Carte monde D3 + zoom + animations
+│       ├── network-tab.js           # Graphe réseau D3 (traceroutes)
+│       ├── stats-tab.js             # Statistiques
+│       ├── ips-tab.js               # Tableau IPs + modales
+│       ├── tooltip.js               # Tooltips enrichis (pays + IPs)
+│       ├── state.js                 # État global
+│       ├── constants.js             # CC, ISO2_TO_N3, VPS...
+│       └── data-loader.js           # Fetch data.json / CSV
 ├── lib/
-│   └── common.sh               # Bibliothèque commune : fonctions partagées (logging, config, validation, SQL escaping, nettoyage fichiers temporaires)
+│   └── common.sh                    # Fonctions communes (logging, config, rotation, SQL)
 ├── config/
-│   ├── config.example          # Exemple de configuration
-│   └── config                  # Configuration personnalisée
-├── install.sh                  # Script d'installation
-├── uninstall.sh                # Script de désinstallation
+│   ├── config.example               # Exemple de configuration
+│   └── config                       # Configuration personnalisée
+├── docs/
+│   ├── ARCHITECTURE.md              # Architecture détaillée + flux de données
+│   └── FLOWCHART.md                 # Schéma Mermaid du pipeline
+├── install.sh
+├── uninstall.sh
 └── README.md
 ```
 
-## 🔄 Workflow Complet
+---
+
+## 🔄 Workflow complet
 
 ### 1. Endlessh capture les bots
 
-Les bots se connectent au port 22. Endlessh les piège et génère des logs `ACCEPT host=IP port=PORT`.
+Les bots se connectent sur le port 22. Endlessh les piège et génère des logs `ACCEPT host=IP port=PORT`.
 
 ### 2. Monitoring et logs
 
-**Monitoring en arrière-plan** (`monitor.sh`) :
-- Parse tout l'historique des logs Endlessh au démarrage
-- Affiche une barre de progression pendant le parsing
-- Suit les nouvelles connexions en temps réel avec `journalctl -f`
-- Écrit toutes les connexions dans `connections.csv`
-- Chaque IP est géolocalisée (avec cache pour optimisation)
+`monitor.sh` (daemon) parse tout l'historique Endlessh au démarrage, puis suit les nouvelles connexions en temps réel. Chaque IP est géolocalisée (cache GeoIP) et écrite dans `connections.csv`.
 
-**Dashboard temps réel** (`dashboard.sh`) :
-- Écoute `journalctl -f` en temps réel
-- Affiche les statistiques et les nouvelles connexions
-- Rafraîchit automatiquement selon `REFRESH_INTERVAL`
+### 3. Pipeline de scans (cron ou manuel)
 
-### 3. Scan des interfaces web (optionnel)
+`run-all-scans.sh` orchestre dans l'ordre :
 
-- `scan-web` : nmap scanne les IPs capturées
-- Détecte les ports HTTP ouverts (80, 443, 8080, 8443, 8000, 8888, 3000, 5000, 9000)
-- Crée `web_interfaces.csv` avec les IPs qui ont des interfaces web
-- Évite les doublons (vérifie si l'IP:port a déjà été scanné)
+- **scan-web** → détecte les ports HTTP ouverts (80, 443, 8080, 8443, 8000, 8888, 3000, 5000, 9000), évite les doublons
+- **capture-web** → screenshot PNG via Chrome headless, scan nikto si installé
+- **dig-ip** → reverse DNS + WHOIS par IP
+- **vuln-scan** → `nmap -F -sV --script vuln`, stocke les rapports dans `screenshotAndLog/<IP>/`
+- **cleanup-old-data** → nettoyage automatique
+- **generate-data** → agrège tout dans `data.json`
 
-### 4. Capture d'écran et analyse (optionnel)
+### 4. Dashboard web
 
-- `capture-web` : lit `web_interfaces.csv`
-- Prend des captures PNG avec `chromium-browser --headless`
-- Scanne les vulnérabilités avec nikto (si installé)
-- Sauvegarde dans `data/screenshotAndLog/`
+`generate-data.sh` scanne `data/screenshotAndLog/`, extrait pour chaque IP : pays, coordonnées, présence nmap/dns/screenshot/nikto/traceroute, hops, vulns HIGH, ports ouverts. Produit `data/visualizer-dashboard/data.json`.
 
-### 5. Scan de vulnérabilités (optionnel)
+`server.py` sert le dashboard HTML + `data.json` + rapports par IP sur `127.0.0.1:8765`. Accès via tunnel SSH uniquement.
 
-- `vuln-scan` : scanne les IPs avec `nmap --script vuln`
-- Parse les rapports avec `parse-nikto.sh` → stocke dans SQLite (`nikto.db`)
-- Recherche dans la base avec `honeypot-search-nikto`
-
-### 6. Analyse DNS/WHOIS (optionnel)
-
-- `honeypot-dig` : effectue des requêtes DNS et WHOIS sur les IPs
-- Enrichit les données collectées
-
-### 7. Scans automatiques (optionnel)
-
-- Configuré via `setup-auto-scan`
-- Exécute `run-all-scans.sh` périodiquement (cron)
-- Inclut : scan-web, capture-web, dig-ip, vuln-scan
-- Nettoie automatiquement après chaque série de scans
+---
 
 ## 🌍 Géolocalisation
 
-Utilise la base de données GeoIP locale (gratuite) :
-- Pas de limite de requêtes
-- Lookup < 1ms
-- Cache intelligent : les IPs déjà géolocalisées sont mises en cache dans `data/cache/geoip-cache.json`
-- **Limitation automatique** : le cache est limité à 10MB (~100k entrées)
-- **Nettoyage automatique** : si le cache dépasse 10MB, garde seulement les 50000 dernières entrées
+Base GeoIP locale (gratuite, sans limite de requêtes, lookup < 1ms). Cache JSON limité à 10 MB (~100k entrées) avec nettoyage automatique au dépassement.
 
-## 📈 Format des Logs
+---
 
-### connections.csv (Endlessh)
+## 📈 Format des données
 
+### `data/logs/connections.csv`
 ```csv
 timestamp,ip,port,country
-2025-12-22 10:30:45,192.168.1.100,56954,FR
-2025-12-22 10:31:12,10.0.0.50,52341,US
+2025-03-01 02:11:00,218.92.0.115,52341,CN
 ```
 
-### web_interfaces.csv (nmap)
-
+### `data/logs/web_interfaces.csv`
 ```csv
-timestamp,ip,port,protocol,url
-2025-12-22 12:00:00,192.168.1.100,80,http,http://192.168.1.100:80
-2025-12-22 12:00:01,192.168.1.100,443,https,https://192.168.1.100:443
+timestamp,ip,port,protocol,url,scanned
+2025-03-01 12:00:00,218.92.0.115,80,http,http://218.92.0.115:80,1
 ```
 
-### nikto.db (SQLite)
+### `data/visualizer-dashboard/data.json`
+```json
+[
+  {
+    "ip": "218.92.0.115",
+    "country": "CN",
+    "lat": 39.9042,
+    "lon": 116.4074,
+    "nmap": true,
+    "dns": true,
+    "screenshot": false,
+    "nikto": false,
+    "traceroute": true,
+    "hops": ["10.0.0.1", "192.168.1.1", "218.92.0.115"],
+    "vuln_high": 2,
+    "ports": "80,443"
+  }
+]
+```
 
-Base de données SQLite contenant les résultats des scans de vulnérabilités :
-- Table `vulnerabilities` : IP, port, service, vuln_id, severity, description, etc.
-- Recherche via `honeypot-search-nikto`
+### `data/logs/nikto.db` (SQLite)
+- Table `vulns` : ip, port, vulnerability, severity (HIGH/MEDIUM/LOW), cve, server_version, full_text
+- Table `parsed_files` : suivi des fichiers déjà parsés (évite les doublons)
+
+---
 
 ## 🔧 Configuration
 
-Fichier `config/config` :
+Fichier `config/config` (copié depuis `config/config.example`) :
 
 ```bash
-# Répertoire des données (logs, cache)
+# Répertoire des données
 DATA_DIR="/home/ubuntu/honeypot/data"
 
-# Nom du service systemd à monitorer
+# Nom du service systemd
 SERVICE_NAME="endlessh"
 
-# Intervalle de rafraîchissement du dashboard (secondes)
+# Dashboard ASCII : intervalle de rafraîchissement (secondes)
 REFRESH_INTERVAL=5
-
-# Activer les notifications (true/false)
-ENABLE_NOTIFICATIONS=false
 
 # Ports à scanner pour les interfaces web
 SCAN_PORTS="80,443,8080,8443,8000,8888,3000,5000,9000"
 
-# Nombre de processus parallèles pour nmap
-NMAP_PARALLEL=15
+# Parallélisme
+NMAP_PARALLEL=10          # Scans nmap simultanés (scan-web)
+CAPTURE_PARALLEL=5        # Captures simultanées (capture-web)
+DIG_PARALLEL=10           # Requêtes DNS simultanées (honeypot-dig)
+NIKTO_PARALLEL=10         # Scans nikto simultanés
+NIKTO_TIMEOUT=600         # Timeout nikto par scan (secondes)
+NIKTO_TUNING="1,2,3,5,6,7,8"  # Tests nikto activés
 
-# Nombre de processus parallèles pour les captures
-CAPTURE_PARALLEL=5
-
-# Nombre de processus parallèles pour dig
-DIG_PARALLEL=10
-
-# Timeout nmap
-NMAP_MAX_RTT_TIMEOUT=500ms
-NMAP_HOST_TIMEOUT=600s
+# Timeouts nmap (vuln-scan)
+NMAP_MAX_RTT_TIMEOUT="500ms"
+NMAP_HOST_TIMEOUT="600s"
 
 # Scans automatiques
-AUTO_SCAN_ENABLED=false
-AUTO_SCAN_HOUR=1
+AUTO_SCAN_ENABLED=true
+AUTO_SCAN_HOUR=1          # Intervalle entre chaque exécution (1-23 heures)
 ```
 
-### Explication des Paramètres
+---
 
-**DATA_DIR** : Chemin vers le répertoire qui contient les logs, cache et captures d'écran.
-- **Par défaut** : `/home/ubuntu/honeypot/data`
-- **Modifier si** : Vous voulez stocker les données ailleurs (ex: `/var/log/honeypot`)
+## 🧹 Nettoyage automatique
 
-**SERVICE_NAME** : Nom du service systemd à monitorer.
-- **Par défaut** : `endlessh`
-- **Modifier si** : Vous utilisez un autre nom de service pour Endlessh
+Exécuté après chaque cycle de scans (`run-all-scans.sh`) ou manuellement (`./scripts/cleanup-old-data.sh`) :
 
-**REFRESH_INTERVAL** : Délai (en secondes) entre chaque rafraîchissement du dashboard.
-- **Par défaut** : `5` secondes
-- **Modifier si** : Vous voulez un rafraîchissement plus rapide (1-2s) ou plus lent (10s+)
+- **Cache GeoIP** : limité à 10 MB, nettoyage automatique si dépassé
+- **Screenshots** : suppression des captures > 30 jours
+- **Rapports nmap** : suppression des rapports > 60 jours
+- **Backups compressés** : suppression des backups > 90 jours
+- **Fichiers CSV** : rotation automatique si > 50 MB
 
-**SCAN_PORTS** : Ports à scanner pour détecter les interfaces web.
-- **Par défaut** : `80,443,8080,8443,8000,8888,3000,5000,9000`
-- **Modifier si** : Vous voulez scanner d'autres ports
+---
 
-**NMAP_PARALLEL** : Nombre de scans nmap en parallèle.
-- **Par défaut** : `15`
-- **Modifier si** : Vous voulez plus ou moins de parallélisme
+## 💾 Gestion mémoire
 
-**AUTO_SCAN_ENABLED** : Active les scans automatiques via cron.
-- **Par défaut** : `false`
-- **Modifier si** : Vous voulez activer les scans automatiques
+- Cache GeoIP : limité à 10 MB, nettoyage automatique
+- CSV : rotation automatique si > 50 MB
+- Fichiers temporaires : nettoyage automatique via `trap`
+- Historique journalctl initial : limité à 10 000 lignes
+- Données anciennes : suppression périodique (30–90 jours)
 
-**AUTO_SCAN_HOUR** : Intervalle entre chaque exécution automatique (heures, 1-23).
-- **Par défaut** : `1` heure
-- **Modifier si** : Vous voulez un intervalle différent
+---
 
-## 🧹 Nettoyage Automatique
+## 📸 Alias disponibles
 
-Le système nettoie automatiquement :
+| Alias | Description |
+|---|---|
+| `honeypot-monitor` | start / stop / status / restart du monitoring |
+| `honeypot-stats` | Statistiques rapides (terminal) |
+| `honeypot-dashboard` | Dashboard ASCII temps réel |
+| `honeypot-logs` | Logs des scans automatiques (tail -f) |
+| `count-ips` | Compte les IPs : journal vs connections.csv |
+| `piegeAbot` | Connexions en temps réel (journalctl -f) |
+| `scan-web` | Scan nmap → interfaces web |
+| `capture-web` | Screenshots + nikto |
+| `vuln-scan` | Scan vulnérabilités nmap |
+| `honeypot-dig` | DNS/WHOIS sur les IPs |
+| `honeypot-search-nikto` | Recherche dans les rapports Nikto (SQLite) |
+| `setup-auto-scan` | Configure les scans automatiques (cron) |
+| `honeypot-make-visualizer-data` | Génère data.json pour le dashboard web |
+| `honeypot-start-server` | start / stop / status du serveur visualiseur |
 
-1. **Cache GeoIP** : limité à 10MB, nettoyage automatique si dépassé
-2. **Captures d'écran** : suppression des captures > 30 jours
-3. **Rapports nmap** : suppression des rapports > 60 jours
-4. **Backups compressés** : suppression des backups > 90 jours
-5. **Fichiers CSV** : rotation automatique si > 50MB
-
-Le nettoyage est exécuté :
-- Automatiquement après chaque série de scans (`run-all-scans.sh`)
-- Manuellement : `./scripts/cleanup-old-data.sh`
-
-## 📊 Exemple de Sortie
-
-### Stats Rapides (`honeypot-stats`)
-
-```
-🍯 HONEYPOT STATISTICS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-📈 Total Connections: 127
-🌍 Unique IPs: 89
-
-🌎 TOP 5 COUNTRIES:
-  FR: 45 (35%)
-  US: 23 (18%)
-  RU: 15 (12%)
-  DE: 8 (6%)
-  CN: 7 (6%)
-
-🔥 LATEST 5 CONNECTIONS:
-  10:45:23 - 192.168.1.100 (US) - port 52341
-  10:44:12 - 10.0.0.50 (CN) - port 38080
-  10:43:05 - 172.16.0.25 (FR) - port 56954
-```
-
-### Dashboard Temps Réel (`honeypot-dashboard`)
-
-Le dashboard affiche les stats en continu et montre immédiatement chaque nouvelle connexion avec le message "✨ NOUVELLE CONNEXION".
-
-### Monitoring (`honeypot-monitor start`)
-
-```
-🚀 Démarrage du monitoring...
-📜 Parsing de l'historique complet d'abord...
-📊 15411 lignes à parser...
-⏳ Parsing... 15411/15411 lignes (100%)
-✅ 15411 lignes parsées
-✅ Historique parsé, écoute des nouvelles connexions...
-✅ Monitoring démarré (PID: 1234567)
-```
-
-## 📸 Captures d'Écran
-
-Les captures sont sauvegardées dans `data/screenshotAndLog/` :
-- **Fichiers PNG** : captures d'écran des interfaces web (format : `{IP}_{PORT}_{TIMESTAMP}.png`)
-- **Fichiers .txt** : métadonnées (IP, port, URL, timestamp)
-- **Fichiers _nikto.txt** : rapports de vulnérabilités (si nikto est installé)
-
-## 💾 Gestion de la Mémoire
-
-Le système est optimisé pour éviter les fuites mémoire :
-
-- **Cache GeoIP** : limité à 10MB, nettoyage automatique
-- **Fichiers CSV** : rotation automatique si > 50MB
-- **Fichiers temporaires** : nettoyage automatique avec `trap`
-- **Journalctl** : limite l'historique initial à 10000 lignes
-- **Nettoyage périodique** : suppression des anciennes données (> 30-90 jours)
+---
 
 ## 🗑️ Désinstallation
 
@@ -459,16 +417,13 @@ cd ~/honeypot
 sudo ./uninstall.sh
 ```
 
-Le script de désinstallation :
-- Arrête le monitoring
-- Supprime les alias du `.bashrc`
-- Supprime le cron (si configuré)
-- Nettoie les processus
-- Optionnellement supprime les données et la configuration
+Le script propose de : arrêter le monitoring, supprimer le cron, nettoyer les processus, supprimer les alias du `.bashrc`, et optionnellement supprimer les données et la configuration.
+
+---
 
 ## 📝 Licence
 
-MIT - Libre d'utilisation
+MIT — libre d'utilisation
 
 ## 🤝 Contribution
 
