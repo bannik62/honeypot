@@ -158,10 +158,11 @@ tr:hover td{background:rgba(0,212,255,.03)}
       <defs>
         <filter id="atk-glow" x="-40%" y="-40%" width="180%" height="180%">
           <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur" />
+          <!-- Teinte le blur en bleu électrique (approx rgb(0,212,255)) -->
           <feColorMatrix in="blur" type="matrix"
-            values="1 0 0 0 0
-                    0 0 0 0 0
-                    0 0 0 0 0
+            values="0 0 0 0 0
+                    0 0 0 0 0.83
+                    0 0 0 0 1
                     0 0 0 1 0" result="glow" />
           <feMerge>
             <feMergeNode in="glow"/>
