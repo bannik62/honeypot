@@ -1,14 +1,35 @@
+import { state } from './state.js';
+
 export function showCountryTip(e, country, count) {
-  document.getElementById('tiip').textContent = country || 'Unknown';
-  document.getElementById('tip-country').textContent = country || 'Unknown';
-  document.getElementById('tip-vuln').textContent = '—';
-  document.getElementById('tip-ports').textContent = '—';
-  document.getElementById('tip-reports').textContent = `${count || 0} IP(s)`;
+  const k1 = document.getElementById('tip-k1');
+  if (k1) k1.textContent = 'IPs';
+  const cc = country || 'Unknown';
+  const ips = state.D.filter((d) => (d.country || 'Unknown') === cc);
+  const totalVulns = ips.reduce((sum, d) => sum + (d.vuln_high || 0), 0);
+  const portSet = new Set();
+  ips.forEach((d) => {
+    if (!d.ports) return;
+    d.ports.split(',').map((p) => p.trim()).filter(Boolean).forEach((p) => portSet.add(p));
+  });
+  const portsTxt = Array.from(portSet).slice(0, 10).join(', ');
+  const reports = [];
+  if (ips.some((d) => d.nmap)) reports.push('nmap');
+  if (ips.some((d) => d.dns)) reports.push('dns');
+  if (ips.some((d) => d.traceroute)) reports.push('tr');
+  if (ips.some((d) => d.screenshot)) reports.push('shot');
+  if (ips.some((d) => d.nikto)) reports.push('nikto');
+  document.getElementById('tiip').textContent = cc;
+  document.getElementById('tip-country').textContent = `${count || ips.length || 0} IP(s)`;
+  document.getElementById('tip-vuln').textContent = totalVulns > 0 ? totalVulns.toString() : '—';
+  document.getElementById('tip-ports').textContent = portsTxt || '—';
+  document.getElementById('tip-reports').textContent = reports.length ? reports.join(', ') : '—';
   document.getElementById('tip').style.display = 'block';
   moveTip(e);
 }
 
 export function showPointTip(e, d) {
+  const k1 = document.getElementById('tip-k1');
+  if (k1) k1.textContent = 'Pays';
   const reports = [];
   if (d.nmap) reports.push('nmap');
   if (d.dns) reports.push('dns');
