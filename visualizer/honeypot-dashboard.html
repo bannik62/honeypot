@@ -42,12 +42,23 @@ header{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 14px;
 .adot .m{fill:#000}
 .adot.country .rng,
 .adot.ip .rng{fill:none;stroke:var(--w);stroke-width:1.1}
-.adot.country-top .rng{fill:none;stroke:var(--w);stroke-width:1.1}
-.adot.country-top .rng-top{fill:none;stroke:crimson;stroke-width:2.2;stroke-opacity:1;animation:rp 2.5s ease-out infinite}
+.adot.country-top .rng{fill:none;stroke:crimson;stroke-width:1.8}
+.adot.country-top .rng-top{
+  fill:none;
+  stroke:crimson;
+  stroke-width:1.4;
+  stroke-opacity:1;
+  transform-origin:center;
+  transform-box:fill-box;
+  animation:rp 2.5s ease-out infinite;
+}
 .adot.country .atk-icon,
 .adot.ip .atk-icon{color:var(--w)}
 .adot.country-top .atk-icon{color:crimson}
-@keyframes rp{0%{r:3;opacity:.7}100%{r:18;opacity:0}}
+@keyframes rp{
+  0%{transform:scale(1);opacity:.7}
+  100%{transform:scale(4);opacity:0}
+}
 .vdot .m{fill:var(--a3);filter:drop-shadow(0 0 4px var(--a3))}
 .vdot .rng{fill:none;stroke:var(--a3);stroke-width:1.2;animation:vr 1.8s ease-out infinite}
 @keyframes vr{0%{r:5;opacity:.9}100%{r:22;opacity:0}}
