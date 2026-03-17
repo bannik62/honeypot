@@ -223,6 +223,12 @@ export function drawMapOverlay() {
             dragOffsets.set(key, { dx: shiftX, dy: shiftY });
             sel.selectAll('circle.m').attr('cx', nx).attr('cy', ny);
             sel.selectAll('circle.rng').attr('cx', nx).attr('cy', ny);
+            const topRing = sel.select('circle.rng-top');
+            if (!topRing.empty()) {
+              topRing
+                .attr('cx', nx).attr('cy', ny)
+                .style('transform-origin', `${nx}px ${ny}px`);
+            }
             sel.selectAll('g.atk-icon').attr('transform', `translate(${nx},${ny}) scale(${iconScale}) translate(-12,-12)`);
             const lbl = sel.select('text.dlbl');
             if (!lbl.empty()) {
