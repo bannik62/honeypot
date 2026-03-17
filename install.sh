@@ -52,17 +52,30 @@ fi
 # Installer les dépendances
 echo "📦 Installation des dépendances..."
 apt-get update -qq
-apt-get install -y geoip-bin geoip-database jq nmap nikto sqlite3 > /dev/null 2>&1
+apt-get install -y geoip-bin geoip-database jq nmap nikto sqlite3 ca-certificates curl gnupg > /dev/null 2>&1
 
-# Installer Google Chrome (non-snap) si pas déjà présent
-if ! command -v google-chrome &> /dev/null && ! command -v google-chrome-stable &> /dev/null; then
-    echo "🌐 Installation de Google Chrome..."
-    CHROME_DEB="/tmp/google-chrome-stable.deb"
-    wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -O "$CHROME_DEB"
-    apt-get install -y "$CHROME_DEB" > /dev/null 2>&1
-    rm -f "$CHROME_DEB"
-else
+# Installer Google Chrome via dépôt APT officiel (non-snap) si pas déjà présent
+if command -v google-chrome &> /dev/null || command -v google-chrome-stable &> /dev/null || dpkg -s google-chrome-stable &> /dev/null; then
     echo "✅ Google Chrome déjà installé"
+else
+    ARCH="$(dpkg --print-architecture 2>/dev/null || echo unknown)"
+    if [ "$ARCH" != "amd64" ]; then
+        echo "⚠️  Google Chrome APT non supporté sur l'architecture: $ARCH"
+        echo "💡 Installez Chromium à la place (ou ignorez si vous ne faites pas de screenshots)."
+    else
+        echo "🌐 Installation de Google Chrome (repo APT)..."
+        install -m 0755 -d /etc/apt/keyrings
+        if [ ! -f /etc/apt/keyrings/google-chrome.gpg ]; then
+            curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /etc/apt/keyrings/google-chrome.gpg
+            chmod a+r /etc/apt/keyrings/google-chrome.gpg
+        fi
+        if [ ! -f /etc/apt/sources.list.d/google-chrome.list ]; then
+            echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" \
+              > /etc/apt/sources.list.d/google-chrome.list
+        fi
+        apt-get update -qq
+        apt-get install -y google-chrome-stable > /dev/null 2>&1
+    fi
 fi
 
 # Créer la structure de répertoires
