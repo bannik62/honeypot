@@ -5,10 +5,10 @@ export function showCountryTip(e, country, count) {
   if (k1) k1.textContent = 'IPs';
   const cc = country || 'Unknown';
   const ips = state.D.filter((d) => (d.country || 'Unknown') === cc);
-  const totalVulns = ips.reduce((sum, d) => sum + (d.vuln_high || 0), 0);
+  const totalVulns = ips.reduce((sum, d) => sum + (Number.parseInt(d.vuln_high, 10) || 0), 0);
   const portSet = new Set();
   ips.forEach((d) => {
-    if (!d.ports) return;
+    if (!d.ports || typeof d.ports !== 'string') return;
     d.ports.split(',').map((p) => p.trim()).filter(Boolean).forEach((p) => portSet.add(p));
   });
   const portsTxt = Array.from(portSet).slice(0, 10).join(', ');
