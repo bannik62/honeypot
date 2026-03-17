@@ -184,7 +184,7 @@ export function drawMapOverlay() {
       const ringExtra = 4 * invK;
       dot.append('circle').attr('cx', px).attr('cy', py).attr('r', r + ringExtra).attr('class', 'rng');
       if (big) {
-        const outerExtra = 7 * invK;
+        const outerExtra = 10 * invK;
         dot.append('circle').attr('cx', px).attr('cy', py).attr('r', r + outerExtra).attr('class', 'rng-top');
       }
       dot.append('circle').attr('cx', px).attr('cy', py).attr('r', r).attr('class', 'm');
