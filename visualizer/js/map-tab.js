@@ -183,8 +183,15 @@ export function drawMapOverlay() {
       dot.append('circle').attr('cx', px).attr('cy', py).attr('r', r + 2 * invK).attr('class', 'rng');
       dot.append('circle').attr('cx', px).attr('cy', py).attr('r', r).attr('class', 'm');
       const iconScale = ((2 * r) / 24) * 0.5;
+      const iconColor = big ? 'crimson' : 'var(--a2)';
       dot.append('g').attr('class', 'atk-icon').attr('transform', `translate(${px},${py}) scale(${iconScale}) translate(-12,-12)`)
-        .append('use').attr('href', '#attacker-icon').attr('x', 0).attr('y', 0).attr('width', 24).attr('height', 24);
+        .append('use')
+        .attr('href', '#attacker-icon')
+        .attr('x', 0)
+        .attr('y', 0)
+        .attr('width', 24)
+        .attr('height', 24)
+        .attr('fill', iconColor);
       if (screenR > 12) {
         dot.append('text').attr('x', cx + r + 2).attr('y', cy + 2).attr('class', 'dlbl')
           .attr('fill', big ? 'var(--w)' : 'var(--tx)').attr('font-size', 7 * invK).text(`${c}(${cnt})`);
@@ -300,7 +307,13 @@ export function drawMapOverlay() {
       dot.append('circle').attr('cx', px).attr('cy', py).attr('r', item.r).attr('class', 'm');
       const iconScale = ((2 * item.r) / 24) * 0.5;
       dot.append('g').attr('class', 'atk-icon').attr('transform', `translate(${px},${py}) scale(${iconScale}) translate(-12,-12)`)
-        .append('use').attr('href', '#attacker-icon').attr('x', 0).attr('y', 0).attr('width', 24).attr('height', 24);
+        .append('use')
+        .attr('href', '#attacker-icon')
+        .attr('x', 0)
+        .attr('y', 0)
+        .attr('width', 24)
+        .attr('height', 24)
+        .attr('fill', 'var(--a2)');
       dot.on('mouseenter', (e) => showPointTip(e, item.d))
         .on('mousemove', moveTip).on('mouseleave', hideTip)
         .call(d3.drag()
