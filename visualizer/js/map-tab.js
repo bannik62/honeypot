@@ -182,11 +182,10 @@ export function drawMapOverlay() {
       const dotClass = big ? 'adot country-top' : 'adot country';
       const dot = g.append('g').attr('class', dotClass).attr('data-key', key);
       const ringExtra = 4 * invK;
-      dot.append('circle').attr('cx', px).attr('cy', py).attr('r', r + ringExtra).attr('class', 'rng');
-      if (big) {
-        const outerExtra = 10 * invK;
-        dot.append('circle').attr('cx', px).attr('cy', py).attr('r', r + outerExtra).attr('class', 'rng-top');
-      }
+      dot.append('circle')
+        .attr('cx', px).attr('cy', py)
+        .attr('r', r + ringExtra)
+        .attr('class', big ? 'rng rng-crimson' : 'rng');
       dot.append('circle').attr('cx', px).attr('cy', py).attr('r', r).attr('class', 'm');
       const iconScale = ((2 * r) / 24) * 0.5;
       dot.append('g')
@@ -198,6 +197,11 @@ export function drawMapOverlay() {
         .attr('y', 0)
         .attr('width', 24)
         .attr('height', 24);
+      // anneau animé EN DERNIER (au-dessus du disque + icône)
+      if (big) {
+        const outerExtra = 10 * invK;
+        dot.append('circle').attr('cx', px).attr('cy', py).attr('r', r + outerExtra).attr('class', 'rng-top');
+      }
       if (screenR > 12) {
         dot.append('text').attr('x', cx + r + 2).attr('y', cy + 2).attr('class', 'dlbl')
           .attr('fill', big ? 'var(--w)' : 'var(--tx)').attr('font-size', 7 * invK).text(`${c}(${cnt})`);
