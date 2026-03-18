@@ -65,6 +65,12 @@ CONFIG = load_config()
 # Buffer d'événements Vulners (sans la clé, ni les tokens)
 VULNERS_EVENTS = deque(maxlen=200)
 VULNERS_EVENT_ID = 0
+VULNERS_SERVER_VERSION = "v2"
+
+# Cache mémoire TTL (24h) pour éviter de re-frapper Vulners.
+# Stocke par ID: desc string (peut être '' si aucun document renvoyé).
+VULNERS_CACHE_TTL_SECONDS = 24 * 60 * 60
+VULNERS_CACHE = {}  # { id: { ts: float, desc: str } }
 
 
 class VisualizerHandler(SimpleHTTPRequestHandler):
@@ -218,7 +224,7 @@ class VisualizerHandler(SimpleHTTPRequestHandler):
 
     def serve_vulners_status(self):
         has_key = bool((CONFIG.get("VULNERS_API_KEY") or "").strip())
-        body = json.dumps({"configured": has_key}).encode("utf-8")
+        body = json.dumps({"configured": has_key, "server_version": VULNERS_SERVER_VERSION}).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
@@ -228,7 +234,7 @@ class VisualizerHandler(SimpleHTTPRequestHandler):
     def serve_vulners_events(self):
         # Retourne uniquement les événements récents, sans donnée sensible.
         events = list(VULNERS_EVENTS)
-        body = json.dumps({"events": events}).encode("utf-8")
+        body = json.dumps({"events": events, "server_version": VULNERS_SERVER_VERSION}).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
@@ -276,8 +282,45 @@ class VisualizerHandler(SimpleHTTPRequestHandler):
                 "type": "lookup_skip_no_key",
                 "configured": configured,
                 "ids_count": len(ids),
+                "server_version": VULNERS_SERVER_VERSION,
             })
             body = json.dumps({"details": {}}).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        now = time.time()
+        ids_to_fetch = []
+        ids_cached_desc = {}  # {id: desc}
+        for vuln_id in ids:
+            ent = VULNERS_CACHE.get(vuln_id)
+            if ent and isinstance(ent, dict):
+                ts = ent.get("ts", 0) or 0
+                desc = ent.get("desc", "")
+                if ts and (now - ts) <= VULNERS_CACHE_TTL_SECONDS:
+                    ids_cached_desc[vuln_id] = desc
+                    continue
+                # expired -> drop
+                if vuln_id in VULNERS_CACHE:
+                    del VULNERS_CACHE[vuln_id]
+            ids_to_fetch.append(vuln_id)
+
+        details_cached_out = {vid: d for vid, d in ids_cached_desc.items() if d}
+        if not ids_to_fetch:
+            VULNERS_EVENT_ID += 1
+            VULNERS_EVENTS.append({
+                "id": VULNERS_EVENT_ID,
+                "ts": time.time(),
+                "type": "lookup_cache_hit",
+                "configured": configured,
+                "ids_count": len(ids),
+                "docs_count": len(details_cached_out),
+                "server_version": VULNERS_SERVER_VERSION,
+            })
+            body = json.dumps({"details": details_cached_out}).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
@@ -291,20 +334,27 @@ class VisualizerHandler(SimpleHTTPRequestHandler):
             "ts": time.time(),
             "type": "lookup_start",
             "configured": configured,
-            "ids_count": len(ids),
+            "ids_count": len(ids_to_fetch),
+            "server_version": VULNERS_SERVER_VERSION,
         })
 
         # Vulners API: authentification via header X-Api-Key (pas dans le body)
-        req_body = json.dumps({"id": ids}).encode("utf-8")
+        req_body = json.dumps({"id": ids_to_fetch}).encode("utf-8")
         req = urllib.request.Request(
             "https://vulners.com/api/v3/search/id",
             data=req_body,
             headers={
                 "Content-Type": "application/json",
                 "X-Api-Key": api_key,
+                # Headers réalistes pour éviter un fingerprint "bot"
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+                "Accept": "application/json",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Connection": "keep-alive",
             },
             method="POST",
         )
+
         try:
             with urllib.request.urlopen(req, timeout=15) as resp:
                 resp_body = resp.read()
@@ -316,10 +366,12 @@ class VisualizerHandler(SimpleHTTPRequestHandler):
                 "ts": time.time(),
                 "type": "lookup_error",
                 "configured": configured,
-                "ids_count": len(ids),
+                "ids_count": len(ids_to_fetch),
                 "error": err or "HTTP error",
+                "server_version": VULNERS_SERVER_VERSION,
             })
-            body = json.dumps({"details": {}}).encode("utf-8")
+            # on renvoie au moins le cache
+            body = json.dumps({"details": details_cached_out}).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
@@ -334,10 +386,11 @@ class VisualizerHandler(SimpleHTTPRequestHandler):
                 "ts": time.time(),
                 "type": "lookup_error",
                 "configured": configured,
-                "ids_count": len(ids),
+                "ids_count": len(ids_to_fetch),
                 "error": (err[:140] if err else "URLError"),
+                "server_version": VULNERS_SERVER_VERSION,
             })
-            body = json.dumps({"details": {}}).encode("utf-8")
+            body = json.dumps({"details": details_cached_out}).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
@@ -351,10 +404,11 @@ class VisualizerHandler(SimpleHTTPRequestHandler):
                 "ts": time.time(),
                 "type": "lookup_error",
                 "configured": configured,
-                "ids_count": len(ids),
+                "ids_count": len(ids_to_fetch),
                 "error": "timeout",
+                "server_version": VULNERS_SERVER_VERSION,
             })
-            body = json.dumps({"details": {}}).encode("utf-8")
+            body = json.dumps({"details": details_cached_out}).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
@@ -362,16 +416,69 @@ class VisualizerHandler(SimpleHTTPRequestHandler):
             self.wfile.write(body)
             return
 
-        details = {}
+        resp_text = resp_body.decode("utf-8", errors="ignore")
+        low = resp_text.lower()
+        # Détection Cloudflare : HTML "Just a moment..." / "Verify you are human"
+        if ("just a moment" in low) or ("verify you are human" in low) or ("cf-browser-verification" in low):
+            VULNERS_EVENT_ID += 1
+            VULNERS_EVENTS.append({
+                "id": VULNERS_EVENT_ID,
+                "ts": time.time(),
+                "type": "lookup_error",
+                "configured": configured,
+                "ids_count": len(ids_to_fetch),
+                "error": "cloudflare_block_detected",
+                "server_version": VULNERS_SERVER_VERSION,
+            })
+            body = json.dumps({"details": details_cached_out}).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        details_fetched = {}
+        parse_ok = False
         try:
-            res = json.loads(resp_body.decode("utf-8"))
+            res = json.loads(resp_text)
             docs = (((res or {}).get("data") or {}).get("documents")) or {}
             if isinstance(docs, dict):
                 for k, v in docs.items():
                     if isinstance(v, dict):
-                        details[k] = (v.get("title") or v.get("description") or "")
+                        details_fetched[k] = (v.get("title") or v.get("description") or "")
+            parse_ok = True
         except Exception:
-            details = {}
+            parse_ok = False
+
+        if not parse_ok:
+            VULNERS_EVENT_ID += 1
+            VULNERS_EVENTS.append({
+                "id": VULNERS_EVENT_ID,
+                "ts": time.time(),
+                "type": "lookup_error",
+                "configured": configured,
+                "ids_count": len(ids_to_fetch),
+                "error": "invalid_json_response",
+                "server_version": VULNERS_SERVER_VERSION,
+            })
+            body = json.dumps({"details": details_cached_out}).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        # Update cache (y compris négatif: '' pour les IDs sans doc)
+        for vuln_id in ids_to_fetch:
+            VULNERS_CACHE[vuln_id] = {"ts": now, "desc": details_fetched.get(vuln_id, "")}
+
+        details_out = {}
+        for vuln_id in ids:
+            desc = ids_cached_desc.get(vuln_id) or details_fetched.get(vuln_id) or ""
+            if desc:
+                details_out[vuln_id] = desc
 
         VULNERS_EVENT_ID += 1
         VULNERS_EVENTS.append({
@@ -379,11 +486,12 @@ class VisualizerHandler(SimpleHTTPRequestHandler):
             "ts": time.time(),
             "type": "lookup_ok",
             "configured": configured,
-            "ids_count": len(ids),
-            "docs_count": len(details),
+            "ids_count": len(ids_to_fetch),
+            "docs_count": len(details_out),
+            "server_version": VULNERS_SERVER_VERSION,
         })
 
-        body = json.dumps({"details": details}).encode("utf-8")
+        body = json.dumps({"details": details_out}).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))

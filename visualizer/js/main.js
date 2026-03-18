@@ -284,15 +284,15 @@ fetch('/api/vulners/status')
 
     let text = '';
     if (ev.type === 'lookup_start') {
-      text = `LOOKUP_START ids=${ev.ids_count || 0} ${configured}`;
+      text = `LOOKUP_START ids=${ev.ids_count || 0} ${configured} v=${ev.server_version || '?'}`;
     } else if (ev.type === 'lookup_ok') {
-      text = `LOOKUP_OK ids=${ev.ids_count || 0} docs=${ev.docs_count || 0} ${configured}`;
+      text = `LOOKUP_OK ids=${ev.ids_count || 0} docs=${ev.docs_count || 0} ${configured} v=${ev.server_version || '?'}`;
     } else if (ev.type === 'lookup_skip_no_key') {
-      text = `LOOKUP_SKIP no-key ids=${ev.ids_count || 0}`;
+      text = `LOOKUP_SKIP no-key ids=${ev.ids_count || 0} v=${ev.server_version || '?'}`;
     } else if (ev.type === 'lookup_error') {
-      text = `LOOKUP_ERROR ids=${ev.ids_count || 0} err=${ev.error || 'unknown'} ${configured}`;
+      text = `LOOKUP_ERROR ids=${ev.ids_count || 0} err=${ev.error || 'unknown'} ${configured} v=${ev.server_version || '?'}`;
     } else {
-      text = `${ev.type || 'event'} ${configured}`;
+      text = `${ev.type || 'event'} ${configured} v=${ev.server_version || '?'}`;
     }
 
     const row = document.createElement('div');
