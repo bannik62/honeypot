@@ -257,5 +257,17 @@ window.loadDemo = loadDemo;
 window.resetSim = resetSim;
 window.loadCSV = loadCSV;
 
+fetch('/api/vulners/status')
+  .then((r) => r.json())
+  .then((res) => {
+    const dot = document.getElementById('vulners-dot');
+    if (dot) {
+      const configured = !!res.configured;
+      dot.style.color = configured ? 'var(--a3)' : 'var(--a2)';
+      dot.title = configured ? 'Clé API Vulners configurée' : 'Clé API Vulners manquante';
+    }
+  })
+  .catch(() => {});
+
 initMap();
 loadInitialData(loadJSON);
