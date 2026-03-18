@@ -145,7 +145,8 @@ export function renderGraph() {
   node.append('text').attr('class', (d) => (d.type === 'vps' ? 'nl vp' : 'nl'))
     .attr('dx', (d) => (d.type === 'vps' ? -12 : 12))
     .attr('dy', (d) => (d.type === 'vps' ? -22 : d.type === 'hop' ? 0 : 4))
-    .text((d) => (d.type === 'vps' ? '🍯 VPS' : d.type === 'hop' ? '' : d.id));
+    // Les hops traceroute représentent des "routeurs intermédiaires" : on affiche au moins leur IP.
+    .text((d) => (d.type === 'vps' ? '🍯 VPS' : d.type === 'hop' ? d.id : d.id));
   node.filter((d) => d.type === 'atk')
     .on('mouseenter', (e, d) => showPointTip(e, {
       ip: d.id,
