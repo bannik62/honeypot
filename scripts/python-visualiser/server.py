@@ -267,9 +267,11 @@ class VisualizerHandler(SimpleHTTPRequestHandler):
         if not isinstance(ids, list):
             self.send_error(400)
             return
-        ids = [str(x) for x in ids if x]
+        # Normalisation : on strip et on déduplique (ordre préservé)
+        ids = [str(x).strip() for x in ids if str(x).strip()]
         if len(ids) > 300:
             ids = ids[:300]
+        ids = list(dict.fromkeys(ids))
 
         api_key = (CONFIG.get("VULNERS_API_KEY") or "").strip()
         configured = bool(api_key)
@@ -340,44 +342,64 @@ class VisualizerHandler(SimpleHTTPRequestHandler):
 
         # Vulners API: authentification via header X-Api-Key (pas dans le body)
         req_body = json.dumps({"id": ids_to_fetch}).encode("utf-8")
+        vulners_url_primary = "https://vulners.com/api/v3/search/id"
+        vulners_url_alt = "https://vulners.com/api/v3/search/id/"
+        vulners_headers = {
+            "Content-Type": "application/json",
+            "X-Api-Key": api_key,
+            # Headers réalistes pour éviter un fingerprint "bot"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+            "Accept": "application/json",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Connection": "keep-alive",
+        }
         req = urllib.request.Request(
-            "https://vulners.com/api/v3/search/id",
+            vulners_url_primary,
             data=req_body,
-            headers={
-                "Content-Type": "application/json",
-                "X-Api-Key": api_key,
-                # Headers réalistes pour éviter un fingerprint "bot"
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-                "Accept": "application/json",
-                "Accept-Language": "en-US,en;q=0.9",
-                "Connection": "keep-alive",
-            },
+            headers=vulners_headers,
             method="POST",
         )
 
+        resp_body = None
         try:
             with urllib.request.urlopen(req, timeout=15) as resp:
                 resp_body = resp.read()
         except urllib.error.HTTPError as e:
-            err = f"HTTP {getattr(e, 'code', '?')}: {getattr(e, 'reason', '')}".strip()
-            VULNERS_EVENT_ID += 1
-            VULNERS_EVENTS.append({
-                "id": VULNERS_EVENT_ID,
-                "ts": time.time(),
-                "type": "lookup_error",
-                "configured": configured,
-                "ids_count": len(ids_to_fetch),
-                "error": err or "HTTP error",
-                "server_version": VULNERS_SERVER_VERSION,
-            })
-            # on renvoie au moins le cache
-            body = json.dumps({"details": details_cached_out}).encode("utf-8")
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-            return
+            http_code = getattr(e, "code", None)
+            # Certaines réponses 400 dépendent du slash final dans l'endpoint.
+            if http_code == 400:
+                try:
+                    req2 = urllib.request.Request(
+                        vulners_url_alt,
+                        data=req_body,
+                        headers=vulners_headers,
+                        method="POST",
+                    )
+                    with urllib.request.urlopen(req2, timeout=15) as resp:
+                        resp_body = resp.read()
+                except Exception:
+                    pass
+
+            if resp_body is None:
+                err = f"HTTP {getattr(e, 'code', '?')}: {getattr(e, 'reason', '')}".strip()
+                VULNERS_EVENT_ID += 1
+                VULNERS_EVENTS.append({
+                    "id": VULNERS_EVENT_ID,
+                    "ts": time.time(),
+                    "type": "lookup_error",
+                    "configured": configured,
+                    "ids_count": len(ids_to_fetch),
+                    "error": err or "HTTP error",
+                    "server_version": VULNERS_SERVER_VERSION,
+                })
+                # on renvoie au moins le cache
+                body = json.dumps({"details": details_cached_out}).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
         except urllib.error.URLError as e:
             err = str(getattr(e, "reason", "")) or str(e)
             VULNERS_EVENT_ID += 1
@@ -444,9 +466,36 @@ class VisualizerHandler(SimpleHTTPRequestHandler):
             res = json.loads(resp_text)
             docs = (((res or {}).get("data") or {}).get("documents")) or {}
             if isinstance(docs, dict):
-                for k, v in docs.items():
-                    if isinstance(v, dict):
-                        details_fetched[k] = (v.get("title") or v.get("description") or "")
+                # Vulners retourne des documents avec des clés qui peuvent inclure un préfixe
+                # (ex: "CVELIST:CVE-2021-44228") alors que le front demande "CVE-2021-44228".
+                # On re-mappe donc vers les IDs demandés en faisant correspondre le suffixe ":<id>".
+                for req_id in ids_to_fetch:
+                    # Cherche la clé la plus probable pour req_id
+                    best_key = None
+                    if req_id in docs:
+                        best_key = req_id
+                    else:
+                        suffix = f":{req_id}"
+                        for k in docs.keys():
+                            if isinstance(k, str) and k.endswith(suffix):
+                                best_key = k
+                                break
+
+                    if not best_key:
+                        continue
+
+                    v = docs.get(best_key)
+                    if not isinstance(v, dict):
+                        continue
+
+                    # Champs possibles selon le type de document Vulners
+                    desc = (
+                        v.get("title")
+                        or v.get("description")
+                        or v.get("short_description")
+                        or ""
+                    )
+                    details_fetched[req_id] = str(desc) if desc is not None else ""
             parse_ok = True
         except Exception:
             parse_ok = False
