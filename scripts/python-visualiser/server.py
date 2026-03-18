@@ -244,11 +244,15 @@ class VisualizerHandler(SimpleHTTPRequestHandler):
             self.wfile.write(body)
             return
 
-        req_body = json.dumps({"id": ids, "apiKey": api_key}).encode("utf-8")
+        # Vulners API: authentification via header X-Api-Key (pas dans le body)
+        req_body = json.dumps({"id": ids}).encode("utf-8")
         req = urllib.request.Request(
-            "https://vulners.com/api/v3/search/id/",
+            "https://vulners.com/api/v3/search/id",
             data=req_body,
-            headers={"Content-Type": "application/json"},
+            headers={
+                "Content-Type": "application/json",
+                "X-Api-Key": api_key,
+            },
             method="POST",
         )
         try:
