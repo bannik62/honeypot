@@ -29,7 +29,10 @@ export function renderIPTable(filter, search) {
     if (d.traceroute) badges += `<span class="badge ok badge-detail" data-ip="${esc(d.ip)}" data-type="traceroute" title="Voir le traceroute">tr</span>`;
     if (d.screenshot) badges += `<span class="badge ok badge-detail" data-ip="${esc(d.ip)}" data-type="screenshot" title="Voir la capture">📸</span>`;
     if (d.nikto) badges += `<span class="badge warn badge-detail" data-ip="${esc(d.ip)}" data-type="nikto" title="Voir le rapport">nikto</span>`;
-    const vuln = d.vuln_high > 0 ? `<span class="badge err">HIGH:${d.vuln_high}</span>` : '<span class="mv">—</span>';
+    const vulnCount = Number.parseInt(d.vuln_high, 10) || 0;
+    const vuln = vulnCount > 0
+      ? `<span class="badge err badge-detail" data-ip="${esc(d.ip)}" data-type="vuln" title="Voir les vulnérabilités">HIGH:${vulnCount}</span>`
+      : '<span class="mv">—</span>';
     return `<tr><td class="av">${esc(d.ip)}</td><td>${esc(d.country) || '?'}</td><td class="mv" style="font-size:.65rem">${esc(d.ports) || '—'}</td><td>${badges}</td><td>${vuln}</td></tr>`;
   }).join('');
 }

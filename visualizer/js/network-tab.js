@@ -70,7 +70,18 @@ export function renderGraph() {
   const nodeIds = new Set(['VPS']);
   top.forEach((d) => {
     if (!nodeIds.has(d.ip)) {
-      nodes.push({ id: d.ip, type: 'atk', country: d.country, vuln: d.vuln_high, ports: d.ports });
+      nodes.push({
+        id: d.ip,
+        type: 'atk',
+        country: d.country,
+        vuln: d.vuln_high,
+        ports: d.ports,
+        nmap: d.nmap,
+        dns: d.dns,
+        screenshot: d.screenshot,
+        nikto: d.nikto,
+        traceroute: d.traceroute,
+      });
       nodeIds.add(d.ip);
     }
     let hops = Array.isArray(d.hops) ? d.hops : [];

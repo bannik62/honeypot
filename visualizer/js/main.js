@@ -46,7 +46,7 @@ document.getElementById('panel-ips').addEventListener('click', (e) => {
   const modal = document.getElementById('ip-detail-modal');
   const titleEl = document.getElementById('ip-modal-title');
   const bodyEl = document.getElementById('ip-modal-body');
-  const labels = { nmap: 'Rapport Nmap', dns: 'Rapport DNS', nikto: 'Rapport Nikto', traceroute: 'Traceroute', screenshot: 'Capture d\'écran' };
+  const labels = { nmap: 'Rapport Nmap', dns: 'Rapport DNS', nikto: 'Rapport Nikto', traceroute: 'Traceroute', screenshot: 'Capture d\'écran', vuln: 'Vulnérabilités' };
   titleEl.textContent = `${labels[type] || type} — ${ip}`;
   bodyEl.innerHTML = '<span class="ip-modal-loading">Chargement…</span>';
   modal.classList.add('open');
@@ -81,6 +81,30 @@ document.getElementById('panel-ips').addEventListener('click', (e) => {
       .catch(() => {
         bodyEl.innerHTML =
           '<span class="ip-modal-loading">Ressource indisponible (réseau ou serveur). Utilisez le dashboard via honeypot-start-server sur le VPS + tunnel SSH.</span>';
+      });
+    return;
+  }
+  if (type === 'vuln') {
+    const url = `/data/screenshotAndLog/${encodeURIComponent(ip)}/nmap`;
+    fetch(url)
+      .then((r) => {
+        if (!r.ok) throw new Error('nmap missing');
+        return r.text();
+      })
+      .then((data) => {
+        if (!data) return;
+        const vulnLines = data.split('\n').filter((l) =>
+          /https?:\/\//.test(l) || /VULNERABLE/.test(l) || /CVE-/.test(l)
+        );
+        if (!vulnLines.length) {
+          bodyEl.innerHTML = '<span class="ip-modal-loading">Aucune vulnérabilité trouvée.</span>';
+          return;
+        }
+        const html = linkifyTextPreservingSafety(vulnLines.join('\n'));
+        bodyEl.innerHTML = `<pre style="white-space:pre-wrap;word-break:break-all">${html}</pre>`;
+      })
+      .catch(() => {
+        bodyEl.innerHTML = '<span class="ip-modal-loading">Rapport nmap introuvable.</span>';
       });
     return;
   }
