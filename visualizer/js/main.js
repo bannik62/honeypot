@@ -171,7 +171,7 @@ function extractVulnEntriesFromNmap(data) {
     const line = lines[i];
     if (!line) continue;
     // ID  score  url (format vulners)
-    const m = line.match(/([A-Z0-9][A-Z0-9:_\\-]+)\\s+([\\d.]+)\\s+(https?:\\/\\/\\S+)/);
+    const m = line.match(/([A-Z0-9][A-Z0-9:_\-]+)\s+([\d.]+)\s+(https?:\/\/\S+)/);
     if (!m) continue;
     const id = m[1];
     const score = Number.parseFloat(m[2]);
