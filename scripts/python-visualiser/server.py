@@ -14,6 +14,9 @@ Pattern des fichiers (aligné avec les scripts) :
 import os
 import re
 import sys
+import json
+import urllib.request
+import urllib.error
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 
@@ -36,6 +39,26 @@ IP_PREFIX = "/data/screenshotAndLog/"
 
 PORT = 8765
 IP_RE = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$")
+
+
+def load_config():
+    cfg = {}
+    config_path = ROOT / "config" / "config"
+    if config_path.is_file():
+        try:
+            with config_path.open("r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
+                    key, _, val = line.partition("=")
+                    cfg[key.strip()] = val.strip().strip('"')
+        except OSError:
+            return {}
+    return cfg
+
+
+CONFIG = load_config()
 
 
 class VisualizerHandler(SimpleHTTPRequestHandler):
@@ -62,6 +85,13 @@ class VisualizerHandler(SimpleHTTPRequestHandler):
         if path.startswith("/"):
             self.path = path
             return super().do_GET()
+        self.send_error(404)
+
+    def do_POST(self):
+        path = self.path.split("?")[0].rstrip("/") or "/"
+        if path == "/api/vulners/lookup":
+            self.serve_vulners_lookup()
+            return
         self.send_error(404)
 
     def _parse_png_name(self, stem, ip):
@@ -170,6 +200,83 @@ class VisualizerHandler(SimpleHTTPRequestHandler):
             return
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _read_json_body(self, max_bytes=1024 * 1024):
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            length = 0
+        if length <= 0 or length > max_bytes:
+            return None
+        try:
+            raw = self.rfile.read(length)
+        except OSError:
+            return None
+        try:
+            return json.loads(raw.decode("utf-8"))
+        except Exception:
+            return None
+
+    def serve_vulners_lookup(self):
+        payload = self._read_json_body()
+        if not payload or not isinstance(payload, dict):
+            self.send_error(400)
+            return
+        ids = payload.get("ids", [])
+        if not isinstance(ids, list):
+            self.send_error(400)
+            return
+        ids = [str(x) for x in ids if x]
+        if len(ids) > 300:
+            ids = ids[:300]
+
+        api_key = (CONFIG.get("VULNERS_API_KEY") or "").strip()
+        # Pas de clé => on renvoie vide (le frontend affichera sans descriptions)
+        if not api_key:
+            body = json.dumps({"details": {}}).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        req_body = json.dumps({"id": ids, "apiKey": api_key}).encode("utf-8")
+        req = urllib.request.Request(
+            "https://vulners.com/api/v3/search/id/",
+            data=req_body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                resp_body = resp.read()
+        except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError):
+            body = json.dumps({"details": {}}).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        details = {}
+        try:
+            res = json.loads(resp_body.decode("utf-8"))
+            docs = (((res or {}).get("data") or {}).get("documents")) or {}
+            if isinstance(docs, dict):
+                for k, v in docs.items():
+                    if isinstance(v, dict):
+                        details[k] = (v.get("title") or v.get("description") or "")
+        except Exception:
+            details = {}
+
+        body = json.dumps({"details": details}).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)

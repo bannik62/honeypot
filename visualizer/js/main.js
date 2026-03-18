@@ -93,15 +93,20 @@ document.getElementById('panel-ips').addEventListener('click', (e) => {
       })
       .then((data) => {
         if (!data) return;
-        const vulnLines = data.split('\n').filter((l) =>
-          /https?:\/\//.test(l) || /VULNERABLE/.test(l) || /CVE-/.test(l)
-        );
-        if (!vulnLines.length) {
+        const entries = extractVulnEntriesFromNmap(data);
+        if (!entries.length) {
           bodyEl.innerHTML = '<span class="ip-modal-loading">Aucune vulnérabilité trouvée.</span>';
           return;
         }
-        const html = linkifyTextPreservingSafety(vulnLines.join('\n'));
-        bodyEl.innerHTML = `<pre style="white-space:pre-wrap;word-break:break-all">${html}</pre>`;
+        // lookup côté serveur (la clé Vulners reste sur le VPS)
+        fetch('/api/vulners/lookup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: entries.map((e) => e.id) }),
+        })
+          .then((r) => (r.ok ? r.json() : { details: {} }))
+          .then((res) => renderVulns(bodyEl, entries, (res && res.details) || {}))
+          .catch(() => renderVulns(bodyEl, entries, {}));
       })
       .catch(() => {
         bodyEl.innerHTML = '<span class="ip-modal-loading">Rapport nmap introuvable.</span>';
@@ -156,6 +161,52 @@ function linkifyTextPreservingSafety(text) {
   }
   out += escapeHtml(text.slice(last));
   return out;
+}
+
+function extractVulnEntriesFromNmap(data) {
+  const entries = [];
+  const seen = new Set();
+  const lines = data.split('\n');
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (!line) continue;
+    // ID  score  url (format vulners)
+    const m = line.match(/([A-Z0-9][A-Z0-9:_\\-]+)\\s+([\\d.]+)\\s+(https?:\\/\\/\\S+)/);
+    if (!m) continue;
+    const id = m[1];
+    const score = Number.parseFloat(m[2]);
+    const url = m[3];
+    if (!id || Number.isNaN(score) || !url) continue;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    entries.push({ id, score, url });
+  }
+  entries.sort((a, b) => b.score - a.score);
+  return entries;
+}
+
+function renderVulns(bodyEl, entries, details) {
+  const html = entries.map((e) => {
+    const score = e.score;
+    const color = score >= 9.0 ? 'var(--a2)' : score >= 7.0 ? 'var(--w)' : 'var(--a3)';
+    const icon = score >= 9.0 ? '🔴' : score >= 7.0 ? '🟡' : '🟢';
+    const descTxt = (details && details[e.id]) ? String(details[e.id]) : '';
+    const desc = descTxt ? `<div style="color:var(--mu);font-size:.68rem;margin:2px 0 4px">${escapeHtml(descTxt)}</div>` : '';
+    return `
+      <div style="border-bottom:1px solid var(--b);padding:8px 0">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span>${icon}</span>
+          <span style="color:${color};font-weight:bold">${escapeHtml(e.id)}</span>
+          <span style="color:var(--mu);font-size:.7rem">Score: ${e.score}</span>
+        </div>
+        ${desc}
+        <a href="${encodeURI(e.url)}" target="_blank" rel="noopener noreferrer"
+           style="color:var(--a);font-size:.68rem;text-decoration:none">
+          ${escapeHtml(e.url)} 🔗
+        </a>
+      </div>`;
+  }).join('');
+  bodyEl.innerHTML = `<div style="padding:4px 0">${html}</div>`;
 }
 
 function closeIpModal() {

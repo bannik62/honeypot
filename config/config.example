@@ -61,3 +61,6 @@ NMAP_MAX_RTT_TIMEOUT="500ms"
 # host-timeout: timeout maximum par host (ex: 600s = 10 minutes)
 NMAP_HOST_TIMEOUT="600s"
 
+# Clé API Vulners (obtenir sur https://vulners.com)
+VULNERS_API_KEY=""
+
