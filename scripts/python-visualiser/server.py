@@ -308,7 +308,8 @@ class VisualizerHandler(SimpleHTTPRequestHandler):
         try:
             with urllib.request.urlopen(req, timeout=15) as resp:
                 resp_body = resp.read()
-        except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError):
+        except urllib.error.HTTPError as e:
+            err = f"HTTP {getattr(e, 'code', '?')}: {getattr(e, 'reason', '')}".strip()
             VULNERS_EVENT_ID += 1
             VULNERS_EVENTS.append({
                 "id": VULNERS_EVENT_ID,
@@ -316,7 +317,42 @@ class VisualizerHandler(SimpleHTTPRequestHandler):
                 "type": "lookup_error",
                 "configured": configured,
                 "ids_count": len(ids),
-                "error": "request_failed",
+                "error": err or "HTTP error",
+            })
+            body = json.dumps({"details": {}}).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        except urllib.error.URLError as e:
+            err = str(getattr(e, "reason", "")) or str(e)
+            VULNERS_EVENT_ID += 1
+            VULNERS_EVENTS.append({
+                "id": VULNERS_EVENT_ID,
+                "ts": time.time(),
+                "type": "lookup_error",
+                "configured": configured,
+                "ids_count": len(ids),
+                "error": (err[:140] if err else "URLError"),
+            })
+            body = json.dumps({"details": {}}).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        except TimeoutError:
+            VULNERS_EVENT_ID += 1
+            VULNERS_EVENTS.append({
+                "id": VULNERS_EVENT_ID,
+                "ts": time.time(),
+                "type": "lookup_error",
+                "configured": configured,
+                "ids_count": len(ids),
+                "error": "timeout",
             })
             body = json.dumps({"details": {}}).encode("utf-8")
             self.send_response(200)

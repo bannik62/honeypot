@@ -297,6 +297,7 @@ fetch('/api/vulners/status')
 
     const row = document.createElement('div');
     row.className = 'vf-row';
+    row.title = text;
     row.innerHTML = `<span class="vf-ts">${escapeHtml(tsStr)}</span>${escapeHtml(text)}`;
     feedLines.appendChild(row);
     if (feedWrap) feedWrap.scrollTop = feedWrap.scrollHeight;
