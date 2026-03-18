@@ -15,6 +15,8 @@ import os
 import re
 import sys
 import json
+import time
+from collections import deque
 import urllib.request
 import urllib.error
 from http.server import HTTPServer, SimpleHTTPRequestHandler
@@ -60,6 +62,10 @@ def load_config():
 
 CONFIG = load_config()
 
+# Buffer d'événements Vulners (sans la clé, ni les tokens)
+VULNERS_EVENTS = deque(maxlen=200)
+VULNERS_EVENT_ID = 0
+
 
 class VisualizerHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -69,6 +75,9 @@ class VisualizerHandler(SimpleHTTPRequestHandler):
         path = self.path.split("?")[0].rstrip("/") or "/"
         if path == "/api/vulners/status":
             self.serve_vulners_status()
+            return
+        if path == "/api/vulners/events":
+            self.serve_vulners_events()
             return
         if path == "/":
             self.path = "/honeypot-dashboard.html"
@@ -216,6 +225,16 @@ class VisualizerHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def serve_vulners_events(self):
+        # Retourne uniquement les événements récents, sans donnée sensible.
+        events = list(VULNERS_EVENTS)
+        body = json.dumps({"events": events}).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def _read_json_body(self, max_bytes=1024 * 1024):
         try:
             length = int(self.headers.get("Content-Length", "0"))
@@ -233,6 +252,7 @@ class VisualizerHandler(SimpleHTTPRequestHandler):
             return None
 
     def serve_vulners_lookup(self):
+        global VULNERS_EVENT_ID
         payload = self._read_json_body()
         if not payload or not isinstance(payload, dict):
             self.send_error(400)
@@ -246,8 +266,17 @@ class VisualizerHandler(SimpleHTTPRequestHandler):
             ids = ids[:300]
 
         api_key = (CONFIG.get("VULNERS_API_KEY") or "").strip()
+        configured = bool(api_key)
         # Pas de clé => on renvoie vide (le frontend affichera sans descriptions)
         if not api_key:
+            VULNERS_EVENT_ID += 1
+            VULNERS_EVENTS.append({
+                "id": VULNERS_EVENT_ID,
+                "ts": time.time(),
+                "type": "lookup_skip_no_key",
+                "configured": configured,
+                "ids_count": len(ids),
+            })
             body = json.dumps({"details": {}}).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -255,6 +284,15 @@ class VisualizerHandler(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
+
+        VULNERS_EVENT_ID += 1
+        VULNERS_EVENTS.append({
+            "id": VULNERS_EVENT_ID,
+            "ts": time.time(),
+            "type": "lookup_start",
+            "configured": configured,
+            "ids_count": len(ids),
+        })
 
         # Vulners API: authentification via header X-Api-Key (pas dans le body)
         req_body = json.dumps({"id": ids}).encode("utf-8")
@@ -271,6 +309,15 @@ class VisualizerHandler(SimpleHTTPRequestHandler):
             with urllib.request.urlopen(req, timeout=15) as resp:
                 resp_body = resp.read()
         except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError):
+            VULNERS_EVENT_ID += 1
+            VULNERS_EVENTS.append({
+                "id": VULNERS_EVENT_ID,
+                "ts": time.time(),
+                "type": "lookup_error",
+                "configured": configured,
+                "ids_count": len(ids),
+                "error": "request_failed",
+            })
             body = json.dumps({"details": {}}).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -289,6 +336,16 @@ class VisualizerHandler(SimpleHTTPRequestHandler):
                         details[k] = (v.get("title") or v.get("description") or "")
         except Exception:
             details = {}
+
+        VULNERS_EVENT_ID += 1
+        VULNERS_EVENTS.append({
+            "id": VULNERS_EVENT_ID,
+            "ts": time.time(),
+            "type": "lookup_ok",
+            "configured": configured,
+            "ids_count": len(ids),
+            "docs_count": len(details),
+        })
 
         body = json.dumps({"details": details}).encode("utf-8")
         self.send_response(200)

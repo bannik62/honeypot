@@ -269,5 +269,64 @@ fetch('/api/vulners/status')
   })
   .catch(() => {});
 
+// Feed "debug" côté UI : montre si le backend reçoit/répond aux lookups
+// (sans jamais exposer de clé, ni de token)
+{
+  const feedWrap = document.getElementById('vulners-feed');
+  const feedLines = document.getElementById('vulners-feed-lines');
+  let lastId = 0;
+
+  function pushLine(ev) {
+    if (!feedLines) return;
+    const ts = ev && ev.ts ? new Date(ev.ts * 1000) : null;
+    const tsStr = ts ? ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
+    const configured = ev && ev.configured ? 'key=OK' : 'key=missing';
+
+    let text = '';
+    if (ev.type === 'lookup_start') {
+      text = `LOOKUP_START ids=${ev.ids_count || 0} ${configured}`;
+    } else if (ev.type === 'lookup_ok') {
+      text = `LOOKUP_OK ids=${ev.ids_count || 0} docs=${ev.docs_count || 0} ${configured}`;
+    } else if (ev.type === 'lookup_skip_no_key') {
+      text = `LOOKUP_SKIP no-key ids=${ev.ids_count || 0}`;
+    } else if (ev.type === 'lookup_error') {
+      text = `LOOKUP_ERROR ids=${ev.ids_count || 0} err=${ev.error || 'unknown'} ${configured}`;
+    } else {
+      text = `${ev.type || 'event'} ${configured}`;
+    }
+
+    const row = document.createElement('div');
+    row.className = 'vf-row';
+    row.innerHTML = `<span class="vf-ts">${escapeHtml(tsStr)}</span>${escapeHtml(text)}`;
+    feedLines.appendChild(row);
+    if (feedWrap) feedWrap.scrollTop = feedWrap.scrollHeight;
+
+    // Petit bonus : quand ça marche/échoue, on met aussi l'indicateur en conséquence.
+    const dot = document.getElementById('vulners-dot');
+    if (dot) {
+      if (ev.type === 'lookup_ok') dot.style.color = 'var(--a3)';
+      if (ev.type === 'lookup_error') dot.style.color = 'var(--a2)';
+    }
+  }
+
+  function refreshFeed() {
+    fetch('/api/vulners/events')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((res) => {
+        const events = (res && res.events) ? res.events : [];
+        events.forEach((ev) => {
+          if (!ev || typeof ev.id !== 'number') return;
+          if (ev.id <= lastId) return;
+          lastId = ev.id;
+          pushLine(ev);
+        });
+      })
+      .catch(() => {});
+  }
+
+  refreshFeed();
+  setInterval(refreshFeed, 1200);
+}
+
 initMap();
 loadInitialData(loadJSON);
