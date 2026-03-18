@@ -98,7 +98,8 @@ document.getElementById('panel-ips').addEventListener('click', (e) => {
     })
     .then((data) => {
       if (!data) return;
-      bodyEl.innerHTML = `<pre>${escapeHtml(data)}</pre>`;
+      const html = linkifyTextPreservingSafety(data);
+      bodyEl.innerHTML = `<pre style="white-space:pre-wrap;word-break:break-all">${html}</pre>`;
     })
     .catch(() => {
       bodyEl.innerHTML =
@@ -110,6 +111,27 @@ function escapeHtml(s) {
   const div = document.createElement('div');
   div.textContent = s;
   return div.innerHTML;
+}
+
+function linkifyTextPreservingSafety(text) {
+  if (!text) return '';
+  const re = /https?:\/\/[^\s<>"']+/g;
+  let out = '';
+  let last = 0;
+  for (let m = re.exec(text); m; m = re.exec(text)) {
+    const start = m.index;
+    const raw = m[0];
+    out += escapeHtml(text.slice(last, start));
+    // Retire la ponctuation finale fréquente, sans casser le href
+    const trimmed = raw.replace(/[)\],.;:!?]+$/g, '');
+    const trailing = raw.slice(trimmed.length);
+    const href = encodeURI(trimmed);
+    const display = escapeHtml(trimmed);
+    out += `<a href="${href}" target="_blank" rel="noopener noreferrer" style="color:var(--a);text-decoration:none">${display} 🔗</a>${escapeHtml(trailing)}`;
+    last = start + raw.length;
+  }
+  out += escapeHtml(text.slice(last));
+  return out;
 }
 
 function closeIpModal() {
