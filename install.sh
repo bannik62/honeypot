@@ -231,12 +231,25 @@ if [ "$AUTO_SCAN_ENABLED" = "true" ]; then
     fi
 fi
 
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "   🔑 Clé API Vulners (optionnel)"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "La clé API Vulners permet d'afficher les descriptions"
+echo "des vulnérabilités dans le dashboard."
+echo "Obtenir une clé gratuite sur : https://vulners.com"
+echo ""
+read -p "Entrez votre clé API Vulners (laisser vide pour ignorer) : " VULNERS_API_KEY
+echo ""
+
 # Ajouter dans le fichier config
 CONFIG_FILE="$SCRIPT_DIR/config/config"
 if [ -f "$CONFIG_FILE" ]; then
     # Supprimer les anciennes valeurs si elles existent
     sed -i "/^AUTO_SCAN_ENABLED=/d" "$CONFIG_FILE"
     sed -i "/^AUTO_SCAN_HOUR=/d" "$CONFIG_FILE"
+    sed -i "/^VULNERS_API_KEY=/d" "$CONFIG_FILE"
     # Ajouter les nouvelles valeurs
     echo "" >> "$CONFIG_FILE"
     echo "# Mise à jour automatique des scans (true/false)" >> "$CONFIG_FILE"
@@ -246,6 +259,20 @@ if [ -f "$CONFIG_FILE" ]; then
         echo "AUTO_SCAN_HOUR=$AUTO_SCAN_HOUR" >> "$CONFIG_FILE"
     else
         echo "# AUTO_SCAN_HOUR=1  # Non utilisé si AUTO_SCAN_ENABLED=false" >> "$CONFIG_FILE"
+    fi
+
+    if [ -n "$VULNERS_API_KEY" ]; then
+        echo "" >> "$CONFIG_FILE"
+        echo "# Clé API Vulners (optionnel)" >> "$CONFIG_FILE"
+        echo "VULNERS_API_KEY=\"$VULNERS_API_KEY\"" >> "$CONFIG_FILE"
+        echo "✅ Clé API Vulners enregistrée"
+    else
+        if ! grep -q "^VULNERS_API_KEY=" "$CONFIG_FILE" 2>/dev/null; then
+            echo "" >> "$CONFIG_FILE"
+            echo "# Clé API Vulners (optionnel)" >> "$CONFIG_FILE"
+            echo "VULNERS_API_KEY=\"\"" >> "$CONFIG_FILE"
+        fi
+        echo "ℹ️  Clé API Vulners ignorée (configurable plus tard dans config/config)"
     fi
 fi
 
