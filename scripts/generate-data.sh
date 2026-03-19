@@ -112,10 +112,31 @@ for ip_dir in "$SCAN_DIR"/*/; do
 
     # Hops du traceroute (ordre des IPs) pour l'onglet Réseau
     hops_json="[]"
+    hop_names_json="{}"
     if [ "$has_traceroute" = true ] && [ -f "$ip_dir/${ip}_traceroute.txt" ]; then
         hop_ips=($(grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' "$ip_dir/${ip}_traceroute.txt" 2>/dev/null))
         if [ ${#hop_ips[@]} -gt 0 ]; then
             hops_json="[$(printf '"%s"' "${hop_ips[0]}"; for i in "${hop_ips[@]:1}"; do printf ',"%s"' "$i"; done)]"
+        fi
+
+        # Reverse DNS (PTR) pour les hops : si <hop_ip>_dns.txt existe, on map vers hostname.
+        # Objectif : permettre au front d'afficher name (hostname) au hover du graphe réseau.
+        hop_names_pairs=()
+        for hop_ip in "${hop_ips[@]}"; do
+            dns_file="$SCAN_DIR/$hop_ip/${hop_ip}_dns.txt"
+            if [ -f "$dns_file" ]; then
+                # Prendre la première ligne non vide après "Reverse DNS (PTR):"
+                ptr="$(awk '/Reverse DNS \\(PTR\\):/{found=1; next} found && $0 ~ /[^[:space:]]/{print $0; exit}' "$dns_file" 2>/dev/null | tr -d '\r' | sed 's/[[:space:]]*$//')"
+                # Nettoyage : si dig n'a rien trouvé, ptr contient souvent "❌ Aucun résultat"
+                if [ -n "$ptr" ] && ! echo "$ptr" | grep -q "Aucun résultat"; then
+                    ptr_safe="$(echo "$ptr" | sed 's/"/\\"/g')"
+                    hop_names_pairs+=("\"$hop_ip\":\"$ptr_safe\"")
+                fi
+            fi
+        done
+
+        if [ ${#hop_names_pairs[@]} -gt 0 ]; then
+            hop_names_json="{$(printf '%s,' "${hop_names_pairs[@]}" | sed 's/,$//')}"
         fi
     fi
 
@@ -151,6 +172,7 @@ for ip_dir in "$SCAN_DIR"/*/; do
     "nikto": $has_nikto,
     "traceroute": $has_traceroute,
     "hops": $hops_json,
+    "hop_names": $hop_names_json,
     "vuln_high": $vuln_high,
     "ports": "$ports_safe"
   }

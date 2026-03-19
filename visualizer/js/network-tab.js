@@ -92,7 +92,8 @@ export function renderGraph() {
       hops = deduped;
       hops.forEach((hopIp) => {
         if (!nodeIds.has(hopIp)) {
-          nodes.push({ id: hopIp, type: 'hop' });
+          const hopName = (d.hop_names && typeof d.hop_names === 'object' && d.hop_names[hopIp]) ? d.hop_names[hopIp] : hopIp;
+          nodes.push({ id: hopIp, type: 'hop', name: hopName });
           nodeIds.add(hopIp);
         }
       });
@@ -163,6 +164,7 @@ export function renderGraph() {
   node.filter((d) => d.type === 'hop')
     .on('mouseenter', (e, d) => showPointTip(e, {
       ip: d.id,
+      name: d.name || d.id,
       country: '',
       vuln_high: 0,
       ports: 'Relais traceroute',

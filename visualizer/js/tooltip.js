@@ -38,7 +38,9 @@ export function showPointTip(e, d) {
   if (d.traceroute) reports.push('tr');
   if (d.screenshot) reports.push('shot');
   if (d.nikto) reports.push('nikto');
-  document.getElementById('tiip').textContent = d.ip || 'Unknown';
+  const name = (d.name && typeof d.name === 'string') ? d.name.trim() : '';
+  const ip = d.ip || 'Unknown';
+  document.getElementById('tiip').textContent = name && name !== ip ? `${name} (${ip})` : ip;
   document.getElementById('tip-country').textContent = d.country || 'Unknown';
   document.getElementById('tip-vuln').textContent = vulnHigh > 0 ? vulnHigh.toString() : '—';
   document.getElementById('tip-ports').textContent = ports || '—';
