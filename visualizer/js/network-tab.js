@@ -65,6 +65,15 @@ export function renderGraph() {
   if (gm) gm.textContent = `Réseau: ${top.length.toLocaleString()} / ${D.length.toLocaleString()} (top attaquants)`;
   if (!top.length) return;
 
+  // Fallback "Pays" pour les hops : si `hop_countries` n'est pas encore présent dans `data.json`,
+  // on récupère le pays depuis l'objet principal `D` (pour chaque IP).
+  const countryByIp = new Map();
+  if (Array.isArray(D)) {
+    D.forEach((x) => {
+      if (x && typeof x.ip === 'string' && x.ip.trim()) countryByIp.set(x.ip, x.country || 'Unknown');
+    });
+  }
+
   const nodes = [{ id: 'VPS', type: 'vps' }];
   const links = [];
   const nodeIds = new Set(['VPS']);
@@ -98,7 +107,9 @@ export function renderGraph() {
 
         const hasHopCountriesObj = d.hop_countries && typeof d.hop_countries === 'object';
         const hopCountryRaw = hasHopCountriesObj ? d.hop_countries[hopIp] : undefined;
-        const hopCountry = (typeof hopCountryRaw === 'string' && hopCountryRaw.trim()) ? hopCountryRaw.trim() : undefined;
+        const hopCountry = (typeof hopCountryRaw === 'string' && hopCountryRaw.trim())
+          ? hopCountryRaw.trim()
+          : (countryByIp.get(hopIp) || undefined);
 
         if (!nodeIds.has(hopIp)) {
           const newNode = { id: hopIp, type: 'hop', name: hopName, country: hopCountry };
