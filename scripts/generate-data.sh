@@ -57,6 +57,7 @@ geoip_resolve() {
 
 # Construire un index pays depuis connections.csv
 declare -A IP_COUNTRY
+declare -A HOP_COUNTRY_CACHE
 if [ -f "$CSV_FILE" ]; then
     while IFS=',' read -r ts ip port country; do
         [[ "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || continue
@@ -113,6 +114,7 @@ for ip_dir in "$SCAN_DIR"/*/; do
     # Hops du traceroute (ordre des IPs) pour l'onglet Réseau
     hops_json="[]"
     hop_names_json="{}"
+    hop_countries_json="{}"
     if [ "$has_traceroute" = true ] && [ -f "$ip_dir/${ip}_traceroute.txt" ]; then
         hop_ips=($(grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' "$ip_dir/${ip}_traceroute.txt" 2>/dev/null))
         if [ ${#hop_ips[@]} -gt 0 ]; then
@@ -122,6 +124,7 @@ for ip_dir in "$SCAN_DIR"/*/; do
         # Reverse DNS (PTR) pour les hops : si <hop_ip>_dns.txt existe, on map vers hostname.
         # Objectif : permettre au front d'afficher name (hostname) au hover du graphe réseau.
         hop_names_pairs=()
+        hop_countries_pairs=()
         for hop_ip in "${hop_ips[@]}"; do
             dns_file="$SCAN_DIR/$hop_ip/${hop_ip}_dns.txt"
             if [ -f "$dns_file" ]; then
@@ -133,10 +136,33 @@ for ip_dir in "$SCAN_DIR"/*/; do
                     hop_names_pairs+=("\"$hop_ip\":\"$ptr_safe\"")
                 fi
             fi
+
+            # Pays pour les hops (optionnel, via geoiplookup si dispo)
+            hop_country=""
+            if [ -n "${IP_COUNTRY[$hop_ip]}" ]; then
+                hop_country="${IP_COUNTRY[$hop_ip]}"
+            elif [ -n "${HOP_COUNTRY_CACHE[$hop_ip]}" ]; then
+                hop_country="${HOP_COUNTRY_CACHE[$hop_ip]}"
+            else
+                geo_raw="$(geoip_resolve "$hop_ip")"
+                if [ "$geo_raw" = "||" ] || [ -z "$geo_raw" ]; then
+                    hop_country=""
+                else
+                    hop_country="${geo_raw%%|*}"
+                fi
+                [ -n "$hop_country" ] && HOP_COUNTRY_CACHE[$hop_ip]="$hop_country"
+            fi
+            [ -z "$hop_country" ] && hop_country="Unknown"
+
+            hop_country_safe="$(echo "$hop_country" | sed 's/"/\\"/g' | tr -d '\n')"
+            hop_countries_pairs+=("\"$hop_ip\":\"$hop_country_safe\"")
         done
 
         if [ ${#hop_names_pairs[@]} -gt 0 ]; then
             hop_names_json="{$(printf '%s,' "${hop_names_pairs[@]}" | sed 's/,$//')}"
+        fi
+        if [ ${#hop_countries_pairs[@]} -gt 0 ]; then
+            hop_countries_json="{$(printf '%s,' "${hop_countries_pairs[@]}" | sed 's/,$//')}"
         fi
     fi
 
@@ -173,6 +199,7 @@ for ip_dir in "$SCAN_DIR"/*/; do
     "traceroute": $has_traceroute,
     "hops": $hops_json,
     "hop_names": $hop_names_json,
+    "hop_countries": $hop_countries_json,
     "vuln_high": $vuln_high,
     "ports": "$ports_safe"
   }

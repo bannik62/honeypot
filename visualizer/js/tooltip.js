@@ -30,6 +30,7 @@ export function showCountryTip(e, country, count) {
 export function showPointTip(e, d) {
   const k1 = document.getElementById('tip-k1');
   if (k1) k1.textContent = 'Pays';
+  const nodeType = (d && d.nodeType) ? String(d.nodeType) : '';
   const vulnHigh = Number.parseInt(d.vuln_high, 10) || 0;
   const ports = (d.ports && typeof d.ports === 'string') ? d.ports.trim() : '';
   const reports = [];
@@ -39,8 +40,23 @@ export function showPointTip(e, d) {
   if (d.screenshot) reports.push('shot');
   if (d.nikto) reports.push('nikto');
   const name = (d.name && typeof d.name === 'string') ? d.name.trim() : '';
-  const ip = d.ip || 'Unknown';
-  document.getElementById('tiip').textContent = name && name !== ip ? `${name} (${ip})` : ip;
+  // Robustesse : selon le contexte, certains appels passent `id` au lieu de `ip`.
+  const ip = (d && typeof d.ip === 'string' && d.ip.trim()) ? d.ip.trim() : (d && d.id ? String(d.id) : 'Unknown');
+
+  const escapeHtml = (s) => String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+
+  if (nodeType === 'hop') {
+    const safeName = name && name !== ip ? name : 'unknow';
+    const tiip = document.getElementById('tiip');
+    tiip.innerHTML = `ip : ${escapeHtml(ip)}<br>name : ${escapeHtml(safeName)}`;
+  } else {
+    document.getElementById('tiip').textContent = name && name !== ip ? `${name} (${ip})` : ip;
+  }
   document.getElementById('tip-country').textContent = d.country || 'Unknown';
   document.getElementById('tip-vuln').textContent = vulnHigh > 0 ? vulnHigh.toString() : '—';
   document.getElementById('tip-ports').textContent = ports || '—';

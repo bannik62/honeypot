@@ -68,6 +68,7 @@ export function renderGraph() {
   const nodes = [{ id: 'VPS', type: 'vps' }];
   const links = [];
   const nodeIds = new Set(['VPS']);
+  const nodeById = new Map([['VPS', nodes[0]]]);
   top.forEach((d) => {
     if (!nodeIds.has(d.ip)) {
       nodes.push({
@@ -91,10 +92,26 @@ export function renderGraph() {
       hops.forEach((h) => { if (h !== prev) { deduped.push(h); prev = h; } });
       hops = deduped;
       hops.forEach((hopIp) => {
+        const hasHopNamesObj = d.hop_names && typeof d.hop_names === 'object';
+        const hopNameRaw = hasHopNamesObj ? d.hop_names[hopIp] : undefined;
+        const hopName = (typeof hopNameRaw === 'string' && hopNameRaw.trim()) ? hopNameRaw.trim() : undefined;
+
+        const hasHopCountriesObj = d.hop_countries && typeof d.hop_countries === 'object';
+        const hopCountryRaw = hasHopCountriesObj ? d.hop_countries[hopIp] : undefined;
+        const hopCountry = (typeof hopCountryRaw === 'string' && hopCountryRaw.trim()) ? hopCountryRaw.trim() : undefined;
+
         if (!nodeIds.has(hopIp)) {
-          const hopName = (d.hop_names && typeof d.hop_names === 'object' && d.hop_names[hopIp]) ? d.hop_names[hopIp] : hopIp;
-          nodes.push({ id: hopIp, type: 'hop', name: hopName });
+          const newNode = { id: hopIp, type: 'hop', name: hopName, country: hopCountry };
+          nodes.push(newNode);
+          nodeById.set(hopIp, newNode);
           nodeIds.add(hopIp);
+        } else {
+          // Mettre à jour le noeud hop si une info (name/country) manque
+          const existing = nodeById.get(hopIp);
+          if (existing) {
+            if (!existing.name && hopName) existing.name = hopName;
+            if ((!existing.country || existing.country === 'Unknown') && hopCountry) existing.country = hopCountry;
+          }
         }
       });
       // Toujours dans le sens attaquant -> VPS
@@ -159,13 +176,14 @@ export function renderGraph() {
       screenshot: !!d.screenshot,
       nikto: !!d.nikto,
       traceroute: !!d.traceroute,
+      nodeType: 'atk',
     }))
     .on('mousemove', moveTip).on('mouseleave', hideTip);
   node.filter((d) => d.type === 'hop')
     .on('mouseenter', (e, d) => showPointTip(e, {
       ip: d.id,
-      name: d.name || d.id,
-      country: '',
+      name: d.name,
+      country: d.country || 'Unknown',
       vuln_high: 0,
       ports: 'Relais traceroute',
       nmap: false,
@@ -173,6 +191,7 @@ export function renderGraph() {
       screenshot: false,
       nikto: false,
       traceroute: true,
+      nodeType: 'hop',
     }))
     .on('mousemove', moveTip).on('mouseleave', hideTip);
   sim.on('tick', () => {
