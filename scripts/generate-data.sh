@@ -218,6 +218,16 @@ for ip_dir in "$SCAN_DIR"/*/; do
         ports=$(grep -oP '^\d+/tcp\s+open' "$ip_dir/${ip}_nmap.txt" 2>/dev/null | grep -oP '^\d+' | tr '\n' ',' | sed 's/,$//')
     fi
 
+    # PTR / hostname pour l'IP attaquante (tooltip Réseau + carte) — même extraction que hop_names
+    name_json="null"
+    if [ -f "$ip_dir/${ip}_dns.txt" ]; then
+        ptr_main="$(awk '/Reverse DNS \\(PTR\\):/{found=1; next} found && $0 ~ /[^[:space:]]/{print $0; exit}' "$ip_dir/${ip}_dns.txt" 2>/dev/null | tr -d '\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        if [ -n "$ptr_main" ] && ! echo "$ptr_main" | grep -q "Aucun résultat"; then
+            name_safe="$(echo "$ptr_main" | sed 's/"/\\"/g' | tr -d '\n')"
+            name_json="\"$name_safe\""
+        fi
+    fi
+
     # Séparateur JSON
     [ $first -eq 0 ] && echo "," >> "$OUTPUT"
     first=0
@@ -229,6 +239,7 @@ for ip_dir in "$SCAN_DIR"/*/; do
     cat >> "$OUTPUT" << JSONLINE
   {
     "ip": "$ip",
+    "name": $name_json,
     "country": "$country_safe",
     "lat": $lat_json,
     "lon": $lon_json,

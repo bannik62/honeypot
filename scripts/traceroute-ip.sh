@@ -84,7 +84,9 @@ do_traceroute() {
     mkdir -p "$ip_dir"
     local tmp_report
     tmp_report=$(mktemp)
-    nmap -sn --traceroute -n --max-rtt-timeout 500ms --host-timeout 90s "$ip" > "$tmp_report" 2>&1
+    # -Pn : ne pas abandonner si le ping ICMP échoue (hôte « down ») — beaucoup d’IPs ne répondent pas au -sn seul
+    #        mais le traceroute fonctionne quand même (cf. cas firewall / hôtes distants).
+    nmap -Pn -sn --traceroute -n --max-rtt-timeout 500ms --host-timeout 90s "$ip" > "$tmp_report" 2>&1
     if [ -s "$tmp_report" ]; then
         # nmap : section "TRACEROUTE" (majuscules) la plus courante ; variantes selon version / locale
         awk '/^TRACEROUTE/ { found=1; next } found { print }' "$tmp_report" > "$out_file"

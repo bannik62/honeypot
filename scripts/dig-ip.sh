@@ -89,27 +89,34 @@ if [ -n "$1" ]; then
     IP="$1"
     scan_ip "$IP"
 else
-    # Sinon, scanner toutes les IPs uniques du CSV
-    if [ ! -f "$CSV_FILE" ] || [ $(tail -n +2 "$CSV_FILE" 2>/dev/null | wc -l) -eq 0 ]; then
-        echo "❌ Aucune IP trouvée dans web_interfaces.csv. Lancez d'abord 'scan-web'"
+    # Sinon : union des IPs (web_interfaces + hops extraits des *_traceroute.txt)
+    # pour que les routeurs intermédiaires aient un PTR dans hop_names (generate-data).
+    temp_file=$(mktemp)
+    : > "$temp_file"
+
+    if [ -f "$CSV_FILE" ] && [ "$(tail -n +2 "$CSV_FILE" 2>/dev/null | wc -l)" -gt 0 ]; then
+        tail -n +2 "$CSV_FILE" | cut -d',' -f2 >> "$temp_file"
+    fi
+
+    if [ -d "$OUTPUT_DIR" ]; then
+        while IFS= read -r -d '' tf; do
+            grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' "$tf" 2>/dev/null >> "$temp_file"
+        done < <(find "$OUTPUT_DIR" -type f \( -name '*_traceroute.txt' -o -name '*traceroute*.txt' \) -print0 2>/dev/null)
+    fi
+
+    sort -u "$temp_file" -o "$temp_file"
+
+    total=$(wc -l < "$temp_file" 2>/dev/null | tr -d ' ' || echo 0)
+    if [ "${total:-0}" -eq 0 ]; then
+        echo "❌ Aucune IP à résoudre : remplissez web_interfaces.csv (scan-web) et/ou générez des *_traceroute.txt (traceroute-ip.sh)."
+        rm -f "$temp_file"
         exit 1
     fi
-    
-    echo "🔍 Scan DNS pour toutes les IPs..."
+
+    echo "🔍 Scan DNS pour toutes les IPs (web + hops traceroute)..."
     echo "⚙️  Processus parallèles: $DIG_PARALLEL"
     echo ""
-    
-    # Extraire les IPs uniques (ignorer l'en-tête)
-    temp_file=$(mktemp)
-    tail -n +2 "$CSV_FILE" | cut -d',' -f2 | sort -u > "$temp_file"
-    total=$(wc -l < "$temp_file" 2>/dev/null || echo 0)
-    
-    if [ "$total" -eq 0 ]; then
-        echo "✅ Aucune IP à scanner"
-        rm -f "$temp_file"
-        exit 0
-    fi
-    
+
     # Scanner (séquentiel ou parallèle)
     if [ "$DIG_PARALLEL" -eq 1 ]; then
         # Mode séquentiel

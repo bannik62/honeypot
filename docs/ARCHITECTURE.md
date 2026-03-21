@@ -124,6 +124,7 @@ Agrégat JSON généré par `generate-data.sh`, lu par le visualiseur.
 [
   {
     "ip": "218.92.0.115",
+    "name": "scanner.example.net",
     "country": "CN",
     "lat": null, "lon": null,
     "nmap": true,

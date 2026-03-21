@@ -51,7 +51,7 @@ export function showPointTip(e, d) {
     .replace(/'/g, '&#039;');
 
   if (nodeType === 'hop') {
-    const safeName = name && name !== ip ? name : 'unknow';
+    const safeName = name && name !== ip ? name : '—';
     const tiip = document.getElementById('tiip');
     tiip.innerHTML = `ip : ${escapeHtml(ip)}<br>name : ${escapeHtml(safeName)}`;
   } else {

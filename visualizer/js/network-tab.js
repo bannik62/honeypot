@@ -97,6 +97,7 @@ export function renderGraph() {
       nodes.push({
         id: d.ip,
         type: 'atk',
+        name: (typeof d.name === 'string' && d.name.trim()) ? d.name.trim() : undefined,
         country: d.country,
         vuln: d.vuln_high,
         ports: d.ports,
@@ -193,6 +194,7 @@ export function renderGraph() {
   node.filter((d) => d.type === 'atk')
     .on('mouseenter', (e, d) => showPointTip(e, {
       ip: d.id,
+      name: d.name,
       country: d.country || 'Unknown',
       vuln_high: d.vuln || 0,
       ports: d.ports || '',

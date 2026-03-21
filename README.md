@@ -174,7 +174,7 @@ Le traceroute **n'est pas** exécuté par `run-all-scans.sh` / le cron — c’e
 sudo bash scripts/traceroute-ip.sh
 ```
 
-Ce script remplit les `_traceroute.txt` **manquants** dans `data/screenshotAndLog/<IP>/`. Relancez ensuite `honeypot-make-visualizer-data` (ou `generate-data.sh`) pour mettre à jour le graphe réseau.
+Ce script remplit les `_traceroute.txt` **manquants** dans `data/screenshotAndLog/<IP>/`. La commande nmap inclut **`-Pn`** : sans cela, beaucoup d’IPs sont vues comme « host down » (ping ICMP filtré) et **aucun** traceroute n’est enregistré. Relancez ensuite `honeypot-make-visualizer-data` (ou `generate-data.sh`) pour mettre à jour le graphe réseau.
 
 > Voir aussi `vuln-scan.sh` (commentaire dans le script) : `--traceroute` n’y est pas ajouté, pour les mêmes raisons (root + cron user).
 
@@ -280,7 +280,7 @@ Les bots se connectent sur le port 22. Endlessh les piège et génère des logs 
 
 - **scan-web** → détecte les ports HTTP ouverts (80, 443, 8080, 8443, 8000, 8888, 3000, 5000, 9000), évite les doublons
 - **capture-web** → screenshot PNG via Chrome headless, scan nikto si installé
-- **dig-ip** → reverse DNS + WHOIS par IP
+- **dig-ip** → reverse DNS + WHOIS par IP (liste = `web_interfaces.csv` **+** toutes les IPv4 trouvées dans `*_traceroute.txt`, pour remplir `name` / `hop_names` dans `data.json`)
 - **vuln-scan** → `nmap -F -sV --script vuln`, stocke les rapports dans `screenshotAndLog/<IP>/` (pas de traceroute ici ; traceroute = script manuel `traceroute-ip.sh`)
 - **cleanup-old-data** → nettoyage automatique
 - **generate-data** → agrège tout dans `data.json`
@@ -318,6 +318,7 @@ timestamp,ip,port,protocol,url,scanned
 [
   {
     "ip": "218.92.0.115",
+    "name": "scanner.example.net",
     "country": "CN",
     "lat": 39.9042,
     "lon": 116.4074,
@@ -327,6 +328,8 @@ timestamp,ip,port,protocol,url,scanned
     "nikto": false,
     "traceroute": true,
     "hops": ["10.0.0.1", "192.168.1.1", "218.92.0.115"],
+    "hop_names": { "10.0.0.1": "gw.isp.net" },
+    "hop_countries": { "10.0.0.1": "US" },
     "vuln_high": 2,
     "ports": "80,443"
   }
