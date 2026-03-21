@@ -66,3 +66,7 @@ flowchart TD
   SSH <-->|port 8765| SRV
   BROWSER <-->|localhost:8765| SSH
 ```
+
+## Traceroute (hors schéma ci‑dessus)
+
+Le **traceroute** (`traceroute-ip.sh`, `sudo`, backfill ponctuel) n’est **pas** branché sur le sous-graphe « Scans automatiques — cron » : il produit des `*_traceroute.txt` dans `screenshotAndLog/<IP>/` en dehors de `run-all-scans.sh` (root requis, charge réseau — volontairement manuel). Voir README § *Traceroute (manuel, ponctuel)*.

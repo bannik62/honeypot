@@ -162,13 +162,21 @@ honeypot-make-visualizer-data  # Agrège tout → data.json pour le dashboard
 
 ### Traceroute (manuel, ponctuel)
 
-Le traceroute nécessite les droits root (raw sockets) et n'est pas inclus dans le cron :
+Le traceroute **n'est pas** exécuté par `run-all-scans.sh` / le cron — c’est un **choix volontaire** :
+
+- **`nmap --traceroute`** utilise des raw sockets : sur la plupart des systèmes il faut **root** ; le cron tourne en **utilisateur normal** (pas de mot de passe, pas de `sudo` interactif).
+- Éviter d’**encombrer le VPS** avec des centaines de traceroutes à chaque passage du cron (charge réseau / durée du cycle).
+- Pas besoin de configurer **`sudo NOPASSWD`** ou un **cron root** pour un usage perso — on garde le pipeline auto simple.
+
+**Conséquence :** les **nouvelles IPs** auront bien le scan vuln (`vuln-scan`) via le cron, mais **pas** de `<IP>_traceroute.txt` tant que vous n’avez pas relancé le script ci‑dessous (backfill ponctuel).
 
 ```bash
 sudo bash scripts/traceroute-ip.sh
 ```
 
-Ce script backfille les `_traceroute.txt` manquants dans `data/screenshotAndLog/<IP>/`. Relancez ensuite `honeypot-make-visualizer-data` pour mettre à jour le graphe réseau.
+Ce script remplit les `_traceroute.txt` **manquants** dans `data/screenshotAndLog/<IP>/`. Relancez ensuite `honeypot-make-visualizer-data` (ou `generate-data.sh`) pour mettre à jour le graphe réseau.
+
+> Voir aussi `vuln-scan.sh` (commentaire dans le script) : `--traceroute` n’y est pas ajouté, pour les mêmes raisons (root + cron user).
 
 ### Scans automatiques
 
@@ -180,7 +188,7 @@ La séquence automatique (`run-all-scans.sh`) exécute dans l'ordre :
 1. `scan-web` (nmap → web_interfaces.csv)
 2. `capture-web` (screenshots + nikto)
 3. `dig-ip` (DNS/WHOIS)
-4. `vuln-scan` (nmap --script vuln)
+4. `vuln-scan` (nmap --script vuln) — **sans** `--traceroute` (voir section Traceroute ci‑dessus)
 5. `cleanup-old-data` (nettoyage)
 6. `generate-data` (→ data.json pour le dashboard)
 
@@ -273,7 +281,7 @@ Les bots se connectent sur le port 22. Endlessh les piège et génère des logs 
 - **scan-web** → détecte les ports HTTP ouverts (80, 443, 8080, 8443, 8000, 8888, 3000, 5000, 9000), évite les doublons
 - **capture-web** → screenshot PNG via Chrome headless, scan nikto si installé
 - **dig-ip** → reverse DNS + WHOIS par IP
-- **vuln-scan** → `nmap -F -sV --script vuln`, stocke les rapports dans `screenshotAndLog/<IP>/`
+- **vuln-scan** → `nmap -F -sV --script vuln`, stocke les rapports dans `screenshotAndLog/<IP>/` (pas de traceroute ici ; traceroute = script manuel `traceroute-ip.sh`)
 - **cleanup-old-data** → nettoyage automatique
 - **generate-data** → agrège tout dans `data.json`
 

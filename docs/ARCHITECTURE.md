@@ -37,13 +37,18 @@ Internet
 │     (DNS WHOIS)                                   │
 │                                                     │
 │  4. vuln-scan.sh      → screenshotAndLog/<IP>/*_nmap.txt │
-│     (nmap --script vuln)                            │
+│     (nmap --script vuln, sans --traceroute)         │
 │                                                     │
 │  5. cleanup-old-data.sh  (rotation + nettoyage)     │
 │                                                     │
 │  6. generate-data.sh  → data/visualizer-dashboard/  │
 │     (agrège tout)       data.json                   │
 └─────────────────────────────────────────────────────┘
+
+Traceroute (hors cron) — manuel, avec sudo :
+  traceroute-ip.sh → screenshotAndLog/<IP>/*_traceroute.txt
+  (nmap --traceroute nécessite root ; pas dans run-all-scans pour éviter
+   sudo dans le cron et limiter la charge réseau — backfill ponctuel.)
        │
        ▼
 ┌─────────────────────────────────────────────────────┐
@@ -107,7 +112,7 @@ Un dossier par IP attaquante :
 ```
 <IP>/
 ├── <IP>_nmap.txt       ← rapport vulnérabilités (vuln-scan.sh)
-├── <IP>_traceroute.txt ← chemin des routeurs, extrait de nmap --traceroute (vuln-scan.sh)
+├── <IP>_traceroute.txt ← chemin des routeurs (traceroute-ip.sh, manuel / sudo — pas le cron)
 ├── <IP>_dns.txt        ← reverse DNS + WHOIS (dig-ip.sh)
 ├── <IP>_<port>_<date>_<time>.png  ← screenshot (web-capture.sh)
 └── <IP>_nikto.txt      ← rapport nikto (optionnel)
@@ -146,6 +151,7 @@ Base SQLite alimentée par `parse-nikto.sh`.
 |------|--------|-------------|-----------|
 | Temps réel | `monitor.sh` | `journalctl -f` | Continu |
 | Scans | `run-all-scans.sh` | cron | Configurable (1-23h) |
+| Traceroute | `traceroute-ip.sh` | **Manuel** (`sudo`) | Ponctuel (backfill) |
 | Visualiseur | `generate-data.sh` | Fin de `run-all-scans.sh` | Après chaque cycle |
 
 ---
