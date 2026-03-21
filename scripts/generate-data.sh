@@ -78,6 +78,18 @@ geoip_resolve() {
     echo "${country}|${lat}|${lon}"
 }
 
+# PTR depuis *_dns.txt (rapport dig-ip) : saute les lignes vides après le titre ; s'arrête avant 📋 WHOIS
+extract_ptr_from_dns() {
+    local f="$1"
+    [ -f "$f" ] || { echo ""; return; }
+    awk '
+        /Reverse DNS \(PTR\):/ { found=1; next }
+        found && /^[[:space:]]*$/ { next }
+        found && /^[[:space:]]*📋/ { exit }
+        found && $0 ~ /[^[:space:]]/ { gsub(/^[[:space:]]+|[[:space:]]+$/, ""); print; exit }
+    ' "$f" 2>/dev/null | tr -d '\r'
+}
+
 # Construire un index pays depuis connections.csv
 declare -A IP_COUNTRY
 declare -A HOP_COUNTRY_CACHE
@@ -164,8 +176,7 @@ for ip_dir in "$SCAN_DIR"/*/; do
         for hop_ip in "${hop_ips[@]}"; do
             dns_file="$SCAN_DIR/$hop_ip/${hop_ip}_dns.txt"
             if [ -f "$dns_file" ]; then
-                # Prendre la première ligne non vide après "Reverse DNS (PTR):"
-                ptr="$(awk '/Reverse DNS \\(PTR\\):/{found=1; next} found && $0 ~ /[^[:space:]]/{print $0; exit}' "$dns_file" 2>/dev/null | tr -d '\r' | sed 's/[[:space:]]*$//')"
+                ptr="$(extract_ptr_from_dns "$dns_file")"
                 # Nettoyage : si dig n'a rien trouvé, ptr contient souvent "❌ Aucun résultat"
                 if [ -n "$ptr" ] && ! echo "$ptr" | grep -q "Aucun résultat"; then
                     ptr_safe="$(echo "$ptr" | sed 's/"/\\"/g')"
@@ -221,7 +232,7 @@ for ip_dir in "$SCAN_DIR"/*/; do
     # PTR / hostname pour l'IP attaquante (tooltip Réseau + carte) — même extraction que hop_names
     name_json="null"
     if [ -f "$ip_dir/${ip}_dns.txt" ]; then
-        ptr_main="$(awk '/Reverse DNS \\(PTR\\):/{found=1; next} found && $0 ~ /[^[:space:]]/{print $0; exit}' "$ip_dir/${ip}_dns.txt" 2>/dev/null | tr -d '\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        ptr_main="$(extract_ptr_from_dns "$ip_dir/${ip}_dns.txt")"
         if [ -n "$ptr_main" ] && ! echo "$ptr_main" | grep -q "Aucun résultat"; then
             name_safe="$(echo "$ptr_main" | sed 's/"/\\"/g' | tr -d '\n')"
             name_json="\"$name_safe\""

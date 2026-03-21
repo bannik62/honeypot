@@ -62,9 +62,14 @@ scan_ip() {
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo ""
         
-        # Reverse DNS
+        # Reverse DNS — dig peut renvoyer vide avec code 0 : sans ligne explicite, generate-data ne lit rien
         echo "📋 Reverse DNS (PTR):"
-        dig +short -x "$IP" 2>/dev/null || echo "  ❌ Aucun résultat"
+        ptr_line="$(dig +short -x "$IP" 2>/dev/null | head -n1)"
+        if [ -z "$ptr_line" ]; then
+            echo "  ❌ Aucun résultat"
+        else
+            echo "$ptr_line"
+        fi
         echo ""
         
         # WHOIS (si disponible)
