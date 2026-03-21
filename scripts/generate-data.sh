@@ -98,6 +98,8 @@ echo "🔍 Parse de $total_dirs IPs en cours..."
 echo "[" > "$OUTPUT"
 first=1
 total=0
+count_tr=0
+count_hops_nonempty=0
 
 for ip_dir in "$SCAN_DIR"/*/; do
     ip=$(basename "$ip_dir")
@@ -131,15 +133,26 @@ for ip_dir in "$SCAN_DIR"/*/; do
     [ -f "$ip_dir/${ip}_nmap.txt" ]       && has_nmap=true
     [ -f "$ip_dir/${ip}_dns.txt" ]        && has_dns=true
     [ -f "$ip_dir/${ip}_nikto.txt" ]      && has_nikto=true
-    [ -f "$ip_dir/${ip}_traceroute.txt" ] && has_traceroute=true
+    # Traceroute : nom attendu IP_traceroute.txt ; sinon tout *traceroute*.txt dans le dossier
+    traceroute_file=""
+    if [ -f "$ip_dir/${ip}_traceroute.txt" ]; then
+        traceroute_file="$ip_dir/${ip}_traceroute.txt"
+    else
+        shopt -s nullglob
+        for f in "$ip_dir"/*traceroute*.txt "$ip_dir"/*TRACEROUTE*.txt; do
+            if [ -f "$f" ]; then traceroute_file="$f"; break; fi
+        done
+        shopt -u nullglob
+    fi
+    [ -n "$traceroute_file" ] && [ -f "$traceroute_file" ] && has_traceroute=true
     ls "$ip_dir"/*.png 2>/dev/null | head -1 | grep -q . && has_screenshot=true
 
     # Hops du traceroute (ordre des IPs) pour l'onglet Réseau
     hops_json="[]"
     hop_names_json="{}"
     hop_countries_json="{}"
-    if [ "$has_traceroute" = true ] && [ -f "$ip_dir/${ip}_traceroute.txt" ]; then
-        hop_ips=($(grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' "$ip_dir/${ip}_traceroute.txt" 2>/dev/null))
+    if [ "$has_traceroute" = true ] && [ -n "$traceroute_file" ]; then
+        hop_ips=($(grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' "$traceroute_file" 2>/dev/null))
         if [ ${#hop_ips[@]} -gt 0 ]; then
             hops_json="[$(printf '"%s"' "${hop_ips[0]}"; for i in "${hop_ips[@]:1}"; do printf ',"%s"' "$i"; done)]"
         fi
@@ -186,6 +199,10 @@ for ip_dir in "$SCAN_DIR"/*/; do
         fi
         if [ ${#hop_countries_pairs[@]} -gt 0 ]; then
             hop_countries_json="{$(printf '%s,' "${hop_countries_pairs[@]}" | sed 's/,$//')}"
+        fi
+        count_tr=$((count_tr + 1))
+        if [ ${#hop_ips[@]} -gt 0 ]; then
+            count_hops_nonempty=$((count_hops_nonempty + 1))
         fi
     fi
 
@@ -238,3 +255,4 @@ done
 echo "]" >> "$OUTPUT"
 
 echo "✅ Parse data.json terminé — $total IPs parsées ($OUTPUT)"
+echo "📊 Traceroute détectés (fichier présent): $count_tr — dont avec hops (IPv4 extraits): $count_hops_nonempty"

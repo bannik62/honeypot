@@ -11,9 +11,19 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_FILE="$SCRIPT_DIR/../config/config"
 
 if [ -f "$CONFIG_FILE" ]; then
+    # shellcheck source=/dev/null
     source "$CONFIG_FILE"
-else
-    DATA_DIR="$SCRIPT_DIR/../data"
+fi
+
+# Même logique que generate-data.sh : data souvent dans .../honeypot/data/ (pas honeypot/honeypot/data)
+DATA_DIR_CANDIDATE_PARENT="$(cd "$SCRIPT_DIR/../.." && pwd)/data"
+DATA_DIR_CANDIDATE_SIBLING="$SCRIPT_DIR/../data"
+if [ -z "${DATA_DIR:-}" ] || [ ! -d "${DATA_DIR}/screenshotAndLog" ]; then
+    if [ -d "$DATA_DIR_CANDIDATE_PARENT/screenshotAndLog" ]; then
+        DATA_DIR="$DATA_DIR_CANDIDATE_PARENT"
+    else
+        DATA_DIR="$DATA_DIR_CANDIDATE_SIBLING"
+    fi
 fi
 
 CSV_FILE="${DATA_DIR}/logs/connections.csv"
@@ -36,7 +46,8 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 echo "📁 DATA_DIR   : $DATA_DIR"
-echo "📁 Enregistrement des traceroutes : $OUTPUT_DIR"
+echo "📁 OUTPUT_DIR (traceroutes) : $OUTPUT_DIR"
+echo "📁 CSV        : $CSV_FILE"
 echo ""
 
 # IPs uniques depuis connections.csv (colonne 2, sans l'en-tête)
@@ -75,7 +86,18 @@ do_traceroute() {
     tmp_report=$(mktemp)
     nmap -sn --traceroute -n --max-rtt-timeout 500ms --host-timeout 90s "$ip" > "$tmp_report" 2>&1
     if [ -s "$tmp_report" ]; then
+        # nmap : section "TRACEROUTE" (majuscules) la plus courante ; variantes selon version / locale
         awk '/^TRACEROUTE/ { found=1; next } found { print }' "$tmp_report" > "$out_file"
+        if [ ! -s "$out_file" ]; then
+            awk '/^Traceroute/ { found=1; next } found { print }' "$tmp_report" > "$out_file"
+        fi
+        if [ ! -s "$out_file" ] && command -v gawk &>/dev/null; then
+            gawk 'BEGIN{IGNORECASE=1} $0 ~ /^traceroute/ { found=1; next } found { print }' "$tmp_report" > "$out_file"
+        fi
+        # Si toujours vide : garder la sortie brute pour que generate-data puisse au moins extraire des IPv4
+        if [ ! -s "$out_file" ] && grep -qE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' "$tmp_report"; then
+            cp "$tmp_report" "$out_file"
+        fi
         [ -s "$out_file" ] || rm -f "$out_file"
     fi
     rm -f "$tmp_report"
