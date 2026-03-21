@@ -5,15 +5,38 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_FILE="$SCRIPT_DIR/../config/config"
 
 if [ -f "$CONFIG_FILE" ]; then
+    # shellcheck source=/dev/null
     source "$CONFIG_FILE"
-else
-    DATA_DIR="$SCRIPT_DIR/../data"
+fi
+
+# Layout fréquent : scripts dans .../honeypot/honeypot/scripts/ mais DATA dans .../honeypot/data/
+# Le défaut scripts/../data = .../honeypot/honeypot/data (souvent vide ou sans traceroute).
+DATA_DIR_CANDIDATE_PARENT="$(cd "$SCRIPT_DIR/../.." && pwd)/data"
+DATA_DIR_CANDIDATE_SIBLING="$SCRIPT_DIR/../data"
+
+if [ -z "${DATA_DIR:-}" ] || [ ! -d "${DATA_DIR}/screenshotAndLog" ]; then
+    if [ -d "$DATA_DIR_CANDIDATE_PARENT/screenshotAndLog" ]; then
+        DATA_DIR="$DATA_DIR_CANDIDATE_PARENT"
+    else
+        DATA_DIR="$DATA_DIR_CANDIDATE_SIBLING"
+    fi
+elif [ -d "$DATA_DIR_CANDIDATE_PARENT/screenshotAndLog" ] && [ "$DATA_DIR" != "$DATA_DIR_CANDIDATE_PARENT" ]; then
+    # Config pointe ailleurs : si le parent a des traceroute et pas le dossier choisi, basculer.
+    n_cfg="$(find "$DATA_DIR/screenshotAndLog" -type f -name '*_traceroute.txt' 2>/dev/null | wc -l)"
+    n_par="$(find "$DATA_DIR_CANDIDATE_PARENT/screenshotAndLog" -type f -name '*_traceroute.txt' 2>/dev/null | wc -l)"
+    if [ "${n_cfg// /}" -eq 0 ] && [ "${n_par// /}" -gt 0 ]; then
+        echo "⚠️  DATA_DIR=$DATA_DIR ne contient aucun *_traceroute.txt ; utilisation de $DATA_DIR_CANDIDATE_PARENT ($n_par fichier(s))."
+        DATA_DIR="$DATA_DIR_CANDIDATE_PARENT"
+    fi
 fi
 
 SCAN_DIR="$DATA_DIR/screenshotAndLog"
 CSV_FILE="$DATA_DIR/logs/connections.csv"
 VIZ_DIR="$DATA_DIR/visualizer-dashboard"
 OUTPUT="$VIZ_DIR/data.json"
+
+echo "📂 DATA_DIR=$DATA_DIR"
+echo "📂 SCAN_DIR=$SCAN_DIR"
 
 mkdir -p "$VIZ_DIR"
 
