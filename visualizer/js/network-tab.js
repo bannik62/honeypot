@@ -38,6 +38,15 @@ function attackerScore(d) {
   return (d.vuln_high || 0) * 100 + (d.nikto ? 35 : 0) + (d.nmap ? 20 : 0) + (d.screenshot ? 8 : 0) + (d.dns ? 5 : 0) + (d.traceroute ? 3 : 0);
 }
 
+/** Pour le graphe réseau : une IP avec traceroute (hops) doit être prioritaire, sinon le "top" est souvent full vulns sans chemin → étoile IP→VPS sans routeurs. */
+function hasTracerouteHops(d) {
+  return Array.isArray(d.hops) && d.hops.length > 0;
+}
+
+function hopCount(d) {
+  return Array.isArray(d.hops) ? d.hops.length : 0;
+}
+
 export function renderGraph() {
   const D = state.D;
   const wrap = document.getElementById('gwrap');
@@ -54,6 +63,11 @@ export function renderGraph() {
   const zoomGroup = svg.append('g');
 
   const top = D.slice().sort((a, b) => {
+    const ha = hasTracerouteHops(a);
+    const hb = hasTracerouteHops(b);
+    if (ha !== hb) return hb ? 1 : -1; // ceux avec hops en premier
+    const hc = hopCount(b) - hopCount(a);
+    if (hc !== 0) return hc;
     const s = attackerScore(b) - attackerScore(a);
     if (s !== 0) return s;
     const v = (b.vuln_high || 0) - (a.vuln_high || 0);
