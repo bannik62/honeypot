@@ -119,7 +119,7 @@ Un dossier par IP attaquante :
 ```
 
 ### `data/visualizer-dashboard/data.json`
-Agrégat JSON généré par `generate-data.sh`, lu par le visualiseur. Chaque `vuln_high` est le nombre d’entrées `severity = 'HIGH'` dans `nikto.db` pour l’IP (après `parse-nikto.sh`, même règle CVSS que la recherche SQLite — plus d’heuristique `grep` sur le fichier nmap).
+Agrégat JSON généré par `generate-data.sh`, lu par le visualiseur. Le champ `vuln_high` est une heuristique rapide (`grep` sur `*_nmap.txt`), pas le comptage SQLite (`parse-nikto.sh` / `nikto.db`).
 ```json
 [
   {

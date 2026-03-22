@@ -283,11 +283,11 @@ Les bots se connectent sur le port 22. Endlessh les piège et génère des logs 
 - **dig-ip** → reverse DNS + WHOIS par IP (liste = `web_interfaces.csv` **+** toutes les IPv4 trouvées dans `*_traceroute.txt`, pour remplir `name` / `hop_names` dans `data.json`)
 - **vuln-scan** → `nmap -F -sV --script vuln`, stocke les rapports dans `screenshotAndLog/<IP>/` (pas de traceroute ici ; traceroute = script manuel `traceroute-ip.sh`)
 - **cleanup-old-data** → nettoyage automatique
-- **generate-data** → lance `parse-nikto.sh` (mise à jour `nikto.db` depuis les `*_nmap.txt`) puis agrège tout dans `data.json`
+- **generate-data** → agrège tout dans `data.json`
 
 ### 4. Dashboard web
 
-`generate-data.sh` met d’abord à jour `data/logs/nikto.db` via `parse-nikto.sh` (vulners nmap : CVSS entier ≥ 9 → HIGH, aligné avec `honeypot-search-vuln`), scanne `data/screenshotAndLog/`, puis extrait pour chaque IP : pays, coordonnées, présence nmap/dns/screenshot/nikto/traceroute, hops, **`vuln_high`** = `COUNT(*)` des lignes HIGH pour cette IP dans la DB, ports ouverts. Produit `data/visualizer-dashboard/data.json`.
+`generate-data.sh` scanne `data/screenshotAndLog/`, extrait pour chaque IP : pays, coordonnées, présence nmap/dns/screenshot/nikto/traceroute, hops, **`vuln_high`** (heuristique `grep` sur le nmap — rapide ; pour des stats alignées sur la base SQLite, lancez `parse-nikto.sh` puis `honeypot-search-vuln`), ports ouverts. Produit `data/visualizer-dashboard/data.json`.
 
 `server.py` sert le dashboard HTML + `data.json` + rapports par IP sur `127.0.0.1:8765`. Accès via tunnel SSH uniquement.
 

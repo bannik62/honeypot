@@ -1,19 +1,13 @@
 #!/bin/bash
-# Parse les rapports vuln nmap (*_nmap.txt, section vulners) → SQLite nikto.db
-# Sévérités : CVSS entier ≥9 → HIGH, ≥7 → MEDIUM, sinon LOW (aligné avec generate-data.sh → vuln_high)
-# Perf : une transaction SQLite par fichier (batch INSERT), moins d’appels sqlite3.
+# Script pour parser les rapports nmap et les stocker dans SQLite
 
 # Variable pour le nettoyage
 temp_file_list=""
-insert_batch_file=""
 
 # Nettoyage des fichiers temporaires en cas d'interruption
 cleanup_temp_files() {
     if [ -n "$temp_file_list" ] && [ -f "$temp_file_list" ]; then
         rm -f "$temp_file_list" 2>/dev/null
-    fi
-    if [ -n "$insert_batch_file" ] && [ -f "$insert_batch_file" ]; then
-        rm -f "$insert_batch_file" 2>/dev/null
     fi
 }
 
@@ -36,75 +30,8 @@ else
     DATA_DIR="$SCRIPT_DIR/../data"
 fi
 
-# Même répertoire données que generate-data.sh quand appelé depuis le pipeline (évite DB ≠ fichiers scannés)
-if [ -n "${HONEYPOT_DATA_DIR:-}" ]; then
-    DATA_DIR="$HONEYPOT_DATA_DIR"
-fi
-
-mkdir -p "$DATA_DIR/logs"
-
 DB_FILE="$DATA_DIR/logs/nikto.db"
 SCREENSHOTS_DIR="$DATA_DIR/screenshotAndLog"
-
-# Échappement SQL (doubler les ')
-escape_sql() {
-    printf '%s' "$1" | sed "s/'/''/g"
-}
-
-# À partir d'une ligne vulners (|  CVE…  9.8 …), écrit une instruction INSERT sur stdout
-append_insert_for_vuln_line() {
-    local vuln_line="$1"
-    local current_port="$2"
-    local ip="$3"
-    local report_file_escaped="$4"
-    local file_mtime_readable="$5"
-    local current_service="$6"
-    local current_version="$7"
-
-    local vuln_line_trim
-    vuln_line_trim=$(echo "$vuln_line" | sed 's/^|[[:space:]]*//')
-    local vuln_text severity_score
-    vuln_text=$(echo "$vuln_line_trim" | awk '{print $1}')
-    severity_score=$(echo "$vuln_line_trim" | awk '{print $2}')
-
-    if [ -z "$vuln_text" ]; then
-        return 0
-    fi
-
-    local severity="LOW"
-    if [ -n "$severity_score" ]; then
-        local score
-        score=$(echo "$severity_score" | cut -d'.' -f1 | grep -oE "^[0-9]+" | head -1)
-        if [ -n "$score" ] && [ "$score" -ge 9 ]; then
-            severity="HIGH"
-        elif [ -n "$score" ] && [ "$score" -ge 7 ]; then
-            severity="MEDIUM"
-        fi
-    fi
-
-    local cve=""
-    if [[ $vuln_text =~ CVE-[0-9]{4}-[0-9]+ ]]; then
-        cve="$vuln_text"
-    fi
-
-    local ip_e vt_e line_e sv_e cve_e
-    ip_e=$(escape_sql "$ip")
-    vt_e=$(escape_sql "$vuln_text")
-    line_e=$(escape_sql "$vuln_line")
-    sv_e=$(escape_sql "$current_service $current_version")
-    cve_e=$(escape_sql "$cve")
-
-    printf "INSERT INTO vulns (ip, port, report_file, vulnerability, severity, file_path, server_version, cve, scan_date, full_text) VALUES ('%s', %s, '%s', '%s', '%s', '', '%s', '%s', '%s', '%s');\n" \
-        "$ip_e" "$current_port" "$report_file_escaped" "$vt_e" "$severity" "$sv_e" "$cve_e" "$file_mtime_readable" "$line_e"
-}
-
-# Vide le tableau vuln_lines vers le fichier batch
-flush_vuln_lines_to_batch() {
-    local vuln_line
-    for vuln_line in "${vuln_lines[@]}"; do
-        append_insert_for_vuln_line "$vuln_line" "$current_port" "$ip" "$report_file_escaped" "$file_mtime_readable" "$current_service" "$current_version" >> "$insert_batch_file"
-    done
-}
 
 # Créer la base de données et la table si nécessaire
 sqlite3 "$DB_FILE" << 'SQL'
@@ -165,8 +92,7 @@ while IFS= read -r report_file; do
         continue
     fi
 
-    insert_batch_file=$(mktemp)
-    : > "$insert_batch_file"
+    sqlite3 "$DB_FILE" "DELETE FROM vulns WHERE report_file = '$report_file_escaped';" 2>/dev/null
 
     filename=$(basename "$report_file")
     dir_path=$(dirname "$report_file")
@@ -205,7 +131,41 @@ while IFS= read -r report_file; do
 
             if [[ $line =~ ^[0-9]+/tcp ]] || [[ ! $line =~ ^\| ]]; then
                 if [ ${#vuln_lines[@]} -gt 0 ]; then
-                    flush_vuln_lines_to_batch
+                    for vuln_line in "${vuln_lines[@]}"; do
+                        vuln_text=$(echo "$vuln_line" | sed 's/^|[[:space:]]*//' | awk '{print $1}')
+                        severity_score=$(echo "$vuln_line" | sed 's/^|[[:space:]]*//' | awk '{print $2}')
+                        vuln_url=$(echo "$vuln_line" | sed 's/^|[[:space:]]*//' | awk '{print $3}')
+
+                        if [ -z "$vuln_text" ]; then
+                            continue
+                        fi
+
+                        severity="LOW"
+                        if [ -n "$severity_score" ]; then
+                            score=$(echo "$severity_score" | cut -d'.' -f1 | grep -oE "^[0-9]+" | head -1)
+                            if [ -n "$score" ] && [ "$score" -ge 9 ]; then
+                                severity="HIGH"
+                            elif [ -n "$score" ] && [ "$score" -ge 7 ]; then
+                                severity="MEDIUM"
+                            fi
+                        fi
+
+                        cve=""
+                        if [[ $vuln_text =~ CVE-[0-9]{4}-[0-9]+ ]]; then
+                            cve="$vuln_text"
+                        fi
+
+                        vuln_text_escaped=$(echo "$vuln_text" | sed "s/'/''/g")
+                        line_escaped=$(echo "$vuln_line" | sed "s/'/''/g")
+                        ip_escaped=$(echo "$ip" | sed "s/'/''/g")
+                        service_escaped=$(echo "$current_service" | sed "s/'/''/g")
+                        version_escaped=$(echo "$current_version" | sed "s/'/''/g")
+
+                        sqlite3 "$DB_FILE" << SQL
+INSERT INTO vulns (ip, port, report_file, vulnerability, severity, file_path, server_version, cve, scan_date, full_text)
+VALUES ('$ip_escaped', $current_port, '$report_file_escaped', '$vuln_text_escaped', '$severity', '', '$service_escaped $version_escaped', '$cve', '$file_mtime_readable', '$line_escaped');
+SQL
+                    done
                 fi
 
                 if [[ $line =~ ^([0-9]+)/tcp[[:space:]]+open ]]; then
@@ -229,30 +189,47 @@ while IFS= read -r report_file; do
     done < "$report_file"
 
     if [ "$in_vulners_section" -eq 1 ] && [ -n "$current_port" ] && [ ${#vuln_lines[@]} -gt 0 ]; then
-        flush_vuln_lines_to_batch
+        for vuln_line in "${vuln_lines[@]}"; do
+            vuln_text=$(echo "$vuln_line" | sed 's/^|[[:space:]]*//' | awk '{print $1}')
+            severity_score=$(echo "$vuln_line" | sed 's/^|[[:space:]]*//' | awk '{print $2}')
+
+            if [ -z "$vuln_text" ]; then
+                continue
+            fi
+
+            severity="LOW"
+            if [ -n "$severity_score" ]; then
+                score=$(echo "$severity_score" | cut -d'.' -f1 | grep -oE "^[0-9]+" | head -1)
+                if [ -n "$score" ] && [ "$score" -ge 9 ]; then
+                    severity="HIGH"
+                elif [ -n "$score" ] && [ "$score" -ge 7 ]; then
+                    severity="MEDIUM"
+                fi
+            fi
+
+            cve=""
+            if [[ $vuln_text =~ CVE-[0-9]{4}-[0-9]+ ]]; then
+                cve="$vuln_text"
+            fi
+
+            vuln_text_escaped=$(echo "$vuln_text" | sed "s/'/''/g")
+            line_escaped=$(echo "$vuln_line" | sed "s/'/''/g")
+            ip_escaped=$(echo "$ip" | sed "s/'/''/g")
+            service_escaped=$(echo "$current_service" | sed "s/'/''/g")
+            version_escaped=$(echo "$current_version" | sed "s/'/''/g")
+
+            sqlite3 "$DB_FILE" << SQL
+INSERT INTO vulns (ip, port, report_file, vulnerability, severity, file_path, server_version, cve, scan_date, full_text)
+VALUES ('$ip_escaped', $current_port, '$report_file_escaped', '$vuln_text_escaped', '$severity', '', '$service_escaped $version_escaped', '$cve', '$file_mtime_readable', '$line_escaped');
+SQL
+        done
     fi
 
     parsed_date=$(date '+%Y-%m-%d %H:%M:%S')
-    parsed_date_escaped=$(escape_sql "$parsed_date")
-
-    # Une transaction par fichier : DELETE + INSERTs + parsed_files
-    {
-        echo "BEGIN IMMEDIATE;"
-        echo "DELETE FROM vulns WHERE report_file = '$report_file_escaped';"
-        if [ -s "$insert_batch_file" ]; then
-            cat "$insert_batch_file"
-        fi
-        echo "INSERT OR REPLACE INTO parsed_files (report_file, file_mtime, parsed_date) VALUES ('$report_file_escaped', '$file_mtime', '$parsed_date_escaped');"
-        echo "COMMIT;"
-    } | sqlite3 "$DB_FILE" || {
-        echo "❌ Erreur SQLite pour: $report_file" >&2
-        rm -f "$insert_batch_file"
-        insert_batch_file=""
-        continue
-    }
-
-    rm -f "$insert_batch_file"
-    insert_batch_file=""
+    sqlite3 "$DB_FILE" << SQL
+INSERT OR REPLACE INTO parsed_files (report_file, file_mtime, parsed_date)
+VALUES ('$report_file_escaped', '$file_mtime', '$parsed_date');
+SQL
 
     parsed=$((parsed + 1))
 
