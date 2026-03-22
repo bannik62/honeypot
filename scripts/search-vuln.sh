@@ -1,5 +1,5 @@
 #!/bin/bash
-# Script de recherche dans les rapports Nikto (menu interactif + CLI)
+# Recherche dans la base vulnérabilités Nikto / SQLite (menu interactif + CLI)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 

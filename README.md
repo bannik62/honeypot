@@ -156,7 +156,7 @@ scan-web                   # Scan nmap → détecte les interfaces web (web_inte
 capture-web                # Screenshots des interfaces web + scan nikto
 vuln-scan                  # Scan vulnérabilités nmap (--script vuln)
 honeypot-dig               # DNS/WHOIS sur toutes les IPs
-honeypot-search-nikto      # Recherche interactive dans la base SQLite
+honeypot-search-vuln       # Recherche interactive dans la base SQLite (vuln / Nikto)
 honeypot-make-visualizer-data  # Agrège tout → data.json pour le dashboard
 ```
 
@@ -228,7 +228,7 @@ honeypot/
 │   ├── vuln-scan.sh                 # Scan vulnérabilités nmap
 │   ├── dig-ip.sh                    # DNS/WHOIS par IP
 │   ├── parse-nikto.sh               # Parse rapports nmap → SQLite
-│   ├── search-nikto.sh              # Recherche interactive SQLite
+│   ├── search-vuln.sh               # Recherche interactive SQLite (vuln / Nikto)
 │   ├── generate-data.sh             # Agrège tout → data.json (visualiseur)
 │   ├── traceroute-ip.sh             # Traceroute manuel (sudo, ponctuel)
 │   ├── run-all-scans.sh             # Orchestre tous les scans (cron)
@@ -414,7 +414,7 @@ Exécuté après chaque cycle de scans (`run-all-scans.sh`) ou manuellement (`./
 | `capture-web` | Screenshots + nikto |
 | `vuln-scan` | Scan vulnérabilités nmap |
 | `honeypot-dig` | DNS/WHOIS sur les IPs |
-| `honeypot-search-nikto` | Recherche dans les rapports Nikto (SQLite) |
+| `honeypot-search-vuln` | Recherche dans la base vulnérabilités (SQLite / Nikto) |
 | `setup-auto-scan` | Configure les scans automatiques (cron) |
 | `honeypot-make-visualizer-data` | Génère data.json pour le dashboard web |
 | `honeypot-start-server` | start / stop / status du serveur visualiseur |

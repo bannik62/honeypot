@@ -161,7 +161,7 @@ Base SQLite alimentée par `parse-nikto.sh`.
 
 - Le serveur visualiseur bind sur `127.0.0.1` uniquement
 - Accès via tunnel SSH exclusivement
-- Validation SQL dans `search-nikto.sh` (escape + whitelist)
+- Validation SQL dans `search-vuln.sh` (escape + whitelist)
 - Validation des IPs avec regex avant tout traitement
 - Aucun port supplémentaire ouvert sur le VPS
 

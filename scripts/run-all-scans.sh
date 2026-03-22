@@ -48,8 +48,8 @@ if bash "$SCRIPT_DIR/web-capture.sh" >> "$LOG_DIR/run-all-scans.log" 2>&1; then
     log "✅ capture-web terminé"
 sleep 30
 else
-    log "❌ Erreur dans capture-web"
-    exit 1
+    log "⚠️  Erreur dans capture-web (non bloquant — la suite des scans continue)"
+sleep 30
 fi
 
 # 3. dig-ip
