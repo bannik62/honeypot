@@ -171,6 +171,33 @@ tr:hover td{background:rgba(0,212,255,.03)}
 .ip-modal-body .ip-modal-figure{margin:0 0 1.2rem 0;break-inside:avoid}
 .ip-modal-body .ip-modal-figure:last-child{margin-bottom:0}
 .ip-modal-figure figcaption{margin-bottom:6px}
+/* Global loading overlay (étape 1 — réutilisable pour maintenance / API longues) */
+.loading-overlay{position:fixed;inset:0;z-index:400;display:none;align-items:center;justify-content:center;padding:24px}
+.loading-overlay.open{display:flex}
+.loading-overlay-backdrop{position:absolute;inset:0;background:rgba(5,10,15,.92);backdrop-filter:blur(4px)}
+.loading-overlay-box{
+  position:relative;z-index:1;min-width:min(420px,92vw);max-width:520px;
+  background:var(--s2);border:1px solid var(--b);border-radius:12px;padding:22px 24px;
+  box-shadow:0 0 40px rgba(0,212,255,.12),inset 0 1px 0 rgba(255,255,255,.04);
+}
+.loading-overlay-title{font-family:'Orbitron',monospace;font-size:.78rem;letter-spacing:2px;color:var(--a);margin-bottom:14px}
+#loading-overlay-msg{font-family:'Share Tech Mono',monospace;font-size:.8rem;color:var(--tx);margin-bottom:14px;line-height:1.45}
+.loading-overlay-bar-wrap{height:8px;background:var(--s);border-radius:6px;overflow:hidden;border:1px solid rgba(26,58,92,.6)}
+#loading-overlay-bar{height:100%;width:0%;border-radius:6px;background:linear-gradient(90deg,var(--a),var(--a3));transition:width .35s ease}
+#loading-overlay-bar.indeterminate{
+  width:35%!important;
+  animation:lo-indet 1.1s ease-in-out infinite;
+}
+@keyframes lo-indet{
+  0%{transform:translateX(-100%);margin-left:0}
+  100%{transform:translateX(280%);margin-left:0}
+}
+#loading-overlay-bar.determinate{transition:width .45s ease}
+#loading-overlay-err{
+  margin-top:14px;padding:12px 14px;background:rgba(255,62,108,.08);border:1px solid rgba(255,62,108,.35);
+  border-radius:8px;color:var(--tx);font-size:.74rem;line-height:1.5;white-space:pre-wrap;word-break:break-word
+}
+#loading-overlay-dismiss{margin-top:14px;width:100%}
 ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--b);border-radius:2px}
 </style>
 </head>
@@ -195,6 +222,7 @@ tr:hover td{background:rgba(0,212,255,.03)}
 <div id="dz">
   <span style="font-size:1.4rem">📂</span>
   <p id="dzt">Chargement…</p>
+  <button type="button" class="btn" id="btn-regenerate-data" title="Relance generate-data.sh sur le VPS (honeypot-make-visualizer-data)">↻ Régénérer data.json</button>
   <button class="btn" onclick="loadDemo()">⚡ Démo</button>
 </div>
 
@@ -320,6 +348,19 @@ tr:hover td{background:rgba(0,212,255,.03)}
   <div class="ip-modal-box">
     <div class="ip-modal-title"><span id="ip-modal-title">—</span><button type="button" class="ip-modal-close" title="Fermer">&times;</button></div>
     <div class="ip-modal-body" id="ip-modal-body"><span class="ip-modal-loading">Chargement…</span></div>
+  </div>
+</div>
+
+<div id="loading-overlay" class="loading-overlay" aria-hidden="true" aria-busy="false" role="alertdialog" aria-labelledby="loading-overlay-msg">
+  <div class="loading-overlay-backdrop" aria-hidden="true"></div>
+  <div class="loading-overlay-box">
+    <div class="loading-overlay-title">CHARGEMENT</div>
+    <p id="loading-overlay-msg">Chargement…</p>
+    <div class="loading-overlay-bar-wrap">
+      <div id="loading-overlay-bar" class="indeterminate"></div>
+    </div>
+    <p id="loading-overlay-err" hidden></p>
+    <button type="button" class="btn pri" id="loading-overlay-dismiss" hidden>Fermer</button>
   </div>
 </div>
 

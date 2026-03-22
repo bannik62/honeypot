@@ -57,10 +57,12 @@ Traceroute (hors cron) — manuel, avec sudo :
 │  server.py (127.0.0.1:8765)                         │
 │  ├── GET /                     → honeypot-dashboard.html │
 │  ├── GET /data/.../data.json   → données agrégées   │
+│  ├── POST /api/dashboard/regenerate → generate-data.sh │
 │  └── GET /data/screenshotAndLog/<ip>/<rapport>      │
 │                                                     │
 │  honeypot-dashboard.html                            │
 │  ├── js/main.js          (orchestration)            │
+│  ├── js/loading-overlay.js (overlay chargement/erreurs) │
 │  ├── js/map-tab.js       (carte monde D3)           │
 │  ├── js/network-tab.js   (graphe force D3)          │
 │  ├── js/stats-tab.js     (statistiques)             │
@@ -68,7 +70,7 @@ Traceroute (hors cron) — manuel, avec sudo :
 │  ├── js/tooltip.js       (tooltips)                 │
 │  ├── js/state.js         (état global)              │
 │  ├── js/constants.js     (CC, ISO2_TO_N3, VPS...)   │
-│  └── js/data-loader.js   (fetch data.json / CSV)    │
+│  └── js/data-loader.js   (fetch data.json / CSV / régénération) │
 └─────────────────────────────────────────────────────┘
 ```
 

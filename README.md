@@ -147,6 +147,8 @@ Le dashboard contient 4 onglets :
 - **Statistiques** — top pays, top ports, timeline des connexions
 - **IPs** — tableau complet avec filtres et modales de détail (nmap, DNS, screenshots)
 
+Depuis l’interface, le bouton **↻ Régénérer data.json** relance `generate-data.sh` sur le VPS via `POST /api/dashboard/regenerate` (barre de progression + message d’erreur si échec). Voir `visualizer/README.md` pour l’API et le module d’overlay.
+
 En vue **pays**, le tooltip agrège automatiquement le nombre total de vulnérabilités HIGH, la liste des ports observés et les rapports disponibles (nmap, DNS, traceroute, screenshots, nikto) pour le pays survolé. En vue **IP individuelle**, le tooltip affiche les données précises de cette IP (pays, vulnérabilités, ports, rapports).
 
 ### Scans & enrichissement
