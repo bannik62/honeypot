@@ -34,11 +34,21 @@ SCAN_DIR="$DATA_DIR/screenshotAndLog"
 CSV_FILE="$DATA_DIR/logs/connections.csv"
 VIZ_DIR="$DATA_DIR/visualizer-dashboard"
 OUTPUT="$VIZ_DIR/data.json"
+NIKTO_DB="$DATA_DIR/logs/nikto.db"
 
 echo "📂 DATA_DIR=$DATA_DIR"
 echo "📂 SCAN_DIR=$SCAN_DIR"
 
 mkdir -p "$VIZ_DIR"
+mkdir -p "$DATA_DIR/logs"
+
+# Rafraîchir nikto.db depuis *_nmap.txt (même règles CVSS que honeypot-search-vuln : HIGH = score ≥ 9)
+if command -v sqlite3 &>/dev/null && [ -f "$SCRIPT_DIR/parse-nikto.sh" ]; then
+    echo "🔄 parse-nikto.sh → $NIKTO_DB (vulners / vuln_high)..."
+    HONEYPOT_DATA_DIR="$DATA_DIR" bash "$SCRIPT_DIR/parse-nikto.sh" || echo "⚠️  parse-nikto.sh a retourné une erreur (data.json utilisera vuln_high=0 si DB vide)"
+else
+    echo "⚠️  sqlite3 ou parse-nikto.sh indisponible — vuln_high sera 0 (installez sqlite3 pour comptage HIGH fiable)"
+fi
 
 if [ ! -d "$SCAN_DIR" ]; then
     echo "[]" > "$OUTPUT"
@@ -217,11 +227,13 @@ for ip_dir in "$SCAN_DIR"/*/; do
         fi
     fi
 
-    # Compter les vulnérabilités HIGH dans le rapport nmap
+    # Vuln HIGH : compte depuis nikto.db (parse-nikto.sh : severity HIGH = CVSS entier ≥ 9)
     vuln_high=0
-    if [ "$has_nmap" = true ]; then
-        vuln_high=$(grep -c "VULNERABLE\|HIGH\|10\.[0-9]" "$ip_dir/${ip}_nmap.txt" 2>/dev/null | tr -d '\n' || echo 0)
+    if [ "$has_nmap" = true ] && command -v sqlite3 &>/dev/null && [ -f "$NIKTO_DB" ]; then
+        ip_sql=$(echo "$ip" | sed "s/'/''/g")
+        vuln_high=$(sqlite3 "$NIKTO_DB" "SELECT COUNT(*) FROM vulns WHERE ip='$ip_sql' AND severity='HIGH';" 2>/dev/null | tr -d '\r\n' || echo 0)
     fi
+    case "$vuln_high" in ''|*[!0-9]*) vuln_high=0 ;; esac
 
     # Ports ouverts depuis nmap
     ports=""
