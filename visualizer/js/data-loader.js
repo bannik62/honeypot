@@ -83,7 +83,7 @@ export async function runRegenerateAndReload(loadJSON) {
       return;
     }
 
-    loadingOverlay.setMessage('generate-data.sh — sortie en direct :');
+    loadingOverlay.setMessage('traceroute-ip.sh → generate-data.sh — sortie :');
 
     const reader = r.body.getReader();
     const dec = new TextDecoder();
@@ -107,7 +107,7 @@ export async function runRegenerateAndReload(loadJSON) {
       const logTail = fullText.length > 12000 ? fullText.slice(-12000) : fullText;
       loadingOverlay.showError(
         exitCode === 124
-          ? `Timeout après 50 minutes (limite serveur).\n\n--- sortie ---\n${logTail}`
+          ? `Timeout après 90 minutes (traceroute + generate).\n\n--- sortie ---\n${logTail}`
           : `Code ${exitCode}.\n\n--- sortie ---\n${logTail}`,
       );
       return;

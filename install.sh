@@ -302,6 +302,7 @@ else
         echo "✅ Cron supprimé (mise à jour automatique désactivée)"
     fi
 fi
+
 read -p "🚀 Voulez-vous démarrer le monitoring maintenant ? (o/N) : " -n 1 -r
 echo ""
 if [[ $REPLY =~ ^[Oo]$ ]]; then

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 routes/dashboard.py
-Rôle: maintenance dashboard — régénération de data.json via generate-data.sh (VPS).
+Rôle: maintenance dashboard — pipeline traceroute puis generate-data (VPS).
 """
 
 import json
@@ -11,8 +11,8 @@ import subprocess
 from config import ROOT
 
 _EXIT_MARKER = "__HONEYPOT_EXIT__"
-# Parse data.json : peut dépasser 10 min (beaucoup d’IPs, geoip, hops…)
-REGENERATE_TIMEOUT_SEC = 50 * 60
+# traceroute-ip + generate-data (beaucoup d’IPs)
+REGENERATE_TIMEOUT_SEC = 90 * 60
 
 
 def _send_json(handler, payload, status=200):
@@ -27,10 +27,10 @@ def _send_json(handler, payload, status=200):
 def serve_dashboard_regenerate(handler):
     """
     POST /api/dashboard/regenerate
-    Lance scripts/generate-data.sh depuis ROOT (même logique que honeypot-make-visualizer-data).
+    Lance scripts/dashboard-regenerate.sh (traceroute-ip puis generate-data).
     Réponse: { ok, returncode?, error?, stdout_tail?, stderr_tail? }
     """
-    script = ROOT / "scripts" / "generate-data.sh"
+    script = ROOT / "scripts" / "dashboard-regenerate.sh"
     if not script.is_file():
         _send_json(
             handler,
@@ -45,7 +45,7 @@ def serve_dashboard_regenerate(handler):
             cwd=str(ROOT),
             capture_output=True,
             text=True,
-            timeout=600,
+            timeout=REGENERATE_TIMEOUT_SEC,
         )
         ok = proc.returncode == 0
         out = (proc.stdout or "")[-12000:]
@@ -74,15 +74,14 @@ def serve_dashboard_regenerate(handler):
 def serve_dashboard_regenerate_stream(handler):
     """
     POST /api/dashboard/regenerate-stream
-    Lance generate-data.sh et envoie stdout+stderr en texte brut (flux type terminal),
-    puis une ligne finale __HONEYPOT_EXIT__ <code>.
+    Lance dashboard-regenerate.sh (traceroute puis generate), flux, puis __HONEYPOT_EXIT__ <code>.
     """
-    script = ROOT / "scripts" / "generate-data.sh"
+    script = ROOT / "scripts" / "dashboard-regenerate.sh"
     if not script.is_file():
         handler.send_response(500)
         handler.send_header("Content-Type", "text/plain; charset=utf-8")
         handler.end_headers()
-        handler.wfile.write(b"Script generate-data.sh introuvable.\n")
+        handler.wfile.write(b"Script dashboard-regenerate.sh introuvable.\n")
         return
 
     handler.send_response(200)

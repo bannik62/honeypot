@@ -84,7 +84,7 @@ export const loadingOverlay = {
     if (titleEl) titleEl.textContent = opts.title || 'GÉNÉRATION';
 
     const msgEl = document.getElementById('loading-overlay-msg');
-    if (msgEl) msgEl.textContent = opts.message || 'Exécution de generate-data.sh sur le serveur…';
+    if (msgEl) msgEl.textContent = opts.message || 'Traceroute puis génération data.json…';
   },
 
   appendLogChunk(text) {

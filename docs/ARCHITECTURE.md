@@ -57,7 +57,7 @@ Traceroute (hors cron) — manuel, avec sudo :
 │  server.py (127.0.0.1:8765)                         │
 │  ├── GET /                     → honeypot-dashboard.html │
 │  ├── GET /data/.../data.json   → données agrégées   │
-│  ├── POST /api/dashboard/regenerate → generate-data.sh │
+│  ├── POST …/regenerate-stream → dashboard-regenerate.sh (traceroute puis generate) │
 │  └── GET /data/screenshotAndLog/<ip>/<rapport>      │
 │                                                     │
 │  honeypot-dashboard.html                            │
