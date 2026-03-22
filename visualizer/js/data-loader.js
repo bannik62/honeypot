@@ -1,5 +1,7 @@
 import { loadingOverlay } from './loading-overlay.js';
 
+const EXIT_MARKER = '__HONEYPOT_EXIT__';
+
 function formatLoadError(err) {
   const status = err && err.status;
   const msg = err && err.message ? String(err.message) : '';
@@ -55,34 +57,62 @@ export function loadInitialData(loadJSON) {
 }
 
 /**
- * Maintenance (étape 3) : appelle POST /api/dashboard/regenerate (generate-data.sh sur le VPS),
- * puis recharge data.json dans le dashboard avec barre de progression / erreurs serveur.
+ * Stream generate-data.sh (POST /api/dashboard/regenerate-stream) → log scroll, puis reload data.json.
  */
 export async function runRegenerateAndReload(loadJSON) {
-  loadingOverlay.show({
-    message: 'Régénération de data.json sur le serveur…',
-    indeterminate: true,
+  loadingOverlay.showTerminal({
+    message: 'Connexion au serveur…',
   });
+
+  let fullText = '';
+
   try {
-    const r = await fetch('/api/dashboard/regenerate', {
+    const r = await fetch('/api/dashboard/regenerate-stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: '{}',
     });
-    let j;
-    try {
-      j = await r.json();
-    } catch {
-      loadingOverlay.showError(`Réponse invalide du serveur (HTTP ${r.status}).`);
+
+    if (!r.ok) {
+      loadingOverlay.showError(`Erreur HTTP ${r.status} sur regenerate-stream.`);
       return;
     }
-    if (!j.ok) {
-      const detail = [j.error, j.stderr_tail].filter(Boolean).join('\n').trim();
+
+    if (!r.body) {
+      loadingOverlay.showError('Réponse sans corps (stream indisponible).');
+      return;
+    }
+
+    loadingOverlay.setMessage('generate-data.sh — sortie en direct :');
+
+    const reader = r.body.getReader();
+    const dec = new TextDecoder();
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = dec.decode(value, { stream: true });
+      fullText += chunk;
+      loadingOverlay.appendLogChunk(chunk);
+    }
+    const flush = dec.decode();
+    if (flush) {
+      fullText += flush;
+      loadingOverlay.appendLogChunk(flush);
+    }
+
+    const exitMatch = fullText.match(new RegExp(`${EXIT_MARKER}\\s+(\\d+)\\s*$`, 'm'));
+    const exitCode = exitMatch ? parseInt(exitMatch[1], 10) : -1;
+
+    if (exitCode !== 0) {
+      const logTail = fullText.length > 12000 ? fullText.slice(-12000) : fullText;
       loadingOverlay.showError(
-        detail || `Échec de la génération (HTTP ${r.status}, code ${j.returncode ?? '?'})`,
+        exitCode === 124
+          ? `Timeout après 50 minutes (limite serveur).\n\n--- sortie ---\n${logTail}`
+          : `Code ${exitCode}.\n\n--- sortie ---\n${logTail}`,
       );
       return;
     }
+
     loadingOverlay.setMessage('Chargement des nouvelles données…');
     const fr = await fetch('/data/visualizer-dashboard/data.json', { cache: 'no-store' });
     if (!fr.ok) {
@@ -90,9 +120,6 @@ export async function runRegenerateAndReload(loadJSON) {
       return;
     }
     const data = await fr.json();
-    loadingOverlay.setProgress(100);
-    loadingOverlay.setMessage('Terminé');
-    await new Promise((res) => setTimeout(res, 220));
     loadingOverlay.hide();
     loadJSON(data);
     const status = document.getElementById('dzt');

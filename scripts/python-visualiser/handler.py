@@ -7,7 +7,7 @@ Rôle: centraliser le dispatch HTTP (do_GET/do_POST) vers les modules routes/*.
 from http.server import SimpleHTTPRequestHandler
 
 from config import DATA_JSON_URL, IP_PREFIX, VISUALIZER_DIR
-from routes.dashboard import serve_dashboard_regenerate
+from routes.dashboard import serve_dashboard_regenerate, serve_dashboard_regenerate_stream
 from routes.ip import serve_ip_resource
 from routes.static import serve_data_json, serve_debug
 from routes.vulners import serve_vulners_events, serve_vulners_lookup, serve_vulners_status
@@ -52,6 +52,9 @@ class VisualizerHandler(SimpleHTTPRequestHandler):
             return
         if path == "/api/dashboard/regenerate":
             serve_dashboard_regenerate(self)
+            return
+        if path == "/api/dashboard/regenerate-stream":
+            serve_dashboard_regenerate_stream(self)
             return
         self.send_error(404)
 

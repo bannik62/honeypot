@@ -180,6 +180,14 @@ tr:hover td{background:rgba(0,212,255,.03)}
   background:var(--s2);border:1px solid var(--b);border-radius:12px;padding:22px 24px;
   box-shadow:0 0 40px rgba(0,212,255,.12),inset 0 1px 0 rgba(255,255,255,.04);
 }
+.loading-overlay-box.has-terminal{max-width:min(920px,96vw);width:min(920px,96vw)}
+#loading-overlay-log{
+  margin:0 0 14px;padding:12px 14px;max-height:min(50vh,420px);overflow:auto;
+  background:rgba(0,0,0,.45);border:1px solid rgba(26,58,92,.8);border-radius:8px;
+  font-family:'Share Tech Mono',monospace;font-size:.65rem;line-height:1.4;color:var(--a3);
+  white-space:pre-wrap;word-break:break-all;text-align:left
+}
+#loading-overlay-log[hidden]{display:none!important}
 .loading-overlay-title{font-family:'Orbitron',monospace;font-size:.78rem;letter-spacing:2px;color:var(--a);margin-bottom:14px}
 #loading-overlay-msg{font-family:'Share Tech Mono',monospace;font-size:.8rem;color:var(--tx);margin-bottom:14px;line-height:1.45}
 .loading-overlay-bar-wrap{height:8px;background:var(--s);border-radius:6px;overflow:hidden;border:1px solid rgba(26,58,92,.6)}
@@ -356,6 +364,7 @@ tr:hover td{background:rgba(0,212,255,.03)}
   <div class="loading-overlay-box">
     <div class="loading-overlay-title">CHARGEMENT</div>
     <p id="loading-overlay-msg">Chargement…</p>
+    <pre id="loading-overlay-log" hidden></pre>
     <div class="loading-overlay-bar-wrap">
       <div id="loading-overlay-bar" class="indeterminate"></div>
     </div>

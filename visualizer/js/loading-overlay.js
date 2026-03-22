@@ -1,10 +1,13 @@
 /**
- * Overlay plein écran réutilisable : chargement (indéterminé ou 0–100 %), message, erreur serveur.
- * Utilisation : import { loadingOverlay } from './loading-overlay.js';
+ * Overlay plein écran : chargement (barre indéterminée / %), zone log type terminal, erreurs.
  */
 
 function root() {
   return document.getElementById('loading-overlay');
+}
+
+function overlayBox() {
+  return document.querySelector('.loading-overlay-box');
 }
 
 function hideErrorUi() {
@@ -20,15 +23,31 @@ function hideErrorUi() {
   if (barWrap) barWrap.style.display = '';
 }
 
+function setTerminalMode(on) {
+  const box = overlayBox();
+  const logEl = document.getElementById('loading-overlay-log');
+  const barWrap = root() && root().querySelector('.loading-overlay-bar-wrap');
+  if (box) box.classList.toggle('has-terminal', !!on);
+  if (logEl) {
+    if (on) {
+      logEl.hidden = false;
+    } else {
+      logEl.hidden = true;
+      logEl.textContent = '';
+    }
+  }
+  if (barWrap) barWrap.style.display = on ? 'none' : '';
+}
+
 export const loadingOverlay = {
   /**
    * @param {{ message?: string, indeterminate?: boolean, progress?: number }} opts
-   *   - indeterminate: true (défaut) barre animée ; false + progress: nombre 0–100
    */
   show(opts = {}) {
     const el = root();
     if (!el) return;
     hideErrorUi();
+    setTerminalMode(false);
     el.classList.add('open');
     el.setAttribute('aria-hidden', 'false');
     el.setAttribute('aria-busy', 'true');
@@ -51,6 +70,30 @@ export const loadingOverlay = {
     }
   },
 
+  /** Mode terminal : masque la barre, affiche le scroll de log (régénération data.json). */
+  showTerminal(opts = {}) {
+    const el = root();
+    if (!el) return;
+    hideErrorUi();
+    setTerminalMode(true);
+    el.classList.add('open');
+    el.setAttribute('aria-hidden', 'false');
+    el.setAttribute('aria-busy', 'true');
+
+    const titleEl = document.querySelector('.loading-overlay-title');
+    if (titleEl) titleEl.textContent = opts.title || 'GÉNÉRATION';
+
+    const msgEl = document.getElementById('loading-overlay-msg');
+    if (msgEl) msgEl.textContent = opts.message || 'Exécution de generate-data.sh sur le serveur…';
+  },
+
+  appendLogChunk(text) {
+    const logEl = document.getElementById('loading-overlay-log');
+    if (!logEl || logEl.hidden) return;
+    logEl.textContent += text;
+    logEl.scrollTop = logEl.scrollHeight;
+  },
+
   setProgress(p) {
     const bar = document.getElementById('loading-overlay-bar');
     if (!bar) return;
@@ -71,6 +114,10 @@ export const loadingOverlay = {
     el.setAttribute('aria-hidden', 'true');
     el.setAttribute('aria-busy', 'false');
     hideErrorUi();
+    setTerminalMode(false);
+
+    const titleEl = document.querySelector('.loading-overlay-title');
+    if (titleEl) titleEl.textContent = 'CHARGEMENT';
 
     const bar = document.getElementById('loading-overlay-bar');
     if (bar) {
@@ -80,10 +127,12 @@ export const loadingOverlay = {
     }
   },
 
-  /** Affiche un message d’erreur lisible + bouton Fermer (overlay reste visible). */
   showError(message) {
     const el = root();
     if (!el) return;
+    setTerminalMode(false);
+    const titleEl = document.querySelector('.loading-overlay-title');
+    if (titleEl) titleEl.textContent = 'ERREUR';
     el.classList.add('open');
     el.setAttribute('aria-hidden', 'false');
     el.setAttribute('aria-busy', 'false');
