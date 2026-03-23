@@ -57,15 +57,16 @@ def _build_filter_expr(port: int, layer: str, filt: str) -> str:
     """Expression tcpdump (sans shell)."""
     p = str(port)
     if layer == "L3":
-        base_bc = "not broadcast and not multicast"
+        # Pas de « not broadcast / not multicast » : avec -i any (LINUX_SLL2),
+        # tcpdump renvoie « not a broadcast link » et quitte en erreur (code 1).
         if filt == "all":
-            return f"(tcp or udp or icmp) and {base_bc} and port {p}"
+            return f"(tcp or udp or icmp) and port {p}"
         if filt == "tcp":
-            return f"tcp and {base_bc} and port {p}"
+            return f"tcp and port {p}"
         if filt == "udp":
-            return f"udp and {base_bc} and port {p}"
+            return f"udp and port {p}"
         if filt == "icmp":
-            return f"icmp and {base_bc} and port {p}"
+            return f"icmp and port {p}"
     if layer == "L4":
         flags = (
             "(tcp[tcpflags] & tcp-syn != 0) or (tcp[tcpflags] & tcp-fin != 0) or "
