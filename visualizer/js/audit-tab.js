@@ -51,15 +51,29 @@ function renderPorts(ports) {
 function renderUfw(ufw) {
   const el = document.getElementById('audit-ufw-status');
   if (!el) return;
+  const raw = ufw?.raw ? String(ufw.raw) : '';
+  const rawSnippet = raw ? raw.split('\n').slice(0, 8).join('\n') : '';
+  const rawHtml = rawSnippet
+    ? escapeHtml(rawSnippet).replace(/\n/g, '<br>')
+    : '';
+
   if (!ufw || ufw.active == null) {
-    el.innerHTML = 'UFW : inconnu';
+    el.innerHTML = `
+      UFW : inconnu
+      ${rawHtml ? `<div style="margin-top:6px;opacity:.85;font-size:.64rem;color:var(--mu)">Debug ufw :<br><code style="white-space:normal;word-break:break-word">${rawHtml}</code></div>` : ''}
+    `;
     return;
   }
   const active = ufw.active ? 'actif' : 'inactif';
+  const policyUnknown = ufw.policy_in == null;
+  const debugBlock = (policyUnknown && rawHtml)
+    ? `<div style="margin-top:6px;opacity:.85;font-size:.64rem;color:var(--mu)">Debug parse UFW (extrait) :<br><code style="white-space:normal;word-break:break-word">${rawHtml}</code></div>`
+    : '';
   el.innerHTML = `
     <div><strong>UFW</strong> : ${escapeHtml(active)}</div>
     <div style="margin-top:4px;opacity:.95">Policy défaut (incoming) : <strong>${escapeHtml(ufw.policy_in || '—')}</strong></div>
     <div style="margin-top:4px;opacity:.95">Règles (best-effort parse) : <strong>${escapeHtml(ufw.rules_count ?? 0)}</strong></div>
+    ${debugBlock}
   `;
 }
 

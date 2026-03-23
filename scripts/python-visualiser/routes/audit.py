@@ -34,6 +34,21 @@ _IPV4_RE = re.compile(r"(?:\d{1,3}\.){3}\d{1,3}")
 _CONTAINER_ID_RE = re.compile(r"(?:docker[-/]|/docker/)([0-9a-f]{12,64})", re.IGNORECASE)
 
 
+def _find_ufw_bin() -> str | None:
+    """Trouve le binaire `ufw` même si le PATH du process ne le contient pas."""
+    candidates = [
+        shutil.which("ufw"),
+        "/usr/sbin/ufw",
+        "/usr/bin/ufw",
+        "/sbin/ufw",
+        "/bin/ufw",
+    ]
+    for p in candidates:
+        if p and os.path.exists(p):
+            return p
+    return None
+
+
 def _send_json(handler, payload: dict[str, Any], status: int = 200) -> None:
     body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     handler.send_response(status)
@@ -225,11 +240,12 @@ def _parse_ufw_status(text: str) -> dict[str, Any]:
 
 
 def _get_ufw_status() -> dict[str, Any]:
-    if not shutil.which("ufw"):
+    ufw_bin = _find_ufw_bin()
+    if not ufw_bin:
         return {"supported": False, "active": None, "policy_in": None, "rules_count": 0}
     try:
         # Tentative sans sudo (si le process a déjà les droits).
-        proc = _run(["ufw", "status", "verbose"], timeout_s=20)
+        proc = _run([ufw_bin, "status", "verbose"], timeout_s=20)
         text = (proc.stdout or "") + (proc.stderr or "")
 
         # Si ufw demande explicitement d'être root, on réessaie en non-interactif.
@@ -240,7 +256,7 @@ def _get_ufw_status() -> dict[str, Any]:
             # 2) si sudo -n échoue (password/tty requis), on tente sudo sans -n : parfois
             #    un "timestamp" sudo permet de passer sans prompt (donc ça peut réussir).
             try:
-                sproc = _run(["sudo", "-n", "ufw", "status", "verbose"], timeout_s=20)
+                sproc = _run(["sudo", "-n", ufw_bin, "status", "verbose"], timeout_s=20)
                 text = (sproc.stdout or "") + (sproc.stderr or "")
                 stext_lower = text.lower()
                 sudo_failed_hint = (
@@ -252,14 +268,14 @@ def _get_ufw_status() -> dict[str, Any]:
                 )
                 if sudo_failed_hint:
                     try:
-                        sproc2 = _run(["sudo", "ufw", "status", "verbose"], timeout_s=20)
+                        sproc2 = _run(["sudo", ufw_bin, "status", "verbose"], timeout_s=20)
                         text = (sproc2.stdout or "") + (sproc2.stderr or "")
                     except Exception:
                         pass
             except Exception:
                 # fallback : parfois -n peut échouer selon config
                 try:
-                    sproc2 = _run(["sudo", "ufw", "status", "verbose"], timeout_s=20)
+                    sproc2 = _run(["sudo", ufw_bin, "status", "verbose"], timeout_s=20)
                     text = (sproc2.stdout or "") + (sproc2.stderr or "")
                 except Exception:
                     pass
@@ -324,13 +340,14 @@ def serve_audit(handler) -> None:
         {
             "ok": True,
             "snapshot_ts": snapshot_ts,
-            # En phase 1 on préfère considérer UFW "détecté" si le binaire existe,
-            # même si le parsing politique détaillé échoue. On classifie alors en "Inconnu".
-            "ufw_supported": bool(shutil.which("ufw")),
+            # En phase 1 on préfère considérer UFW "détecté" dès qu'on a une sortie
+            # exploitable (et pas juste selon le PATH du process).
+            "ufw_supported": bool(ufw.get("supported")),
             "ufw": {
                 "active": ufw.get("active"),
                 "policy_in": policy_in,
                 "rules_count": ufw.get("rules_count"),
+                "raw": ufw.get("raw"),
             },
             "ports_open": ports_open,
             "cross_open_ports": cross,
