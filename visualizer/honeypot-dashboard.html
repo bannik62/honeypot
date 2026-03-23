@@ -74,6 +74,16 @@ header{
 #panel-sonde .btn.sonde-muted:hover{border-color:var(--b);color:var(--mu)}
 #panel-sonde .btn.pri:not(:disabled){opacity:1;cursor:pointer}
 #panel-sonde .btn.pri:not(:disabled):hover{border-color:var(--a3);color:var(--a3)}
+/* Audit réseau */
+#panel-audit .audit-muted{opacity:.45;filter:grayscale(.2);pointer-events:none}
+#panel-audit .audit-badge{
+  display:inline-block;padding:2px 10px;border-radius:999px;border:1px solid var(--b);
+  font-family:'Orbitron',monospace;font-size:.66rem;letter-spacing:.5px;white-space:nowrap
+}
+#panel-audit .audit-badge.protected{border-color:rgba(57,255,20,.35);color:var(--a3)}
+#panel-audit .audit-badge.open{border-color:rgba(255,170,0,.35);color:var(--w)}
+#panel-audit .audit-badge.dead{border-color:rgba(255,62,108,.35);color:var(--a2)}
+#panel-audit .audit-badge.unknown{border-color:rgba(200,230,255,.25);color:var(--tx)}
 /* TABS */
 .tabs{display:flex;border-bottom:1px solid var(--b);overflow-x:auto;scrollbar-width:none}
 .tabs::-webkit-scrollbar{display:none}
@@ -250,6 +260,7 @@ tr:hover td{background:rgba(0,212,255,.03)}
   <button class="tab" data-tab="stats">📊 STATS</button>
   <button class="tab" data-tab="ips">🔎 IPs</button>
   <button class="tab" data-tab="sonde">📡 SONDE</button>
+  <button class="tab" data-tab="audit">🛡️ AUDIT</button>
 </nav>
 
 <div id="panel-map" class="panel active">
@@ -351,6 +362,69 @@ tr:hover td{background:rgba(0,212,255,.03)}
     <div id="ip-meta">IPs affichées: —</div>
     <table><thead><tr><th>IP</th><th>PAYS</th><th>PORTS</th><th>RAPPORTS</th><th>VULNS</th></tr></thead>
     <tbody id="ip-tbody"></tbody></table>
+  </div>
+</div>
+
+<div id="panel-audit" class="panel">
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+    <div>
+      <div style="font-family:'Orbitron',monospace;color:var(--a);letter-spacing:1px;font-size:.82rem">AUDIT RÉSEAU — Ports ouverts / UFW</div>
+      <div style="font-size:.68rem;color:var(--mu);margin-top:4px">Cliquez sur « Rafraîchir » pour un snapshot. Pas d’actions en phase 1.</div>
+    </div>
+    <button type="button" class="btn pri" id="audit-refresh">↻ Rafraîchir</button>
+  </div>
+
+  <div id="audit-fw-compat" style="display:none;padding:12px 14px;background:rgba(255,62,108,.08);border:1px solid rgba(255,62,108,.35);border-radius:8px;color:var(--tx);margin-bottom:12px;line-height:1.4"></div>
+
+  <div id="audit-sections">
+    <div style="margin-bottom:14px">
+      <div style="font-family:'Orbitron',monospace;color:var(--mu);letter-spacing:1px;font-size:.74rem;margin-bottom:8px">1) Ports ouverts</div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr>
+            <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--b);font-size:.66rem">Port</th>
+            <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--b);font-size:.66rem">Proto</th>
+            <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--b);font-size:.66rem">État</th>
+            <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--b);font-size:.66rem">Process / Container</th>
+            <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--b);font-size:.66rem">Origine</th>
+          </tr>
+        </thead>
+        <tbody id="audit-ports-tbody"></tbody>
+      </table>
+    </div>
+
+    <div style="margin-bottom:14px">
+      <div style="font-family:'Orbitron',monospace;color:var(--mu);letter-spacing:1px;font-size:.74rem;margin-bottom:8px">2) Statut UFW</div>
+      <div id="audit-ufw-status" style="padding:12px 14px;background:rgba(0,0,0,.35);border:1px solid rgba(26,58,92,.8);border-radius:8px;color:var(--tx);line-height:1.5;font-size:.72rem"></div>
+    </div>
+
+    <div style="margin-bottom:14px">
+      <div style="font-family:'Orbitron',monospace;color:var(--mu);letter-spacing:1px;font-size:.74rem;margin-bottom:8px">3) Croisement Ports / UFW</div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr>
+            <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--b);font-size:.66rem">Port</th>
+            <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--b);font-size:.66rem">Proto</th>
+            <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--b);font-size:.66rem">Statut</th>
+          </tr>
+        </thead>
+        <tbody id="audit-cross-tbody"></tbody>
+      </table>
+    </div>
+
+    <div>
+      <div style="font-family:'Orbitron',monospace;color:var(--mu);letter-spacing:1px;font-size:.74rem;margin-bottom:8px">4) Règles DENY mortes (snapshot)</div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr>
+            <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--b);font-size:.66rem">Port</th>
+            <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--b);font-size:.66rem">Proto</th>
+            <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--b);font-size:.66rem">Badge</th>
+          </tr>
+        </thead>
+        <tbody id="audit-deaddeny-tbody"></tbody>
+      </table>
+    </div>
   </div>
 </div>
 

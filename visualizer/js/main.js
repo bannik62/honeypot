@@ -5,6 +5,7 @@ import { renderGraph, resetSim } from './network-tab.js';
 import { renderStats } from './stats-tab.js';
 import { renderIPTable } from './ips-tab.js';
 import { initSonde } from './sonde-tab.js';
+import { initAudit } from './audit-tab.js';
 
 function updateHeader() {
   const D = state.D;
@@ -337,4 +338,5 @@ fetch('/api/vulners/status')
 
 initMap();
 initSonde();
+initAudit();
 loadInitialData(loadJSON);

@@ -49,3 +49,21 @@ Le bouton **Régénérer** appelle `dashboard-regenerate.sh`, qui lance **`sudo 
 Couches : `L3` (tcp/udp/icmp + port), `L4` (fanions `syn` / `fin` / `rst` séparément ou `synfinrst`), `L7` (`-A` + `greater`). Filtres : whitelist dans `routes/sonde.py`.
 
 Le serveur utilise **`ThreadingHTTPServer`** pour ne pas bloquer les autres requêtes pendant un flux SSE.
+
+## API — Audit Réseau (phase 1, read-only)
+
+### `GET /api/audit` (utilisé par l’onglet « AUDIT »)
+
+- Snapshot à l’instant T : ports en écoute via `ss` + statut UFW via `ufw status verbose` (si disponible).
+- Retour JSON avec :
+  - `ports_open` : liste des ports ouverts
+  - `cross_open_ports` : classification de phase 1
+  - `dead_deny_rules` : règles DENY explicites sans service observé (snapshot)
+
+Classification (phase 1) :
+- DENY explicite sur le port => ✅ Protégé
+- Policy défaut DENY, pas de règle explicite => ✅ Protégé
+- Pas de règle ET policy ALLOW => ⚠️ À l’air libre
+- DENY explicite sur port sans service observé => 🟡 Règle morte (snapshot)
+
+Si UFW n’est pas supporté / indisponible : l’onglet n’effectue pas le croisement et affiche un message de compatibilité.

@@ -10,6 +10,7 @@ from config import DATA_JSON_URL, IP_PREFIX, VISUALIZER_DIR
 from routes.dashboard import serve_dashboard_regenerate, serve_dashboard_regenerate_stream
 from routes.ip import serve_ip_resource
 from routes.sonde import serve_sonde_stop, serve_sonde_stream
+from routes.audit import serve_audit
 from routes.static import serve_data_json, serve_debug
 from routes.vulners import serve_vulners_events, serve_vulners_lookup, serve_vulners_status
 
@@ -28,6 +29,9 @@ class VisualizerHandler(SimpleHTTPRequestHandler):
             return
         if path == "/api/sonde/stream":
             serve_sonde_stream(self)
+            return
+        if path == "/api/audit":
+            serve_audit(self)
             return
         if path == "/":
             self.path = "/honeypot-dashboard.html"
