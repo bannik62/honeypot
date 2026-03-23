@@ -207,9 +207,11 @@ def _parse_ufw_status(text: str) -> dict[str, Any]:
     # Compte règles : on garde un nombre best-effort.
     rules_count = len(ufw_rules)
 
-    # On peut considérer UFW "supporté" au minimum si on a une policy par défaut
-    # ou si on a pu extraire des règles DENY explicites (pour classer certains ports).
-    supported = (policy_in is not None) or (len(denied_ports) > 0)
+    # On considère UFW "supporté" dès qu'on a une sortie exploitable.
+    # Même si le parsing exact (active/policy) échoue sur certains providers/formats,
+    # ça permet d'afficher les tableaux et de garder des statuts "Inconnu" plutôt que
+    # de griser/couper l'audit.
+    supported = bool(out.strip())
 
     return {
         "supported": supported,
