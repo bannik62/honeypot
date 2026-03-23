@@ -235,14 +235,34 @@ def _get_ufw_status() -> dict[str, Any]:
         # Si ufw demande explicitement d'être root, on réessaie en non-interactif.
         # (évite de bloquer si sudo demande un mot de passe)
         need_root = ("need to be root" in text.lower()) or ("need to be a root" in text.lower())
-        sudo_failed = False
         if proc.returncode != 0 and need_root and shutil.which("sudo"):
+            # 1) sudo -n (NOPASSWD requis) : si ça marche, on récupère directement.
+            # 2) si sudo -n échoue (password/tty requis), on tente sudo sans -n : parfois
+            #    un "timestamp" sudo permet de passer sans prompt (donc ça peut réussir).
             try:
-                sudo_failed = False
                 sproc = _run(["sudo", "-n", "ufw", "status", "verbose"], timeout_s=20)
                 text = (sproc.stdout or "") + (sproc.stderr or "")
+                stext_lower = text.lower()
+                sudo_failed_hint = (
+                    "password is required" in stext_lower
+                    or "a password is required" in stext_lower
+                    or "a terminal is required" in stext_lower
+                    or "no tty present" in stext_lower
+                    or "cannot open terminal" in stext_lower
+                )
+                if sudo_failed_hint:
+                    try:
+                        sproc2 = _run(["sudo", "ufw", "status", "verbose"], timeout_s=20)
+                        text = (sproc2.stdout or "") + (sproc2.stderr or "")
+                    except Exception:
+                        pass
             except Exception:
-                sudo_failed = True
+                # fallback : parfois -n peut échouer selon config
+                try:
+                    sproc2 = _run(["sudo", "ufw", "status", "verbose"], timeout_s=20)
+                    text = (sproc2.stdout or "") + (sproc2.stderr or "")
+                except Exception:
+                    pass
 
         ufw = _parse_ufw_status(text)
 
