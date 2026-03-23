@@ -230,9 +230,14 @@ def _get_ufw_status() -> dict[str, Any]:
     try:
         proc = _run(["ufw", "status", "verbose"], timeout_s=20)
         text = (proc.stdout or "") + (proc.stderr or "")
-        return _parse_ufw_status(text)
+        ufw = _parse_ufw_status(text)
+        # Phase 1 : si ufw existe, on ne veut pas forcément bloquer l'audit croisé.
+        # On garde les champs policy_in/active/rules_count comme "inconnu" si le parsing échoue,
+        # mais on considère ufw "détecté" côté UI.
+        ufw["supported"] = True
+        return ufw
     except Exception:
-        return {"supported": False, "active": None, "policy_in": None, "rules_count": 0}
+        return {"supported": True, "active": None, "policy_in": None, "rules_count": 0}
 
 
 def _classify_port(
