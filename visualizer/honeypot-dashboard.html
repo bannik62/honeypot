@@ -69,6 +69,11 @@ header{
 .btn:hover{border-color:var(--a3);color:var(--a3)}
 .btn.pri{border-color:var(--a);color:var(--a)}
 .btn.pri:hover{border-color:var(--a3);color:var(--a3)}
+/* Sonde — toggle Démarrer / Arrêter : actif = pri (cyan), inactif = grisé */
+#panel-sonde .btn.sonde-muted{border-color:var(--b);color:var(--mu);opacity:.5;cursor:not-allowed}
+#panel-sonde .btn.sonde-muted:hover{border-color:var(--b);color:var(--mu)}
+#panel-sonde .btn.pri:not(:disabled){opacity:1;cursor:pointer}
+#panel-sonde .btn.pri:not(:disabled):hover{border-color:var(--a3);color:var(--a3)}
 /* TABS */
 .tabs{display:flex;border-bottom:1px solid var(--b);overflow-x:auto;scrollbar-width:none}
 .tabs::-webkit-scrollbar{display:none}
@@ -354,6 +359,7 @@ tr:hover td{background:rgba(0,212,255,.03)}
     Écoute réseau via <strong>sudo tcpdump</strong> (ligne à ligne). Nécessite <strong>tcpdump</strong> et un utilisateur pouvant lancer <strong>sudo</strong> sans TTY (ex. groupe sudo).
     Un seul flux à la fois — un nouveau démarrage arrête l’écoute précédente.
     <strong>L7</strong> affiche le payload en ASCII : trafic chargé = beaucoup de texte — l’affichage est <strong>limité</strong> (lignes + longueur) pour ne pas faire planter le navigateur.
+    <strong>Sens</strong> : filtre côté tcpdump — <strong>Entrant</strong> ≈ paquets <code>dst port</code> (lignes <strong>In</strong>), <strong>Sortant</strong> ≈ <code>src port</code> (<strong>Out</strong>).
   </p>
   <div class="sonde-row">
     <label>Port <input type="number" id="sonde-port" min="1" max="65535" value="22" title="Port TCP/UDP"></label>
@@ -365,8 +371,15 @@ tr:hover td{background:rgba(0,212,255,.03)}
       </select>
     </label>
     <label>Filtre <select id="sonde-filter"></select></label>
+    <label title="In = vers le serveur (dst port), Out = depuis le serveur (src port)">Sens
+      <select id="sonde-direction">
+        <option value="both">Tous (In + Out)</option>
+        <option value="in">Entrant (In)</option>
+        <option value="out">Sortant (Out)</option>
+      </select>
+    </label>
     <button type="button" class="btn pri" id="sonde-start">▶ Démarrer</button>
-    <button type="button" class="btn" id="sonde-stop">■ Arrêter</button>
+    <button type="button" class="btn sonde-muted" id="sonde-stop" disabled>■ Arrêter</button>
   </div>
   <pre id="sonde-log"></pre>
 </div>

@@ -21,6 +21,7 @@ _VALID_LAYER = frozenset({"L3", "L4", "L7"})
 _FILTERS_L3 = frozenset({"all", "tcp", "udp", "icmp"})
 _FILTERS_L4 = frozenset({"syn", "fin", "rst", "synfinrst"})
 _FILTERS_L7 = frozenset({"gt50", "gt128"})
+_VALID_DIRECTION = frozenset({"both", "in", "out"})
 
 # Lignes de démarrage tcpdump sur « -i any » (promiscuous, LINUX_SLL2, etc.) — bruit sans intérêt.
 _TCPDUMP_STARTUP_NOISE = re.compile(
@@ -53,20 +54,46 @@ def _kill_sonde_unlocked() -> None:
         _sonde_proc = None
 
 
-def _build_filter_expr(port: int, layer: str, filt: str) -> str:
-    """Expression tcpdump (sans shell)."""
+def _tcp_port(port: str, direction: str, proto: str = "tcp") -> str:
+    """Qualifiant de port selon sens (comme In/Out dans la sortie tcpdump)."""
+    if direction == "in":
+        return f"{proto} and dst port {port}"
+    if direction == "out":
+        return f"{proto} and src port {port}"
+    return f"{proto} and port {port}"
+
+
+def _build_filter_expr(port: int, layer: str, filt: str, direction: str) -> str:
+    """Expression tcpdump (sans shell). direction: both | in (dst) | out (src)."""
     p = str(port)
+    if direction not in _VALID_DIRECTION:
+        direction = "both"
+
     if layer == "L3":
         # Pas de « not broadcast / not multicast » : avec -i any (LINUX_SLL2),
         # tcpdump renvoie « not a broadcast link » et quitte en erreur (code 1).
         if filt == "all":
-            return f"(tcp or udp or icmp) and port {p}"
+            if direction == "both":
+                return f"(tcp or udp or icmp) and port {p}"
+            if direction == "in":
+                return (
+                    f"(tcp and dst port {p}) or (udp and dst port {p}) or "
+                    f"(icmp and dst port {p})"
+                )
+            return (
+                f"(tcp and src port {p}) or (udp and src port {p}) or "
+                f"(icmp and src port {p})"
+            )
         if filt == "tcp":
-            return f"tcp and port {p}"
+            return _tcp_port(p, direction, "tcp")
         if filt == "udp":
-            return f"udp and port {p}"
+            return _tcp_port(p, direction, "udp")
         if filt == "icmp":
-            return f"icmp and port {p}"
+            if direction == "both":
+                return f"icmp and port {p}"
+            if direction == "in":
+                return f"icmp and dst port {p}"
+            return f"icmp and src port {p}"
     if layer == "L4":
         if filt == "syn":
             flags = "(tcp[tcpflags] & tcp-syn != 0)"
@@ -79,15 +106,17 @@ def _build_filter_expr(port: int, layer: str, filt: str) -> str:
                 "(tcp[tcpflags] & tcp-syn != 0) or (tcp[tcpflags] & tcp-fin != 0) or "
                 "(tcp[tcpflags] & tcp-rst != 0)"
             )
-        return f"tcp and port {p} and ({flags})"
+        base = _tcp_port(p, direction, "tcp")
+        return f"{base} and ({flags})"
     if layer == "L7":
         gt = "50" if filt == "gt50" else "128"
-        return f"tcp and port {p} and greater {gt}"
+        base = _tcp_port(p, direction, "tcp")
+        return f"{base} and greater {gt}"
     raise ValueError("layer")
 
 
-def _tcpdump_cmd(port: int, layer: str, filt: str) -> list[str]:
-    expr = _build_filter_expr(port, layer, filt)
+def _tcpdump_cmd(port: int, layer: str, filt: str, direction: str) -> list[str]:
+    expr = _build_filter_expr(port, layer, filt, direction)
     cmd = ["sudo", "tcpdump", "-n", "-i", "any", "-l"]
     if layer == "L7":
         cmd.append("-A")
@@ -112,6 +141,7 @@ def serve_sonde_stream(handler) -> None:
         port_s = (qs.get("port") or [""])[0]
         layer = (qs.get("layer") or ["L3"])[0].upper()
         filt = (qs.get("filter") or [""])[0] or "all"
+        direction = (qs.get("direction") or ["both"])[0].lower()
         port = int(port_s)
     except (ValueError, TypeError):
         handler.send_response(400)
@@ -134,7 +164,10 @@ def serve_sonde_stream(handler) -> None:
     elif layer == "L7" and filt not in _FILTERS_L7:
         filt = "gt50"
 
-    cmd = _tcpdump_cmd(port, layer, filt)
+    if direction not in _VALID_DIRECTION:
+        direction = "both"
+
+    cmd = _tcpdump_cmd(port, layer, filt, direction)
 
     my_proc: subprocess.Popen | None = None
     with _sonde_lock:
@@ -166,7 +199,10 @@ def serve_sonde_stream(handler) -> None:
 
     # Ligne d’info (JSON) pour le front
     info = json.dumps(
-        {"t": f"# tcpdump layer={layer} filter={filt} port={port}", "info": True},
+        {
+            "t": f"# tcpdump layer={layer} filter={filt} port={port} direction={direction}",
+            "info": True,
+        },
         ensure_ascii=False,
     )
     _sse_write(handler, f"data: {info}\n\n")

@@ -43,7 +43,7 @@ Le bouton **Régénérer** appelle `dashboard-regenerate.sh`, qui lance **`sudo 
 
 ## API — Sonde (tcpdump, SSE)
 
-- **`GET /api/sonde/stream?port=&layer=&filter=`** — `text/event-stream` : chaque événement est du JSON `{"t":"ligne tcpdump", ...}` (lignes `# ...` pour info / fin). Un seul tcpdump actif ; une nouvelle connexion tue le précédent.
+- **`GET /api/sonde/stream?port=&layer=&filter=&direction=`** — `direction` : `both` (défaut), `in` (dst port → lignes **In**), `out` (src port → **Out**). `text/event-stream` : JSON `{"t":"…"}` par ligne. Un seul tcpdump actif ; une nouvelle connexion tue le précédent.
 - **`POST /api/sonde/stop`** — arrête le tcpdump actif. JSON `{ "ok": true, "stopped": true }`.
 
 Couches : `L3` (tcp/udp/icmp + port), `L4` (fanions `syn` / `fin` / `rst` séparément ou `synfinrst`), `L7` (`-A` + `greater`). Filtres : whitelist dans `routes/sonde.py`.

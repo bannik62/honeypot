@@ -47,6 +47,25 @@ export function initSonde() {
   if (!pre || !startBtn || !stopBtn || !layerEl || !portEl) return;
 
   let es = null;
+  /** @param {boolean} running — true = capture en cours (Arrêter en bleu, Démarrer grisé) */
+  function setSondeToggle(running) {
+    if (running) {
+      startBtn.classList.remove('pri');
+      startBtn.classList.add('sonde-muted');
+      startBtn.disabled = true;
+      stopBtn.classList.remove('sonde-muted');
+      stopBtn.classList.add('pri');
+      stopBtn.disabled = false;
+    } else {
+      startBtn.classList.add('pri');
+      startBtn.classList.remove('sonde-muted');
+      startBtn.disabled = false;
+      stopBtn.classList.remove('pri');
+      stopBtn.classList.add('sonde-muted');
+      stopBtn.disabled = true;
+    }
+  }
+
   /** @type {string[]} */
   let ring = [];
   /** @type {string[]} */
@@ -99,8 +118,7 @@ export function initSonde() {
       es = null;
     }
     fetch('/api/sonde/stop', { method: 'POST' }).catch(() => {});
-    stopBtn.disabled = true;
-    startBtn.disabled = false;
+    setSondeToggle(false);
   }
 
   layerEl.addEventListener('change', () => {
@@ -120,11 +138,11 @@ export function initSonde() {
 
     const layer = layerEl.value;
     const filter = document.getElementById('sonde-filter').value;
-    const qs = new URLSearchParams({ port: String(port), layer, filter });
+    const direction = document.getElementById('sonde-direction')?.value || 'both';
+    const qs = new URLSearchParams({ port: String(port), layer, filter, direction });
     const url = `/api/sonde/stream?${qs}`;
 
-    startBtn.disabled = true;
-    stopBtn.disabled = false;
+    setSondeToggle(true);
 
     es = new EventSource(url);
 
@@ -146,8 +164,7 @@ export function initSonde() {
         es = null;
       }
       enqueueLine('# Connexion SSE interrompue (réseau, sudo ou arrêt).');
-      startBtn.disabled = false;
-      stopBtn.disabled = true;
+      setSondeToggle(false);
       fetch('/api/sonde/stop', { method: 'POST' }).catch(() => {});
     };
   });
@@ -159,5 +176,5 @@ export function initSonde() {
     appendLineSync('# Arrêt demandé.');
   });
 
-  stopBtn.disabled = true;
+  setSondeToggle(false);
 }
