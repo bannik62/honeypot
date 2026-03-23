@@ -40,6 +40,16 @@ echo "📂 SCAN_DIR=$SCAN_DIR"
 
 mkdir -p "$VIZ_DIR"
 
+# Lock anti-concurrence : évite que le cron et un "generate manuel" écrivent data.json en même temps.
+LOCK_FILE="$VIZ_DIR/.generate-data.lock"
+exec 9>"$LOCK_FILE"
+if flock -n 9; then
+    :
+else
+    echo "Une génération de data est déjà en cours en arrière-plan. Veuillez patienté..."
+    flock 9
+fi
+
 if [ ! -d "$SCAN_DIR" ]; then
     echo "[]" > "$OUTPUT"
     echo "❌ Dossier $SCAN_DIR introuvable"
