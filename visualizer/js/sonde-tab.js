@@ -1,6 +1,11 @@
 /**
  * Onglet Sonde — EventSource SSE vers /api/sonde/stream
+ * Garde-fous : le L7 (-A) peut envoyer des Mo/s ; sans limite le navigateur plante.
  */
+
+const MAX_LINES = 800; // lignes max dans le <pre>
+const MAX_LINE_CHARS = 480; // tronquer une ligne (payload ASCII)
+const LINES_PER_FRAME = 120; // max lignes appliquées par frame (évite blocage UI)
 
 function buildFilterOptions(layer) {
   const sel = document.getElementById('sonde-filter');
@@ -25,10 +30,9 @@ function buildFilterOptions(layer) {
   }
 }
 
-function appendLine(pre, text) {
-  const atBottom = pre.scrollHeight - pre.scrollTop - pre.clientHeight < 40;
-  pre.textContent += `${text}\n`;
-  if (atBottom) pre.scrollTop = pre.scrollHeight;
+function truncateLine(text) {
+  if (text.length <= MAX_LINE_CHARS) return text;
+  return `${text.slice(0, MAX_LINE_CHARS)} … [tronqué ${text.length} car.]`;
 }
 
 export function initSonde() {
@@ -40,6 +44,51 @@ export function initSonde() {
   if (!pre || !startBtn || !stopBtn || !layerEl || !portEl) return;
 
   let es = null;
+  /** @type {string[]} */
+  let ring = [];
+  /** @type {string[]} */
+  let inbox = [];
+  let flushScheduled = false;
+
+  function applyRingToDom() {
+    while (ring.length > MAX_LINES) ring.shift();
+    pre.textContent = ring.join('\n');
+    pre.scrollTop = pre.scrollHeight;
+  }
+
+  function flushInbox() {
+    let n = 0;
+    while (inbox.length && n < LINES_PER_FRAME) {
+      ring.push(truncateLine(inbox.shift()));
+      n += 1;
+    }
+    applyRingToDom();
+    if (inbox.length) {
+      requestAnimationFrame(flushInbox);
+    } else {
+      flushScheduled = false;
+    }
+  }
+
+  function enqueueLine(text) {
+    inbox.push(text);
+    if (!flushScheduled) {
+      flushScheduled = true;
+      requestAnimationFrame(flushInbox);
+    }
+  }
+
+  function appendLineSync(text) {
+    ring.push(truncateLine(text));
+    applyRingToDom();
+  }
+
+  function resetLog() {
+    ring = [];
+    inbox = [];
+    flushScheduled = false;
+    pre.textContent = '';
+  }
 
   function stopStream() {
     if (es) {
@@ -59,11 +108,12 @@ export function initSonde() {
   startBtn.addEventListener('click', () => {
     const port = parseInt(portEl.value, 10);
     if (Number.isNaN(port) || port < 1 || port > 65535) {
-      appendLine(pre, '# Port invalide (1–65535).');
+      resetLog();
+      appendLineSync('# Port invalide (1–65535).');
       return;
     }
     stopStream();
-    pre.textContent = '';
+    resetLog();
 
     const layer = layerEl.value;
     const filter = document.getElementById('sonde-filter').value;
@@ -78,12 +128,12 @@ export function initSonde() {
     es.onmessage = (event) => {
       try {
         const j = JSON.parse(event.data);
-        if (j.t != null) appendLine(pre, j.t);
+        if (j.t != null) enqueueLine(j.t);
         if (j.end) {
           stopStream();
         }
       } catch {
-        appendLine(pre, event.data);
+        enqueueLine(event.data);
       }
     };
 
@@ -92,7 +142,7 @@ export function initSonde() {
         es.close();
         es = null;
       }
-      appendLine(pre, '# Connexion SSE interrompue (réseau, sudo ou arrêt).');
+      enqueueLine('# Connexion SSE interrompue (réseau, sudo ou arrêt).');
       startBtn.disabled = false;
       stopBtn.disabled = true;
       fetch('/api/sonde/stop', { method: 'POST' }).catch(() => {});
@@ -100,8 +150,10 @@ export function initSonde() {
   });
 
   stopBtn.addEventListener('click', () => {
+    inbox = [];
+    flushScheduled = false;
     stopStream();
-    appendLine(pre, '# Arrêt demandé.');
+    appendLineSync('# Arrêt demandé.');
   });
 
   stopBtn.disabled = true;

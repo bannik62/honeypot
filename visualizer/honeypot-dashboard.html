@@ -353,6 +353,7 @@ tr:hover td{background:rgba(0,212,255,.03)}
   <p class="sonde-intro">
     Écoute réseau via <strong>sudo tcpdump</strong> (ligne à ligne). Nécessite <strong>tcpdump</strong> et un utilisateur pouvant lancer <strong>sudo</strong> sans TTY (ex. groupe sudo).
     Un seul flux à la fois — un nouveau démarrage arrête l’écoute précédente.
+    <strong>L7</strong> affiche le payload en ASCII : trafic chargé = beaucoup de texte — l’affichage est <strong>limité</strong> (lignes + longueur) pour ne pas faire planter le navigateur.
   </p>
   <div class="sonde-row">
     <label>Port <input type="number" id="sonde-port" min="1" max="65535" value="22" title="Port TCP/UDP"></label>

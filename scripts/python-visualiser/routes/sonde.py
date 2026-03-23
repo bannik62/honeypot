@@ -7,6 +7,7 @@ Un seul tcpdump actif à la fois (nouvelle connexion tue l’ancien).
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import threading
@@ -20,6 +21,16 @@ _VALID_LAYER = frozenset({"L3", "L4", "L7"})
 _FILTERS_L3 = frozenset({"all", "tcp", "udp", "icmp"})
 _FILTERS_L4 = frozenset({"synfinrst"})
 _FILTERS_L7 = frozenset({"gt50", "gt128"})
+
+# Lignes de démarrage tcpdump sur « -i any » (promiscuous, LINUX_SLL2, etc.) — bruit sans intérêt.
+_TCPDUMP_STARTUP_NOISE = re.compile(
+    r"(?i)(tcpdump:\s*)?(WARNING:.*promiscuous|"
+    r"\(Promiscuous mode not supported|"
+    r"data link type LINUX_|"
+    r"verbose output suppressed|"
+    r"listening on any, link-type|"
+    r"snapshot length \d+ bytes\s*$)",
+)
 
 
 def _kill_sonde_unlocked() -> None:
@@ -159,6 +170,8 @@ def serve_sonde_stream(handler) -> None:
             if line == "":
                 break
             line = line.rstrip("\r\n")
+            if _TCPDUMP_STARTUP_NOISE.search(line):
+                continue
             payload = json.dumps({"t": line}, ensure_ascii=False)
             _sse_write(handler, f"data: {payload}\n\n")
         rc = my_proc.wait(timeout=2)
