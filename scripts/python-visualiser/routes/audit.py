@@ -163,8 +163,6 @@ def _get_ports_open() -> list[dict[str, Any]]:
 
 
 def _parse_ufw_status(text: str) -> dict[str, Any]:
-    # Supported ?
-    supported = bool(text)
     out = text or ""
     # Default incoming policy
     policy_in = None
@@ -177,6 +175,10 @@ def _parse_ufw_status(text: str) -> dict[str, Any]:
         active = True
     elif re.search(r"Status:\s*inactive", out, re.IGNORECASE):
         active = False
+
+    # Si on ne trouve pas les éléments structurants (Status + Default incoming),
+    # on considère UFW "non supporté" pour éviter un audit trompeur.
+    supported = (active is not None) and (policy_in is not None)
 
     rules_lines = [ln.strip() for ln in out.splitlines() if ln.strip()]
     ufw_rules: list[dict[str, Any]] = []
@@ -225,7 +227,10 @@ def _get_ufw_status() -> dict[str, Any]:
         return {"supported": False, "active": None, "policy_in": None, "rules_count": 0}
     try:
         proc = _run(["ufw", "status", "verbose"], timeout_s=20)
-        # ufw peut renvoyer code !=0 selon cas ; on parse quand même le stdout/stderr.
+        # Si ufw échoue (permissions, provider, etc.), on ne tente pas un parse fragile.
+        if proc.returncode != 0:
+            return {"supported": False, "active": None, "policy_in": None, "rules_count": 0}
+
         text = (proc.stdout or "") + (proc.stderr or "")
         return _parse_ufw_status(text)
     except Exception:
