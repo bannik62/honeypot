@@ -228,16 +228,30 @@ def _get_ufw_status() -> dict[str, Any]:
     if not shutil.which("ufw"):
         return {"supported": False, "active": None, "policy_in": None, "rules_count": 0}
     try:
+        # Tentative sans sudo (si le process a déjà les droits).
         proc = _run(["ufw", "status", "verbose"], timeout_s=20)
         text = (proc.stdout or "") + (proc.stderr or "")
+
+        # Si ufw demande explicitement d'être root, on réessaie en non-interactif.
+        # (évite de bloquer si sudo demande un mot de passe)
+        need_root = ("need to be root" in text.lower()) or ("need to be a root" in text.lower())
+        sudo_failed = False
+        if proc.returncode != 0 and need_root and shutil.which("sudo"):
+            try:
+                sudo_failed = False
+                sproc = _run(["sudo", "-n", "ufw", "status", "verbose"], timeout_s=20)
+                text = (sproc.stdout or "") + (sproc.stderr or "")
+            except Exception:
+                sudo_failed = True
+
         ufw = _parse_ufw_status(text)
-        # Phase 1 : si ufw existe, on ne veut pas forcément bloquer l'audit croisé.
-        # On garde les champs policy_in/active/rules_count comme "inconnu" si le parsing échoue,
-        # mais on considère ufw "détecté" côté UI.
-        ufw["supported"] = True
+
+        # Phase 1 : si on a une sortie (même si parsing partiel), ne pas griser l'audit.
+        if text.strip():
+            ufw["supported"] = True
         return ufw
     except Exception:
-        return {"supported": True, "active": None, "policy_in": None, "rules_count": 0}
+        return {"supported": False, "active": None, "policy_in": None, "rules_count": 0}
 
 
 def _classify_port(
