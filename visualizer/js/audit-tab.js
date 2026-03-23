@@ -122,9 +122,10 @@ async function loadAudit() {
     if (!data.ufw_supported) {
       if (compatEl) {
         compatEl.style.display = 'block';
-        compatEl.textContent = 'firewall non supporté / parsing UFW partiel : statuts incomplets — croisement basé sur ce qu’on arrive à extraire.';
+        compatEl.textContent = 'firewall non supporté / parsing UFW partiel : statuts incomplets — croisement affiché en mode inconnu.';
       }
-      if (sections) sections.classList.add('audit-muted');
+      // Important : on continue à afficher les tables (phase 1 read-only),
+      // même si la policy UFW ne peut pas être déterminée.
     } else if (compatEl) {
       compatEl.style.display = 'none';
       if (sections) sections.classList.remove('audit-muted');
