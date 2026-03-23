@@ -6,7 +6,7 @@ Le dispatch HTTP est implémenté dans handler.py et routes/*.
 """
 
 import sys
-from http.server import HTTPServer
+from http.server import ThreadingHTTPServer
 
 from config import PORT, VISUALIZER_DIR
 from handler import VisualizerHandler
@@ -16,7 +16,8 @@ def main():
     if not VISUALIZER_DIR.is_dir():
         print("Erreur: visualizer/ introuvable", file=sys.stderr)
         sys.exit(1)
-    server = HTTPServer(("127.0.0.1", PORT), VisualizerHandler)
+    # Threading : SSE (sonde, regenerate-stream) ne bloque pas les autres requêtes.
+    server = ThreadingHTTPServer(("127.0.0.1", PORT), VisualizerHandler)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

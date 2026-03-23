@@ -177,9 +177,23 @@ else
     echo "   ℹ️  Pas de répertoire config"
 fi
 
-# 9. Supprimer le répertoire honeypot-monitor
+# 9. Désinstaller tcpdump (optionnel — installé pour la future sonde / capture)
 echo ""
-echo "9️⃣  Suppression du répertoire d'installation..."
+echo "9️⃣  Paquet système tcpdump (optionnel)..."
+if command -v dpkg >/dev/null 2>&1 && dpkg -l tcpdump 2>/dev/null | grep -q '^ii'; then
+    if ask_confirmation "   ❓ Désinstaller le paquet apt « tcpdump » ? (ok si tu ne t’en sers pas ailleurs)"; then
+        sudo apt-get remove -y tcpdump >/dev/null 2>&1 || true
+        echo "   ✅ tcpdump désinstallé"
+    else
+        echo "   ℹ️  tcpdump conservé"
+    fi
+else
+    echo "   ℹ️  tcpdump non installé via apt ou déjà absent"
+fi
+
+# 10. Supprimer le répertoire honeypot-monitor
+echo ""
+echo "🔟  Suppression du répertoire d'installation..."
 if ask_confirmation "   ❓ Voulez-vous supprimer complètement le répertoire d'installation ?"; then
     cd "$HOME"
     rm -rf "$SCRIPT_DIR"

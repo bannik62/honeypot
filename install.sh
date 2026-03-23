@@ -16,7 +16,7 @@ echo ""
 
 # Demander confirmation
 echo "Cette installation va :"
-echo "  • installer les dépendances (geoip, jq, google-chrome, nmap, nikto, sqlite3)"
+echo "  • installer les dépendances (geoip, jq, google-chrome, nmap, nikto, sqlite3, tcpdump)"
 echo "  • Créer la structure de répertoires"
 echo "  • Ajouter des alias dans ~/.bashrc"
 echo ""
@@ -52,7 +52,7 @@ fi
 # Installer les dépendances
 echo "📦 Installation des dépendances..."
 apt-get update -qq
-apt-get install -y geoip-bin geoip-database jq nmap nikto sqlite3 ca-certificates curl gnupg > /dev/null 2>&1
+apt-get install -y geoip-bin geoip-database jq nmap nikto sqlite3 tcpdump ca-certificates curl gnupg > /dev/null 2>&1
 
 # Installer Google Chrome via dépôt APT officiel (non-snap) si pas déjà présent
 if command -v google-chrome &> /dev/null || command -v google-chrome-stable &> /dev/null || dpkg -s google-chrome-stable &> /dev/null; then

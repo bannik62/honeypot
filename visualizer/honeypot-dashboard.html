@@ -207,6 +207,11 @@ tr:hover td{background:rgba(0,212,255,.03)}
 }
 #loading-overlay-dismiss{margin-top:14px;width:100%}
 ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--b);border-radius:2px}
+/* SONDE */
+#panel-sonde .sonde-intro{font-size:.68rem;color:var(--mu);margin-bottom:10px;line-height:1.45;max-width:920px}
+#panel-sonde .sonde-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px}
+#panel-sonde input,#panel-sonde select{background:var(--s);border:1px solid var(--b);color:var(--tx);padding:6px 8px;border-radius:4px;font-family:'Share Tech Mono',monospace;font-size:.72rem}
+#sonde-log{width:100%;max-height:min(55vh,520px);min-height:180px;overflow:auto;background:rgba(0,0,0,.4);border:1px solid var(--b);border-radius:8px;padding:10px 12px;font-size:.65rem;line-height:1.35;color:var(--a3);white-space:pre-wrap;word-break:break-word}
 </style>
 </head>
 <body>
@@ -239,6 +244,7 @@ tr:hover td{background:rgba(0,212,255,.03)}
   <button class="tab" data-tab="graph">🕸 RÉSEAU</button>
   <button class="tab" data-tab="stats">📊 STATS</button>
   <button class="tab" data-tab="ips">🔎 IPs</button>
+  <button class="tab" data-tab="sonde">📡 SONDE</button>
 </nav>
 
 <div id="panel-map" class="panel active">
@@ -341,6 +347,27 @@ tr:hover td{background:rgba(0,212,255,.03)}
     <table><thead><tr><th>IP</th><th>PAYS</th><th>PORTS</th><th>RAPPORTS</th><th>VULNS</th></tr></thead>
     <tbody id="ip-tbody"></tbody></table>
   </div>
+</div>
+
+<div id="panel-sonde" class="panel">
+  <p class="sonde-intro">
+    Écoute réseau via <strong>sudo tcpdump</strong> (ligne à ligne). Nécessite <strong>tcpdump</strong> et un utilisateur pouvant lancer <strong>sudo</strong> sans TTY (ex. groupe sudo).
+    Un seul flux à la fois — un nouveau démarrage arrête l’écoute précédente.
+  </p>
+  <div class="sonde-row">
+    <label>Port <input type="number" id="sonde-port" min="1" max="65535" value="22" title="Port TCP/UDP"></label>
+    <label>Couche
+      <select id="sonde-layer" title="L3 tout protocole, L4 fanions TCP, L7 payload ASCII">
+        <option value="L3">L3 (IP)</option>
+        <option value="L4">L4 (TCP flags)</option>
+        <option value="L7">L7 (payload)</option>
+      </select>
+    </label>
+    <label>Filtre <select id="sonde-filter"></select></label>
+    <button type="button" class="btn pri" id="sonde-start">▶ Démarrer</button>
+    <button type="button" class="btn" id="sonde-stop">■ Arrêter</button>
+  </div>
+  <pre id="sonde-log"></pre>
 </div>
 
 <div id="tip">

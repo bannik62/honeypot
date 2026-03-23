@@ -40,3 +40,12 @@ Le module `js/loading-overlay.js` expose `loadingOverlay` :
 ### Traceroute
 
 Le bouton **Régénérer** appelle `dashboard-regenerate.sh`, qui lance **`sudo bash traceroute-ip.sh`** puis `generate-data.sh`.
+
+## API — Sonde (tcpdump, SSE)
+
+- **`GET /api/sonde/stream?port=&layer=&filter=`** — `text/event-stream` : chaque événement est du JSON `{"t":"ligne tcpdump", ...}` (lignes `# ...` pour info / fin). Un seul tcpdump actif ; une nouvelle connexion tue le précédent.
+- **`POST /api/sonde/stop`** — arrête le tcpdump actif. JSON `{ "ok": true, "stopped": true }`.
+
+Couches : `L3` (tcp/udp/icmp + broadcast/multicast), `L4` (fanions SYN/FIN/RST), `L7` (`-A` + `greater`). Filtres : voir whitelist dans `routes/sonde.py`.
+
+Le serveur utilise **`ThreadingHTTPServer`** pour ne pas bloquer les autres requêtes pendant un flux SSE.
