@@ -324,7 +324,9 @@ def serve_audit(handler) -> None:
         {
             "ok": True,
             "snapshot_ts": snapshot_ts,
-            "ufw_supported": bool(ufw.get("supported")),
+            # En phase 1 on préfère considérer UFW "détecté" si le binaire existe,
+            # même si le parsing politique détaillé échoue. On classifie alors en "Inconnu".
+            "ufw_supported": bool(shutil.which("ufw")),
             "ufw": {
                 "active": ufw.get("active"),
                 "policy_in": policy_in,
