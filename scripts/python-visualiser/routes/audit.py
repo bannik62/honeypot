@@ -176,10 +176,6 @@ def _parse_ufw_status(text: str) -> dict[str, Any]:
     elif re.search(r"Status:\s*inactive", out, re.IGNORECASE):
         active = False
 
-    # Si on ne trouve pas les éléments structurants (Status + Default incoming),
-    # on considère UFW "non supporté" pour éviter un audit trompeur.
-    supported = (active is not None) and (policy_in is not None)
-
     rules_lines = [ln.strip() for ln in out.splitlines() if ln.strip()]
     ufw_rules: list[dict[str, Any]] = []
     denied_ports: set[tuple[int, str]] = set()
@@ -211,6 +207,10 @@ def _parse_ufw_status(text: str) -> dict[str, Any]:
     # Compte règles : on garde un nombre best-effort.
     rules_count = len(ufw_rules)
 
+    # On peut considérer UFW "supporté" au minimum si on a une policy par défaut
+    # ou si on a pu extraire des règles DENY explicites (pour classer certains ports).
+    supported = (policy_in is not None) or (len(denied_ports) > 0)
+
     return {
         "supported": supported,
         "active": active,
@@ -227,10 +227,6 @@ def _get_ufw_status() -> dict[str, Any]:
         return {"supported": False, "active": None, "policy_in": None, "rules_count": 0}
     try:
         proc = _run(["ufw", "status", "verbose"], timeout_s=20)
-        # Si ufw échoue (permissions, provider, etc.), on ne tente pas un parse fragile.
-        if proc.returncode != 0:
-            return {"supported": False, "active": None, "policy_in": None, "rules_count": 0}
-
         text = (proc.stdout or "") + (proc.stderr or "")
         return _parse_ufw_status(text)
     except Exception:
@@ -266,19 +262,6 @@ def serve_audit(handler) -> None:
     open_set = {(p["port"], p["proto"]) for p in ports_open}
 
     ufw = _get_ufw_status()
-    if not ufw.get("supported"):
-        _send_json(
-            handler,
-            {
-                "ok": True,
-                "snapshot_ts": snapshot_ts,
-                "ufw_supported": False,
-                "ports_open": ports_open,
-                "cross_open_ports": [],
-                "dead_deny_rules": [],
-            },
-        )
-        return
 
     policy_in = ufw.get("policy_in")
     explicit_ports = {(r["port"], r["proto"]) for r in ufw.get("explicit_ports") or []}
@@ -300,7 +283,7 @@ def serve_audit(handler) -> None:
         {
             "ok": True,
             "snapshot_ts": snapshot_ts,
-            "ufw_supported": True,
+            "ufw_supported": bool(ufw.get("supported")),
             "ufw": {
                 "active": ufw.get("active"),
                 "policy_in": policy_in,

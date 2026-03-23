@@ -122,15 +122,13 @@ async function loadAudit() {
     if (!data.ufw_supported) {
       if (compatEl) {
         compatEl.style.display = 'block';
-        compatEl.textContent = 'firewall non supporté : ufw non disponible ou non compatible (audit croisé indisponible).';
+        compatEl.textContent = 'firewall non supporté / parsing UFW partiel : statuts incomplets — croisement basé sur ce qu’on arrive à extraire.';
       }
       if (sections) sections.classList.add('audit-muted');
-      loadingOverlay.hide();
-      return;
+    } else if (compatEl) {
+      compatEl.style.display = 'none';
+      if (sections) sections.classList.remove('audit-muted');
     }
-
-    if (compatEl) compatEl.style.display = 'none';
-    if (sections) sections.classList.remove('audit-muted');
 
     renderUfw(data.ufw);
     renderCross(data.cross_open_ports);
