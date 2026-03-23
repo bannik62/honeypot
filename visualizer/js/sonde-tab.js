@@ -44,7 +44,8 @@ export function initSonde() {
   const stopBtn = document.getElementById('sonde-stop');
   const layerEl = document.getElementById('sonde-layer');
   const portEl = document.getElementById('sonde-port');
-  if (!pre || !startBtn || !stopBtn || !layerEl || !portEl) return;
+  const grepEl = document.getElementById('sonde-grep');
+  if (!pre || !startBtn || !stopBtn || !layerEl || !portEl || !grepEl) return;
 
   let es = null;
   /** @param {boolean} running — true = capture en cours (Arrêter en bleu, Démarrer grisé) */
@@ -139,6 +140,8 @@ export function initSonde() {
     const layer = layerEl.value;
     const filter = document.getElementById('sonde-filter').value;
     const direction = document.getElementById('sonde-direction')?.value || 'both';
+    const grepNeedle = String(grepEl.value || '').trim();
+    const grepNeedleLower = grepNeedle ? grepNeedle.toLowerCase() : '';
     const qs = new URLSearchParams({ port: String(port), layer, filter, direction });
     const url = `/api/sonde/stream?${qs}`;
 
@@ -149,11 +152,23 @@ export function initSonde() {
     es.onmessage = (event) => {
       try {
         const j = JSON.parse(event.data);
-        if (j.t != null) enqueueLine(j.t);
+        if (j.t != null) {
+          const line = String(j.t);
+          // On ne filtre pas les lignes "info" qui commencent par "#".
+          if (line.startsWith('#')) {
+            enqueueLine(line);
+          } else if (!grepNeedleLower) {
+            enqueueLine(line);
+          } else {
+            const lineLower = line.toLowerCase();
+            if (lineLower.includes(grepNeedleLower)) enqueueLine(line);
+          }
+        }
         if (j.end) {
           stopStream();
         }
       } catch {
+        // Cas improbable (flux non-JSON) : on affiche tel quel.
         enqueueLine(event.data);
       }
     };

@@ -371,6 +371,15 @@ tr:hover td{background:rgba(0,212,255,.03)}
       </select>
     </label>
     <label>Filtre <select id="sonde-filter"></select></label>
+    <label title="Recherche littérale (insensible à la casse). Ne filtre pas les lignes qui commencent par #.">
+      Grep
+      <input
+        type="text"
+        id="sonde-grep"
+        placeholder="ex: SSH-2.0"
+        style="width:180px"
+      />
+    </label>
     <label title="In = vers le serveur (dst port), Out = depuis le serveur (src port)">Sens
       <select id="sonde-direction">
         <option value="both">Tous (In + Out)</option>
