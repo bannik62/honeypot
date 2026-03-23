@@ -19,7 +19,7 @@ _sonde_proc: subprocess.Popen | None = None
 _VALID_LAYER = frozenset({"L3", "L4", "L7"})
 # Filtres autorisés par couche (whitelist)
 _FILTERS_L3 = frozenset({"all", "tcp", "udp", "icmp"})
-_FILTERS_L4 = frozenset({"synfinrst"})
+_FILTERS_L4 = frozenset({"syn", "fin", "rst", "synfinrst"})
 _FILTERS_L7 = frozenset({"gt50", "gt128"})
 
 # Lignes de démarrage tcpdump sur « -i any » (promiscuous, LINUX_SLL2, etc.) — bruit sans intérêt.
@@ -68,10 +68,17 @@ def _build_filter_expr(port: int, layer: str, filt: str) -> str:
         if filt == "icmp":
             return f"icmp and port {p}"
     if layer == "L4":
-        flags = (
-            "(tcp[tcpflags] & tcp-syn != 0) or (tcp[tcpflags] & tcp-fin != 0) or "
-            "(tcp[tcpflags] & tcp-rst != 0)"
-        )
+        if filt == "syn":
+            flags = "(tcp[tcpflags] & tcp-syn != 0)"
+        elif filt == "fin":
+            flags = "(tcp[tcpflags] & tcp-fin != 0)"
+        elif filt == "rst":
+            flags = "(tcp[tcpflags] & tcp-rst != 0)"
+        else:  # synfinrst — les trois (OU)
+            flags = (
+                "(tcp[tcpflags] & tcp-syn != 0) or (tcp[tcpflags] & tcp-fin != 0) or "
+                "(tcp[tcpflags] & tcp-rst != 0)"
+            )
         return f"tcp and port {p} and ({flags})"
     if layer == "L7":
         gt = "50" if filt == "gt50" else "128"

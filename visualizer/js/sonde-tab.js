@@ -23,7 +23,10 @@ function buildFilterOptions(layer) {
     add('udp', 'UDP seul');
     add('icmp', 'ICMP seul');
   } else if (layer === 'L4') {
-    add('synfinrst', 'SYN / FIN / RST');
+    add('syn', 'SYN seul');
+    add('fin', 'FIN seul');
+    add('rst', 'RST seul');
+    add('synfinrst', 'SYN + FIN + RST (tous)');
   } else {
     add('gt50', 'Payload > 50 octets');
     add('gt128', 'Payload > 128 octets');
