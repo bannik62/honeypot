@@ -140,8 +140,9 @@ export function initSonde() {
     const layer = layerEl.value;
     const filter = document.getElementById('sonde-filter').value;
     const direction = document.getElementById('sonde-direction')?.value || 'both';
+    // Grep "tel quel" : recherche littérale, sensible à la casse.
+    // Exemple : "In" ne doit pas matcher "win".
     const grepNeedle = String(grepEl.value || '').trim();
-    const grepNeedleLower = grepNeedle ? grepNeedle.toLowerCase() : '';
     const qs = new URLSearchParams({ port: String(port), layer, filter, direction });
     const url = `/api/sonde/stream?${qs}`;
 
@@ -157,11 +158,10 @@ export function initSonde() {
           // On ne filtre pas les lignes "info" qui commencent par "#".
           if (line.startsWith('#')) {
             enqueueLine(line);
-          } else if (!grepNeedleLower) {
+          } else if (!grepNeedle) {
             enqueueLine(line);
           } else {
-            const lineLower = line.toLowerCase();
-            if (lineLower.includes(grepNeedleLower)) enqueueLine(line);
+            if (line.includes(grepNeedle)) enqueueLine(line);
           }
         }
         if (j.end) {
