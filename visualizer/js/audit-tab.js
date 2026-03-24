@@ -115,12 +115,15 @@ function renderDeadDeny(list) {
   }).join('');
 }
 
-async function loadAudit() {
-  loadingOverlay.show({
-    title: 'AUDIT RÉSEAU',
-    message: 'Snapshot ports + UFW…',
-    indeterminate: true,
-  });
+async function loadAudit(options = {}) {
+  const withOverlay = options.withOverlay !== false;
+  if (withOverlay) {
+    loadingOverlay.show({
+      title: 'AUDIT RÉSEAU',
+      message: 'Snapshot ports + UFW…',
+      indeterminate: true,
+    });
+  }
   try {
     const r = await fetch('/api/audit', { method: 'GET' });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -148,17 +151,17 @@ async function loadAudit() {
     renderUfw(data.ufw);
     renderCross(data.cross_open_ports);
     renderDeadDeny(data.dead_deny_rules);
-    loadingOverlay.hide();
+    if (withOverlay) loadingOverlay.hide();
   } catch (e) {
-    loadingOverlay.showError(e?.message || String(e));
+    if (withOverlay) loadingOverlay.showError(e?.message || String(e));
   }
 }
 
 export function initAudit() {
   const btn = document.getElementById('audit-refresh');
   if (!btn) return;
-  btn.addEventListener('click', () => loadAudit());
+  btn.addEventListener('click', () => loadAudit({ withOverlay: true }));
   // Option : premier chargement immédiat (toujours en mode "manuel" côté utilisateur : pas de polling).
-  loadAudit();
+  loadAudit({ withOverlay: false });
 }
 
