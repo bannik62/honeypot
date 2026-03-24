@@ -228,13 +228,16 @@ def _parse_ufw_status(text: str) -> dict[str, Any]:
     # de griser/couper l'audit.
     supported = bool(out.strip())
 
+    explicit_ports_sorted = [{"port": p, "proto": pr} for (p, pr) in sorted(explicit_ports)]
+    denied_ports_sorted = [{"port": p, "proto": pr} for (p, pr) in sorted(denied_ports)]
+
     return {
         "supported": supported,
         "active": active,
         "policy_in": policy_in,
         "rules_count": rules_count,
-        "explicit_ports": sorted([{"port": p, "proto": proto} for (p, proto) in explicit_ports]),
-        "denied_ports": sorted([{"port": p, "proto": proto} for (p, proto) in denied_ports]),
+        "explicit_ports": explicit_ports_sorted,
+        "denied_ports": denied_ports_sorted,
         "raw": out[:4000],
     }
 
