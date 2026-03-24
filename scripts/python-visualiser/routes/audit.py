@@ -242,27 +242,63 @@ def _parse_ufw_status(text: str) -> dict[str, Any]:
 def _get_ufw_status() -> dict[str, Any]:
     ufw_bin = _find_ufw_bin()
     if not ufw_bin:
-        return {"supported": False, "active": None, "policy_in": None, "rules_count": 0}
+        return {
+            "supported": False,
+            "active": None,
+            "policy_in": None,
+            "rules_count": 0,
+            "raw": "",
+            "debug": {"step": "find_ufw_bin", "error": "ufw binary not found"},
+        }
     try:
         text = ""
+        debug: dict[str, Any] = {
+            "step": "start",
+            "ufw_bin": ufw_bin,
+            "sudo_bin": shutil.which("sudo"),
+        }
         # UFW exige des droits root: on force un appel sudo non-interactif.
         if not shutil.which("sudo"):
-            return {"supported": True, "active": None, "policy_in": None, "rules_count": 0}
+            return {
+                "supported": True,
+                "active": None,
+                "policy_in": None,
+                "rules_count": 0,
+                "raw": "",
+                "debug": {"step": "precheck", "error": "sudo binary not found", **debug},
+            }
         try:
             sproc = _run(["sudo", "-n", ufw_bin, "status", "verbose"], timeout_s=20)
             text = (sproc.stdout or "") + (sproc.stderr or "")
+            debug.update(
+                {
+                    "step": "sudo_n_done",
+                    "returncode": sproc.returncode,
+                    "stdout_len": len(sproc.stdout or ""),
+                    "stderr_len": len(sproc.stderr or ""),
+                }
+            )
         except Exception:
             text = ""
+            debug.update({"step": "sudo_n_exception", "error": "exception while running sudo -n ufw"})
 
         ufw = _parse_ufw_status(text)
 
         # Phase 1 : si ufw existe, on le considère supporté même avec parsing partiel
         # (on garde "Inconnu" au lieu de basculer en "non supporté").
         ufw["supported"] = True
+        ufw["debug"] = debug
         return ufw
-    except Exception:
+    except Exception as e:
         # Même en cas d'erreur d'exécution, on sait que le binaire ufw existe.
-        return {"supported": True, "active": None, "policy_in": None, "rules_count": 0}
+        return {
+            "supported": True,
+            "active": None,
+            "policy_in": None,
+            "rules_count": 0,
+            "raw": "",
+            "debug": {"step": "outer_exception", "error": str(e)},
+        }
 
 
 def _classify_port(
@@ -323,6 +359,7 @@ def serve_audit(handler) -> None:
                 "policy_in": policy_in,
                 "rules_count": ufw.get("rules_count"),
                 "raw": ufw.get("raw"),
+                "debug": ufw.get("debug"),
             },
             "ports_open": ports_open,
             "cross_open_ports": cross,
