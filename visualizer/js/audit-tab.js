@@ -51,31 +51,30 @@ function renderPorts(ports) {
 function renderUfw(ufw) {
   const el = document.getElementById('audit-ufw-status');
   if (!el) return;
-  let activeTxt = 'inconnu';
-  if (ufw?.active === true) activeTxt = 'actif';
-  if (ufw?.active === false) activeTxt = 'inactif';
-  const policyTxt = ufw?.policy_in || '—';
-  const rulesTxt = ufw?.rules_count ?? 0;
+  const raw = ufw?.raw ? String(ufw.raw) : '';
+  const rawSnippet = raw ? raw.split('\n').slice(0, 8).join('\n') : '';
+  const rawHtml = rawSnippet
+    ? escapeHtml(rawSnippet).replace(/\n/g, '<br>')
+    : '';
 
+  if (!ufw || ufw.active == null) {
+    el.innerHTML = `
+      UFW : inconnu
+      ${rawHtml ? `<div style="margin-top:6px;opacity:.85;font-size:.64rem;color:var(--mu)">Debug ufw :<br><code style="white-space:normal;word-break:break-word">${rawHtml}</code></div>` : ''}
+    `;
+    return;
+  }
+  const active = ufw.active ? 'actif' : 'inactif';
+  const policyUnknown = ufw.policy_in == null;
+  const debugBlock = (policyUnknown && rawHtml)
+    ? `<div style="margin-top:6px;opacity:.85;font-size:.64rem;color:var(--mu)">Debug parse UFW (extrait) :<br><code style="white-space:normal;word-break:break-word">${rawHtml}</code></div>`
+    : '';
   el.innerHTML = `
-    <table style="width:100%;border-collapse:collapse">
-      <thead>
-        <tr>
-          <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--b);font-size:.66rem">État</th>
-          <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--b);font-size:.66rem">Policy incoming</th>
-          <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--b);font-size:.66rem">Règles</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td style="padding:6px 8px;border-top:1px solid rgba(26,58,92,.35);font-size:.72rem">${escapeHtml(activeTxt)}</td>
-          <td style="padding:6px 8px;border-top:1px solid rgba(26,58,92,.35);font-size:.72rem">${escapeHtml(policyTxt)}</td>
-          <td style="padding:6px 8px;border-top:1px solid rgba(26,58,92,.35);font-size:.72rem">${escapeHtml(rulesTxt)}</td>
-        </tr>
-      </tbody>
-    </table>
+    <div><strong>UFW</strong> : ${escapeHtml(active)}</div>
+    <div style="margin-top:4px;opacity:.95">Policy défaut (incoming) : <strong>${escapeHtml(ufw.policy_in || '—')}</strong></div>
+    <div style="margin-top:4px;opacity:.95">Règles (best-effort parse) : <strong>${escapeHtml(ufw.rules_count ?? 0)}</strong></div>
+    ${debugBlock}
   `;
-
 }
 
 function renderCross(cross) {
