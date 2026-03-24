@@ -51,22 +51,11 @@ function renderPorts(ports) {
 function renderUfw(ufw) {
   const el = document.getElementById('audit-ufw-status');
   if (!el) return;
-  const raw = ufw?.raw ? String(ufw.raw) : '';
-  const dbg = ufw?.debug || null;
-  const rawSnippet = raw ? raw.split('\n').slice(0, 8).join('\n') : '';
-  const rawHtml = rawSnippet
-    ? escapeHtml(rawSnippet).replace(/\n/g, '<br>')
-    : '';
-  const hint = 'UFW non accessible en mode non interactif (sudo -n). Vérifiez la configuration sudo (voir README § Audit).';
-
   let activeTxt = 'inconnu';
   if (ufw?.active === true) activeTxt = 'actif';
-  else if (ufw?.active === false) activeTxt = 'inactif';
-  const policyTxt = ufw?.policy_in ? String(ufw.policy_in) : '—';
-  const rulesTxt = String(ufw?.rules_count ?? 0);
-  const warnLine = (ufw?.active == null && dbg?.error)
-    ? `<div style="margin-top:6px;opacity:.9;color:var(--w)">${escapeHtml(hint)}</div>`
-    : '';
+  if (ufw?.active === false) activeTxt = 'inactif';
+  const policyTxt = ufw?.policy_in || '—';
+  const rulesTxt = ufw?.rules_count ?? 0;
 
   el.innerHTML = `
     <table style="width:100%;border-collapse:collapse">
@@ -85,8 +74,6 @@ function renderUfw(ufw) {
         </tr>
       </tbody>
     </table>
-    ${warnLine}
-    ${rawHtml ? `<div style="margin-top:6px;opacity:.85;font-size:.64rem;color:var(--mu)">Debug ufw :<br><code style="white-space:normal;word-break:break-word">${rawHtml}</code></div>` : ''}
   `;
 
 }
