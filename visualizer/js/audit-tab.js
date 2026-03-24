@@ -59,26 +59,36 @@ function renderUfw(ufw) {
     : '';
   const hint = 'UFW non accessible en mode non interactif (sudo -n). Vérifiez la configuration sudo (voir README § Audit).';
 
-  if (!ufw || ufw.active == null) {
-    const debugLine = dbg?.error ? `<div style="margin-top:6px;opacity:.9;color:var(--w)">${escapeHtml(hint)}</div>` : '';
-    el.innerHTML = `
-      UFW : inconnu
-      ${debugLine}
-      ${rawHtml ? `<div style="margin-top:6px;opacity:.85;font-size:.64rem;color:var(--mu)">Debug ufw :<br><code style="white-space:normal;word-break:break-word">${rawHtml}</code></div>` : ''}
-    `;
-    return;
-  }
-  const active = ufw.active ? 'actif' : 'inactif';
-  const policyUnknown = ufw.policy_in == null;
-  const debugBlock = (policyUnknown && rawHtml)
-    ? `<div style="margin-top:6px;opacity:.85;font-size:.64rem;color:var(--mu)">Debug parse UFW (extrait) :<br><code style="white-space:normal;word-break:break-word">${rawHtml}</code></div>`
+  let activeTxt = 'inconnu';
+  if (ufw?.active === true) activeTxt = 'actif';
+  else if (ufw?.active === false) activeTxt = 'inactif';
+  const policyTxt = ufw?.policy_in ? String(ufw.policy_in) : '—';
+  const rulesTxt = String(ufw?.rules_count ?? 0);
+  const warnLine = (ufw?.active == null && dbg?.error)
+    ? `<div style="margin-top:6px;opacity:.9;color:var(--w)">${escapeHtml(hint)}</div>`
     : '';
+
   el.innerHTML = `
-    <div><strong>UFW</strong> : ${escapeHtml(active)}</div>
-    <div style="margin-top:4px;opacity:.95">Policy défaut (incoming) : <strong>${escapeHtml(ufw.policy_in || '—')}</strong></div>
-    <div style="margin-top:4px;opacity:.95">Règles (best-effort parse) : <strong>${escapeHtml(ufw.rules_count ?? 0)}</strong></div>
-    ${debugBlock}
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr>
+          <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--b);font-size:.66rem">État</th>
+          <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--b);font-size:.66rem">Policy incoming</th>
+          <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--b);font-size:.66rem">Règles</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="padding:6px 8px;border-top:1px solid rgba(26,58,92,.35);font-size:.72rem">${escapeHtml(activeTxt)}</td>
+          <td style="padding:6px 8px;border-top:1px solid rgba(26,58,92,.35);font-size:.72rem">${escapeHtml(policyTxt)}</td>
+          <td style="padding:6px 8px;border-top:1px solid rgba(26,58,92,.35);font-size:.72rem">${escapeHtml(rulesTxt)}</td>
+        </tr>
+      </tbody>
+    </table>
+    ${warnLine}
+    ${rawHtml ? `<div style="margin-top:6px;opacity:.85;font-size:.64rem;color:var(--mu)">Debug ufw :<br><code style="white-space:normal;word-break:break-word">${rawHtml}</code></div>` : ''}
   `;
+
 }
 
 function renderCross(cross) {
