@@ -158,11 +158,23 @@ def _parse_ss_ports(output: str) -> list[dict[str, Any]]:
 
 
 def _get_ports_open() -> list[dict[str, Any]]:
-    # Première tentative avec -p (process) ; si permissions insuffisantes, on retente sans.
-    ss_cmds = [
-        ["ss", "-H", "-l", "-n", "-t", "-u", "-p"],
-        ["ss", "-H", "-l", "-n", "-t", "-u"],
-    ]
+    # Aligné sur UFW: on tente d'abord en sudo non-interactif pour récupérer les PID/process.
+    ss_cmds: list[list[str]] = []
+    if shutil.which("sudo"):
+        ss_cmds.extend(
+            [
+                ["sudo", "-n", "ss", "-H", "-l", "-n", "-t", "-u", "-p"],
+                ["sudo", "-n", "ss", "-H", "-l", "-n", "-t", "-u"],
+            ]
+        )
+    # Fallback sans sudo (environnement sans sudo / permissions réduites).
+    ss_cmds.extend(
+        [
+            ["ss", "-H", "-l", "-n", "-t", "-u", "-p"],
+            ["ss", "-H", "-l", "-n", "-t", "-u"],
+        ]
+    )
+
     last_out = ""
     for cmd in ss_cmds:
         try:
