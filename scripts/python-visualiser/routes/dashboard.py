@@ -13,6 +13,7 @@ from config import ROOT
 _EXIT_MARKER = "__HONEYPOT_EXIT__"
 # traceroute-ip + generate-data (beaucoup d’IPs)
 REGENERATE_TIMEOUT_SEC = 90 * 60
+STARTUP_CHECK_TIMEOUT_SEC = 25
 
 
 def _send_json(handler, payload, status=200):
@@ -137,3 +138,65 @@ def serve_dashboard_regenerate_stream(handler):
 
     handler.wfile.write(f"\n{_EXIT_MARKER} {rc}\n".encode("utf-8"))
     handler.wfile.flush()
+
+
+def serve_dashboard_startup_log_stream(handler):
+    """
+    GET /api/dashboard/startup-log-stream
+    Stream du diagnostic honeypot-check.sh pour animer le chargement initial.
+    """
+    script = ROOT / "scripts" / "honeypot-check.sh"
+    if not script.is_file():
+        handler.send_response(200)
+        handler.send_header("Content-Type", "text/plain; charset=utf-8")
+        handler.send_header("Cache-Control", "no-store")
+        handler.end_headers()
+        handler.wfile.write(b"[startup] honeypot-check.sh introuvable.\n")
+        handler.wfile.flush()
+        return
+
+    handler.send_response(200)
+    handler.send_header("Content-Type", "text/plain; charset=utf-8")
+    handler.send_header("Cache-Control", "no-store")
+    handler.send_header("X-Accel-Buffering", "no")
+    handler.end_headers()
+
+    cmd = ["/bin/bash", str(script)]
+    stdbuf = shutil.which("stdbuf")
+    if stdbuf:
+        cmd = [stdbuf, "-oL", "-eL"] + cmd
+
+    try:
+        proc = subprocess.Popen(
+            cmd,
+            cwd=str(ROOT),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+        )
+    except OSError as e:
+        handler.wfile.write(f"[startup] erreur lancement: {e}\n".encode("utf-8"))
+        handler.wfile.flush()
+        return
+
+    try:
+        if proc.stdout is not None:
+            for line in proc.stdout:
+                handler.wfile.write(line.encode("utf-8", errors="replace"))
+                handler.wfile.flush()
+        proc.wait(timeout=STARTUP_CHECK_TIMEOUT_SEC)
+    except subprocess.TimeoutExpired:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+        handler.wfile.write(f"\n[startup] timeout ({STARTUP_CHECK_TIMEOUT_SEC}s)\n".encode("utf-8"))
+        handler.wfile.flush()
+    except Exception as e:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+        handler.wfile.write(f"\n[startup] erreur stream: {e}\n".encode("utf-8"))
+        handler.wfile.flush()

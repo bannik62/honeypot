@@ -7,7 +7,11 @@ Rôle: centraliser le dispatch HTTP (do_GET/do_POST) vers les modules routes/*.
 from http.server import SimpleHTTPRequestHandler
 
 from config import DATA_JSON_URL, IP_PREFIX, VISUALIZER_DIR
-from routes.dashboard import serve_dashboard_regenerate, serve_dashboard_regenerate_stream
+from routes.dashboard import (
+    serve_dashboard_regenerate,
+    serve_dashboard_regenerate_stream,
+    serve_dashboard_startup_log_stream,
+)
 from routes.ip import serve_ip_resource
 from routes.sonde import serve_sonde_stop, serve_sonde_stream
 from routes.audit import serve_audit
@@ -32,6 +36,9 @@ class VisualizerHandler(SimpleHTTPRequestHandler):
             return
         if path == "/api/audit":
             serve_audit(self)
+            return
+        if path == "/api/dashboard/startup-log-stream":
+            serve_dashboard_startup_log_stream(self)
             return
         if path == "/":
             self.path = "/honeypot-dashboard.html"

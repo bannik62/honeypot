@@ -18,10 +18,30 @@ function formatLoadError(err) {
 }
 
 export function loadInitialData(loadJSON) {
-  loadingOverlay.show({
+  loadingOverlay.showTerminal({
+    title: 'INITIALISATION',
     message: 'Chargement de data.json…',
-    indeterminate: true,
   });
+
+  const startupAbort = new AbortController();
+  const streamPromise = fetch('/api/dashboard/startup-log-stream', {
+    method: 'GET',
+    signal: startupAbort.signal,
+  })
+    .then(async (r) => {
+      if (!r.ok || !r.body) return;
+      const reader = r.body.getReader();
+      const dec = new TextDecoder();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = dec.decode(value, { stream: true });
+        if (chunk) loadingOverlay.appendLogChunk(chunk);
+      }
+      const flush = dec.decode();
+      if (flush) loadingOverlay.appendLogChunk(flush);
+    })
+    .catch(() => {});
 
   return fetch('/data/visualizer-dashboard/data.json')
     .then((r) => {
@@ -33,8 +53,8 @@ export function loadInitialData(loadJSON) {
       return r.json();
     })
     .then((data) => {
-      loadingOverlay.setProgress(100);
       loadingOverlay.setMessage('Données prêtes');
+      startupAbort.abort();
       return new Promise((resolve) => {
         setTimeout(() => {
           loadingOverlay.hide();
@@ -48,11 +68,16 @@ export function loadInitialData(loadJSON) {
       if (status) status.innerHTML = '<strong>✅ data.json chargé</strong>';
     })
     .catch((err) => {
+      startupAbort.abort();
       loadingOverlay.showError(formatLoadError(err));
       const status = document.getElementById('dzt');
       if (status) {
         status.innerHTML = 'Aucune donnée (ouvrir via <code>honeypot-start-server start</code>)';
       }
+    })
+    .finally(() => {
+      // laisse une courte fenêtre pour la fermeture propre du stream
+      setTimeout(() => { void streamPromise; }, 0);
     });
 }
 
