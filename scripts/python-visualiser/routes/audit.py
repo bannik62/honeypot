@@ -317,12 +317,12 @@ def _classify_port(
         return {"key": key, "status": "protected", "label": "✅ Protégé"}
     if key in explicit_ports:
         # règle explicite mais pas DENY (donc pas protégée au sens de ta phase 1)
-        return {"key": key, "status": "open", "label": "⚠️ À l'air libre"}
+        return {"key": key, "status": "open", "label": "⚠️ Non protégé"}
     # Pas de règle explicite
     if policy_in == "deny":
         return {"key": key, "status": "protected", "label": "✅ Protégé"}
     if policy_in == "allow":
-        return {"key": key, "status": "open", "label": "⚠️ À l'air libre"}
+        return {"key": key, "status": "open", "label": "⚠️ Non protégé"}
     return {"key": key, "status": "unknown", "label": "🟨 Inconnu (policy UFW)"}
 
 

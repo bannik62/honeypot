@@ -54,16 +54,20 @@ Le serveur utilise **`ThreadingHTTPServer`** pour ne pas bloquer les autres requ
 
 ### `GET /api/audit` (utilisé par l’onglet « AUDIT »)
 
-- Snapshot à l’instant T : ports en écoute via `ss` + statut UFW via `ufw status verbose` (si disponible).
+- Snapshot à l’instant T : ports en écoute via `ss` + statut UFW via `sudo -n ufw status verbose`.
+- Le backend Audit est prévu pour un contexte non interactif (serveur web sans TTY) : pas de prompt sudo.
 - Retour JSON avec :
   - `ports_open` : liste des ports ouverts
+  - `ufw` : état UFW (`active`, `policy_in`, `rules_count`) + champs debug (`raw`, `debug`)
   - `cross_open_ports` : classification de phase 1
   - `dead_deny_rules` : règles DENY explicites sans service observé (snapshot)
 
 Classification (phase 1) :
 - DENY explicite sur le port => ✅ Protégé
 - Policy défaut DENY, pas de règle explicite => ✅ Protégé
-- Pas de règle ET policy ALLOW => ⚠️ À l’air libre
+- Pas de règle ET policy ALLOW => ⚠️ Non protégé
 - DENY explicite sur port sans service observé => 🟡 Règle morte (snapshot)
 
-Si UFW n’est pas supporté / indisponible : l’onglet n’effectue pas le croisement et affiche un message de compatibilité.
+Compatibilité :
+- Si `ufw` n’est pas présent : bannière de compatibilité, croisement en statut partiel/inconnu.
+- Si `ufw` est présent mais que la lecture détaillée échoue : les tableaux restent affichés avec des statuts `Inconnu` (phase 1 best-effort).
