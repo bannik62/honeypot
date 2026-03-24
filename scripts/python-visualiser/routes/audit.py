@@ -244,50 +244,25 @@ def _get_ufw_status() -> dict[str, Any]:
     if not ufw_bin:
         return {"supported": False, "active": None, "policy_in": None, "rules_count": 0}
     try:
-        # Tentative sans sudo (si le process a déjà les droits).
-        proc = _run([ufw_bin, "status", "verbose"], timeout_s=20)
-        text = (proc.stdout or "") + (proc.stderr or "")
-
-        # Si ufw demande explicitement d'être root, on réessaie en non-interactif.
-        # (évite de bloquer si sudo demande un mot de passe)
-        need_root = ("need to be root" in text.lower()) or ("need to be a root" in text.lower())
-        if proc.returncode != 0 and need_root and shutil.which("sudo"):
-            # 1) sudo -n (NOPASSWD requis) : si ça marche, on récupère directement.
-            # 2) si sudo -n échoue (password/tty requis), on tente sudo sans -n : parfois
-            #    un "timestamp" sudo permet de passer sans prompt (donc ça peut réussir).
-            try:
-                sproc = _run(["sudo", "-n", ufw_bin, "status", "verbose"], timeout_s=20)
-                text = (sproc.stdout or "") + (sproc.stderr or "")
-                stext_lower = text.lower()
-                sudo_failed_hint = (
-                    "password is required" in stext_lower
-                    or "a password is required" in stext_lower
-                    or "a terminal is required" in stext_lower
-                    or "no tty present" in stext_lower
-                    or "cannot open terminal" in stext_lower
-                )
-                if sudo_failed_hint:
-                    try:
-                        sproc2 = _run(["sudo", ufw_bin, "status", "verbose"], timeout_s=20)
-                        text = (sproc2.stdout or "") + (sproc2.stderr or "")
-                    except Exception:
-                        pass
-            except Exception:
-                # fallback : parfois -n peut échouer selon config
-                try:
-                    sproc2 = _run(["sudo", ufw_bin, "status", "verbose"], timeout_s=20)
-                    text = (sproc2.stdout or "") + (sproc2.stderr or "")
-                except Exception:
-                    pass
+        text = ""
+        # UFW exige des droits root: on force un appel sudo non-interactif.
+        if not shutil.which("sudo"):
+            return {"supported": True, "active": None, "policy_in": None, "rules_count": 0}
+        try:
+            sproc = _run(["sudo", "-n", ufw_bin, "status", "verbose"], timeout_s=20)
+            text = (sproc.stdout or "") + (sproc.stderr or "")
+        except Exception:
+            text = ""
 
         ufw = _parse_ufw_status(text)
 
-        # Phase 1 : si on a une sortie (même si parsing partiel), ne pas griser l'audit.
-        if text.strip():
-            ufw["supported"] = True
+        # Phase 1 : si ufw existe, on le considère supporté même avec parsing partiel
+        # (on garde "Inconnu" au lieu de basculer en "non supporté").
+        ufw["supported"] = True
         return ufw
     except Exception:
-        return {"supported": False, "active": None, "policy_in": None, "rules_count": 0}
+        # Même en cas d'erreur d'exécution, on sait que le binaire ufw existe.
+        return {"supported": True, "active": None, "policy_in": None, "rules_count": 0}
 
 
 def _classify_port(

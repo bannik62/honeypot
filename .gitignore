@@ -16,3 +16,7 @@ config/config
 *.backup
 *.bak
 data/
+
+# Python cache
+__pycache__/
+*.pyc
