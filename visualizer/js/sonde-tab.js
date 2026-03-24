@@ -179,6 +179,7 @@ export function initSonde() {
         es = null;
       }
       enqueueLine('# Connexion SSE interrompue (réseau, sudo ou arrêt).');
+      enqueueLine('# Si tcpdump ne démarre pas: vérifiez sudo (sudo -n tcpdump ...) et README § Sonde.');
       setSondeToggle(false);
       fetch('/api/sonde/stop', { method: 'POST' }).catch(() => {});
     };

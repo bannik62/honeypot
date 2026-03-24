@@ -52,14 +52,18 @@ function renderUfw(ufw) {
   const el = document.getElementById('audit-ufw-status');
   if (!el) return;
   const raw = ufw?.raw ? String(ufw.raw) : '';
+  const dbg = ufw?.debug || null;
   const rawSnippet = raw ? raw.split('\n').slice(0, 8).join('\n') : '';
   const rawHtml = rawSnippet
     ? escapeHtml(rawSnippet).replace(/\n/g, '<br>')
     : '';
+  const hint = 'UFW non accessible en mode non interactif (sudo -n). Vérifiez la configuration sudo (voir README § Audit).';
 
   if (!ufw || ufw.active == null) {
+    const debugLine = dbg?.error ? `<div style="margin-top:6px;opacity:.9;color:var(--w)">${escapeHtml(hint)}</div>` : '';
     el.innerHTML = `
       UFW : inconnu
+      ${debugLine}
       ${rawHtml ? `<div style="margin-top:6px;opacity:.85;font-size:.64rem;color:var(--mu)">Debug ufw :<br><code style="white-space:normal;word-break:break-word">${rawHtml}</code></div>` : ''}
     `;
     return;
