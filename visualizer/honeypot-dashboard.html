@@ -379,7 +379,12 @@ tr:hover td{background:rgba(0,212,255,.03)}
 
   <div id="audit-sections">
     <div style="margin-bottom:14px">
-      <div style="font-family:'Orbitron',monospace;color:var(--mu);letter-spacing:1px;font-size:.74rem;margin-bottom:8px">1) Ports ouverts</div>
+      <div style="font-family:'Orbitron',monospace;color:var(--mu);letter-spacing:1px;font-size:.74rem;margin-bottom:8px">1) Statut UFW</div>
+      <div id="audit-ufw-status" style="padding:12px 14px;background:rgba(0,0,0,.35);border:1px solid rgba(26,58,92,.8);border-radius:8px;color:var(--tx);line-height:1.5;font-size:.72rem"></div>
+    </div>
+
+    <div style="margin-bottom:14px">
+      <div style="font-family:'Orbitron',monospace;color:var(--mu);letter-spacing:1px;font-size:.74rem;margin-bottom:8px">2) Ports ouverts</div>
       <table style="width:100%;border-collapse:collapse">
         <thead>
           <tr>
@@ -392,11 +397,6 @@ tr:hover td{background:rgba(0,212,255,.03)}
         </thead>
         <tbody id="audit-ports-tbody"></tbody>
       </table>
-    </div>
-
-    <div style="margin-bottom:14px">
-      <div style="font-family:'Orbitron',monospace;color:var(--mu);letter-spacing:1px;font-size:.74rem;margin-bottom:8px">2) Statut UFW</div>
-      <div id="audit-ufw-status" style="padding:12px 14px;background:rgba(0,0,0,.35);border:1px solid rgba(26,58,92,.8);border-radius:8px;color:var(--tx);line-height:1.5;font-size:.72rem"></div>
     </div>
 
     <div style="margin-bottom:14px">
