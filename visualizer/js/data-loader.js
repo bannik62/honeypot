@@ -18,6 +18,7 @@ function formatLoadError(err) {
 }
 
 export function loadInitialData(loadJSON) {
+  const startTs = Date.now();
   loadingOverlay.showTerminal({
     title: 'INITIALISATION',
     message: 'Chargement de data.json…',
@@ -53,19 +54,23 @@ export function loadInitialData(loadJSON) {
       return r.json();
     })
     .then((data) => {
-      loadingOverlay.setMessage('Données prêtes');
+      loadingOverlay.setMessage('Données prêtes, rendu en cours…');
       startupAbort.abort();
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          loadingOverlay.hide();
-          resolve(data);
-        }, 220);
-      });
+      return data;
     })
     .then((data) => {
       loadJSON(data);
       const status = document.getElementById('dzt');
       if (status) status.innerHTML = '<strong>✅ data.json chargé</strong>';
+      // Évite l'effet "flash": on garde l'overlay au moins ~1.2s.
+      const elapsed = Date.now() - startTs;
+      const waitMs = Math.max(0, 1200 - elapsed);
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          loadingOverlay.hide();
+          resolve();
+        }, waitMs);
+      });
     })
     .catch((err) => {
       startupAbort.abort();
