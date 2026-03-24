@@ -17,24 +17,11 @@ function formatLoadError(err) {
   return 'Aucune donnée ou réseau indisponible. Ouvrez via honeypot-start-server (tunnel SSH) ou importez un CSV.';
 }
 
-function waitForMapReady(maxWaitMs = 8000) {
+function waitForPaint() {
   return new Promise((resolve) => {
-    const start = Date.now();
-    const tick = () => {
-      const loader = document.getElementById('map-loader');
-      if (!loader) {
-        resolve();
-        return;
-      }
-      const hidden = loader.style.display === 'none';
-      const failed = (loader.textContent || '').toLowerCase().includes('erreur');
-      if (hidden || failed || (Date.now() - start) >= maxWaitMs) {
-        resolve();
-        return;
-      }
-      setTimeout(tick, 120);
-    };
-    tick();
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => resolve());
+    });
   });
 }
 
@@ -83,7 +70,7 @@ export function loadInitialData(loadJSON) {
       loadJSON(data);
       const status = document.getElementById('dzt');
       if (status) status.innerHTML = '<strong>✅ data.json chargé</strong>';
-      return waitForMapReady(8000);
+      return waitForPaint();
     })
     .then(() => {
       // Évite l'effet "flash": on garde l'overlay au moins ~1.2s.
