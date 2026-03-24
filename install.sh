@@ -152,6 +152,7 @@ if [ -f "$BASHRC" ]; then
     sed -i.bak '/^alias count-ips=/d' "$BASHRC" 2>/dev/null
     sed -i.bak '/^alias piegeAbot=/d' "$BASHRC" 2>/dev/null
     sed -i.bak '/^alias honeypot-make-visualizer-data=/d' "$BASHRC" 2>/dev/null
+    sed -i.bak '/^alias honeypot-check=/d' "$BASHRC" 2>/dev/null
     sed -i.bak '/^honeypot-start-server()/d' "$BASHRC" 2>/dev/null
     rm -f "${BASHRC}.bak" 2>/dev/null
 
@@ -173,6 +174,7 @@ if [ -f "$BASHRC" ]; then
     echo "alias count-ips='echo \"📊 Journal endlessh (lignes ACCEPT):\" && sudo journalctl -u endlessh -o cat --no-pager 2>/dev/null | grep \"ACCEPT\" | grep -oE \"[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\" | sort -u | wc -l && echo \"📊 connections.csv:\" && tail -n +2 \"$SCRIPT_DIR_ABS/data/logs/connections.csv\" 2>/dev/null | cut -d\",\" -f2 | sort -u | wc -l && echo \"📊 Différence (manquantes dans connections.csv):\" && comm -23 <(sudo journalctl -u endlessh -o cat --no-pager 2>/dev/null | grep \"ACCEPT\" | grep -oE \"[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\" | sort -u) <(tail -n +2 \"$SCRIPT_DIR_ABS/data/logs/connections.csv\" 2>/dev/null | cut -d\",\" -f2 | sort -u | grep -E \"^[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}$\") | wc -l'" >> "$BASHRC"
     echo "alias piegeAbot='sudo journalctl -u endlessh -f'" >> "$BASHRC"
     echo "alias honeypot-make-visualizer-data='cd \"$SCRIPT_DIR_ABS\" && ./scripts/generate-data.sh'" >> "$BASHRC"
+    echo "alias honeypot-check='cd \"$SCRIPT_DIR_ABS\" && ./scripts/honeypot-check.sh'" >> "$BASHRC"
     echo "honeypot-start-server() { cd \"$SCRIPT_DIR_ABS\" && ./scripts/python-visualiser/server.sh \"\$@\"; }" >> "$BASHRC"
 
     echo "✅ Aliases mis à jour dans $BASHRC"
@@ -196,6 +198,7 @@ echo "   • setup-auto-scan    → Configurer les scans automatiques"
 echo "   • count-ips          → Compter les IPs (journal vs connections.csv)"
 echo "   • piegeAbot                  → Suivre les connexions en temps réel (journalctl)"
 echo "   • honeypot-make-visualizer-data → Générer data.json pour le visualizer"
+echo "   • honeypot-check     → Diagnostic complet de l'installation"
 echo "   • honeypot-start-server {start|stop|status} → Serveur visualiseur (127.0.0.1:8765)"
 echo ""
 echo "⚠️  Pour utiliser les aliases dans cette session :"

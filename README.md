@@ -129,7 +129,7 @@ honeypot-make-visualizer-data
 honeypot-start-server start
 
 # 3. Depuis votre PC : tunnel SSH (garder la fenêtre ouverte)
-ssh -L 8765:127.0.0.1:8765 ubuntu@IP_DU_VPS
+ssh -L 8765:127.0.0.1:8765 USER@IP_DU_VPS
 
 # 4. Ouvrir dans le navigateur
 http://localhost:8765
@@ -148,6 +148,22 @@ Le dashboard contient 4 onglets :
 - **IPs** — tableau complet avec filtres et modales de détail (nmap, DNS, screenshots)
 
 Depuis l’interface, **↻ Régénérer data.json** lance `scripts/dashboard-regenerate.sh` : **`sudo traceroute-ip.sh`** puis **`generate-data.sh`** (flux `regenerate-stream`).
+
+### Droits sudo requis (important)
+
+Pour que toutes les fonctions du dashboard marchent sur un serveur non interactif (pas de TTY), les commandes suivantes doivent être autorisées via `sudo -n` pour l'utilisateur qui lance le serveur :
+
+- **Audit réseau** :
+  - `sudo -n /usr/sbin/ufw status verbose`
+  - `sudo -n ss -H -l -n -t -u -p`
+- **Sonde** :
+  - `sudo -n /usr/sbin/tcpdump ...`
+- **Régénérer data.json (bouton)** :
+  - `sudo bash scripts/traceroute-ip.sh`
+- **Monitoring live / diagnostics** :
+  - `sudo journalctl ...` (endlessh)
+
+Si `sudo -n` n'est pas autorisé pour une commande, l'UI passe en mode partiel (`Inconnu`, PID masqués, etc.) même si la commande fonctionne en shell interactif.
 
 En vue **pays**, le tooltip agrège automatiquement le nombre total de vulnérabilités HIGH, la liste des ports observés et les rapports disponibles (nmap, DNS, traceroute, screenshots, nikto) pour le pays survolé. En vue **IP individuelle**, le tooltip affiche les données précises de cette IP (pays, vulnérabilités, ports, rapports).
 

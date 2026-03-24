@@ -48,13 +48,16 @@ Le bouton **Régénérer** appelle `dashboard-regenerate.sh`, qui lance **`sudo 
 
 Couches : `L3` (tcp/udp/icmp + port), `L4` (fanions `syn` / `fin` / `rst` séparément ou `synfinrst`), `L7` (`-A` + `greater`). Filtres : whitelist dans `routes/sonde.py`.
 
+Pré-requis sudo (serveur non interactif) :
+- `sudo -n /usr/sbin/tcpdump ...`
+
 Le serveur utilise **`ThreadingHTTPServer`** pour ne pas bloquer les autres requêtes pendant un flux SSE.
 
 ## API — Audit Réseau (phase 1, read-only)
 
 ### `GET /api/audit` (utilisé par l’onglet « AUDIT »)
 
-- Snapshot à l’instant T : ports en écoute via `ss` + statut UFW via `sudo -n ufw status verbose`.
+- Snapshot à l’instant T : ports en écoute via `sudo -n ss ...` + statut UFW via `sudo -n ufw status verbose`.
 - Le backend Audit est prévu pour un contexte non interactif (serveur web sans TTY) : pas de prompt sudo.
 - Retour JSON avec :
   - `ports_open` : liste des ports ouverts
@@ -71,3 +74,4 @@ Classification (phase 1) :
 Compatibilité :
 - Si `ufw` n’est pas présent : bannière de compatibilité, croisement en statut partiel/inconnu.
 - Si `ufw` est présent mais que la lecture détaillée échoue : les tableaux restent affichés avec des statuts `Inconnu` (phase 1 best-effort).
+- Si `sudo -n ss` échoue : les colonnes process/PID peuvent rester masquées (`— PID —`).
