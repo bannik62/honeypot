@@ -48,6 +48,23 @@ function hopCount(d) {
   return Array.isArray(d.hops) ? d.hops.length : 0;
 }
 
+function linkEndpointId(end) {
+  if (end && typeof end === 'object' && end.id != null) return end.id;
+  return end;
+}
+
+/** Nœud dragué + tous les voisins reliés par au moins une arête (graphe non orienté). */
+function neighborIdSet(draggedId, linkList) {
+  const out = new Set([draggedId]);
+  linkList.forEach((l) => {
+    const s = linkEndpointId(l.source);
+    const t = linkEndpointId(l.target);
+    if (s === draggedId) out.add(t);
+    if (t === draggedId) out.add(s);
+  });
+  return out;
+}
+
 export function renderGraph() {
   const D = state.D;
   const wrap = document.getElementById('gwrap');
@@ -186,13 +203,41 @@ export function renderGraph() {
   const node = zoomGroup.append('g').selectAll('g').data(nodes).join('g')
     .attr('class', (d) => (d.type === 'vps' ? 'nv' : d.type === 'hop' ? 'na nh' : 'na'))
     .call(d3.drag()
-      .on('start', (e, d) => { if (!e.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
-      .on('drag', (e, d) => { d.fx = e.x; d.fy = e.y; })
-      .on('end', (e, d) => { if (!e.active) sim.alphaTarget(0); d.fx = d.x; d.fy = d.y; }));
+      .on('start', (event, dnd) => {
+        const elastic = neighborIdSet(dnd.id, links);
+        nodes.forEach((n) => {
+          if (elastic.has(n.id)) {
+            n.fx = null;
+            n.fy = null;
+          } else {
+            n.fx = n.x;
+            n.fy = n.y;
+          }
+        });
+        dnd.fx = dnd.x;
+        dnd.fy = dnd.y;
+        if (!event.active) sim.alphaTarget(0.3).restart();
+      })
+      .on('drag', (event, dnd) => {
+        dnd.fx = event.x;
+        dnd.fy = event.y;
+      })
+      .on('end', (event) => {
+        if (!event.active) sim.alphaTarget(0);
+        nodes.forEach((n) => {
+          n.fx = n.x;
+          n.fy = n.y;
+        });
+      }));
+  const graphZoomPct = document.getElementById('graph-zoom-pct');
+  if (graphZoomPct) graphZoomPct.textContent = '100%';
   svg.call(d3.zoom()
     .scaleExtent([0.2, 4])
     .filter((event) => !event.target.closest('.na') && !event.target.closest('.nv'))
-    .on('zoom', (event) => zoomGroup.attr('transform', event.transform)));
+    .on('zoom', (event) => {
+      zoomGroup.attr('transform', event.transform);
+      if (graphZoomPct) graphZoomPct.textContent = `${Math.round(event.transform.k * 100)}%`;
+    }));
   node.append('circle').attr('r', (d) => (d.type === 'vps' ? 17 : d.type === 'hop' ? 4 : (d.vuln > 0 ? 8 : 5)));
   node.append('text').attr('class', (d) => (d.type === 'vps' ? 'nl vp' : 'nl'))
     .attr('dx', (d) => (d.type === 'vps' ? -12 : 12))
