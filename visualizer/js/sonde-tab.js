@@ -1,3 +1,5 @@
+import { syncHeaderContextFeed } from './header-context-feed.js';
+
 /**
  * Onglet Sonde — EventSource SSE vers /api/sonde/stream
  * Garde-fous : le L7 (-A) peut envoyer des Mo/s ; sans limite le navigateur plante.
@@ -90,6 +92,7 @@ export function initSonde() {
       requestAnimationFrame(flushInbox);
     } else {
       flushScheduled = false;
+      if (document.querySelector('.tab.active')?.dataset?.tab === 'sonde') syncHeaderContextFeed();
     }
   }
 
@@ -104,6 +107,7 @@ export function initSonde() {
   function appendLineSync(text) {
     ring.push(truncateLine(text));
     applyRingToDom();
+    if (document.querySelector('.tab.active')?.dataset?.tab === 'sonde') syncHeaderContextFeed();
   }
 
   function resetLog() {

@@ -6,6 +6,7 @@ import { renderStats } from './stats-tab.js';
 import { renderIPTable } from './ips-tab.js';
 import { initSonde } from './sonde-tab.js';
 import { initAudit } from './audit-tab.js';
+import { syncHeaderContextFeed } from './header-context-feed.js';
 
 function updateHeader() {
   const D = state.D;
@@ -23,6 +24,7 @@ function loadJSON(data) {
   renderStats();
   renderIPTable();
   if (document.getElementById('panel-graph').classList.contains('active')) renderGraph();
+  syncHeaderContextFeed();
 }
 
 function loadCSV(txt) {
@@ -228,6 +230,7 @@ document.querySelectorAll('.tab').forEach((btn) => {
     document.getElementById(`panel-${id}`).classList.add('active');
     if (id === 'graph' && state.D.length > 0) setTimeout(renderGraph, 60);
     if (id === 'ips' && state.D.length > 0) renderIPTable();
+    syncHeaderContextFeed();
   });
 });
 
@@ -279,7 +282,6 @@ fetch('/api/vulners/status')
 // Feed "debug" côté UI : montre si le backend reçoit/répond aux lookups
 // (sans jamais exposer de clé, ni de token)
 {
-  const feedWrap = document.getElementById('vulners-feed');
   const feedLines = document.getElementById('vulners-feed-lines');
   let lastId = 0;
 
@@ -307,7 +309,9 @@ fetch('/api/vulners/status')
     row.title = text;
     row.innerHTML = `<span class="vf-ts">${escapeHtml(tsStr)}</span>${escapeHtml(text)}`;
     feedLines.appendChild(row);
-    if (feedWrap) feedWrap.scrollTop = feedWrap.scrollHeight;
+    if (document.querySelector('.tab.active')?.dataset?.tab === 'stats') {
+      feedLines.scrollTop = feedLines.scrollHeight;
+    }
 
     // Petit bonus : quand ça marche/échoue, on met aussi l'indicateur en conséquence.
     const dot = document.getElementById('vulners-dot');
@@ -339,4 +343,5 @@ fetch('/api/vulners/status')
 initMap();
 initSonde();
 initAudit();
+syncHeaderContextFeed();
 loadInitialData(loadJSON);

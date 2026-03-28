@@ -1,6 +1,7 @@
 import { GRAPH_TOP_ATTACKERS_LIMIT } from './constants.js';
 import { state } from './state.js';
 import { showPointTip, moveTip, hideTip } from './tooltip.js';
+import { syncHeaderContextFeed } from './header-context-feed.js';
 
 let sim = null;
 
@@ -77,7 +78,10 @@ export function renderGraph() {
 
   const gm = document.getElementById('graph-meta');
   if (gm) gm.textContent = `Réseau: ${top.length.toLocaleString()} / ${D.length.toLocaleString()} (top attaquants)`;
-  if (!top.length) return;
+  if (!top.length) {
+    syncHeaderContextFeed();
+    return;
+  }
 
   // Fallback "Pays" pour les hops : si `hop_countries` n'est pas encore présent dans `data.json`,
   // on récupère le pays depuis l'objet principal `D` (pour chaque IP).
@@ -230,6 +234,7 @@ export function renderGraph() {
   sim.on('end', () => {
     savePositions(nodes);
   });
+  syncHeaderContextFeed();
 }
 
 export function resetSim() {

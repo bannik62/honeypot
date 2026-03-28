@@ -1,4 +1,5 @@
 import { state } from './state.js';
+import { syncHeaderContextFeed } from './header-context-feed.js';
 
 export function renderIPTable(filter, search) {
   const D = state.D;
@@ -35,4 +36,5 @@ export function renderIPTable(filter, search) {
       : '<span class="mv">—</span>';
     return `<tr><td class="av">${esc(d.ip)}</td><td>${esc(d.country) || '?'}</td><td class="mv" style="font-size:.65rem">${esc(d.ports) || '—'}</td><td>${badges}</td><td>${vuln}</td></tr>`;
   }).join('');
+  syncHeaderContextFeed();
 }

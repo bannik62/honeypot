@@ -1,6 +1,7 @@
 import { CC, ISO2_TO_N3, VPS, W, H } from './constants.js';
 import { state, getByCountry } from './state.js';
 import { showCountryTip, showPointTip, moveTip, hideTip } from './tooltip.js';
+import { syncHeaderContextFeed } from './header-context-feed.js';
 
 // Légèrement plus dé-zoomé et recentré pour voir plus du globe à 100 %
 let projection = d3.geoMercator().scale(120).translate([W / 2, H / 2 + 40]).center([0, 15]);
@@ -432,7 +433,11 @@ export function initMap() {
           mapG.attr('transform', t);
           updateZoomPct(t.k);
         })
-        .on('end', (e) => { currentZoomK = e.transform.k; drawMapOverlay(); });
+        .on('end', (e) => {
+          currentZoomK = e.transform.k;
+          drawMapOverlay();
+          syncHeaderContextFeed();
+        });
       svg.call(zoom);
       updateZoomPct(1);
       const btns = document.querySelectorAll('#map-ctl button');
@@ -461,7 +466,10 @@ export function initMap() {
       }
       const filterEl = document.getElementById('map-filter-cat');
       if (filterEl) {
-        filterEl.addEventListener('change', drawMapOverlay);
+        filterEl.addEventListener('change', () => {
+          drawMapOverlay();
+          syncHeaderContextFeed();
+        });
       }
       if (state.D.length > 0) drawMapOverlay();
     })

@@ -1,4 +1,5 @@
 import { loadingOverlay } from './loading-overlay.js';
+import { syncHeaderContextFeed } from './header-context-feed.js';
 
 function escapeHtml(s) {
   return String(s)
@@ -151,6 +152,7 @@ async function loadAudit(options = {}) {
     renderUfw(data.ufw);
     renderCross(data.cross_open_ports);
     renderDeadDeny(data.dead_deny_rules);
+    syncHeaderContextFeed();
     if (withOverlay) loadingOverlay.hide();
   } catch (e) {
     if (withOverlay) loadingOverlay.showError(e?.message || String(e));

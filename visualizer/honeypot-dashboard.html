@@ -30,16 +30,34 @@ header{
 .hc.r .v{color:var(--a2)}.hc.g .v{color:var(--a3)}
 #vulners-feed{
   position:relative;
+  display:flex;
+  flex-direction:column;
   width:min(360px,92vw);
   height:120px;
   background:rgba(0,0,0,.65);
   border:1px solid rgba(200,230,255,.18);
   border-radius:8px;
-  overflow-y:auto;
+  overflow:hidden;
   padding:36px 10px 8px;
   font-size:.62rem;
   color:var(--tx);
   box-shadow:0 0 18px rgba(0,212,255,.08);
+}
+#header-feed-body{
+  flex:1;
+  min-height:0;
+  position:relative;
+}
+.header-feed-pane{
+  position:absolute;
+  left:0;
+  right:0;
+  top:0;
+  bottom:0;
+  overflow-y:auto;
+}
+.header-feed-pane[hidden]{
+  display:none !important;
 }
 #vulners-feed .vf-title{
   position:absolute;
@@ -241,8 +259,11 @@ tr:hover td{background:rgba(0,212,255,.03)}
   <div class="logo">🍯 HONEY<span>TRAP</span></div>
   <div class="vf-center">
     <div id="vulners-feed" aria-live="polite">
-      <div class="vf-title">VULNERS FEED</div>
-      <div id="vulners-feed-lines"></div>
+      <div class="vf-title" id="header-feed-title">CARTE — FILTRE &amp; ZOOM</div>
+      <div id="header-feed-body">
+        <div id="vulners-feed-lines" class="header-feed-pane" hidden></div>
+        <div id="header-context-lines" class="header-feed-pane"></div>
+      </div>
     </div>
   </div>
   <div class="hs">
