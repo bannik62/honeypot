@@ -48,23 +48,6 @@ function hopCount(d) {
   return Array.isArray(d.hops) ? d.hops.length : 0;
 }
 
-function linkEndpointId(end) {
-  if (end && typeof end === 'object' && end.id != null) return end.id;
-  return end;
-}
-
-/** Nœud dragué + tous les voisins reliés par au moins une arête (graphe non orienté). */
-function neighborIdSet(draggedId, linkList) {
-  const out = new Set([draggedId]);
-  linkList.forEach((l) => {
-    const s = linkEndpointId(l.source);
-    const t = linkEndpointId(l.target);
-    if (s === draggedId) out.add(t);
-    if (t === draggedId) out.add(s);
-  });
-  return out;
-}
-
 export function renderGraph() {
   const D = state.D;
   const wrap = document.getElementById('gwrap');
@@ -179,8 +162,7 @@ export function renderGraph() {
       if (sp && typeof sp.x === 'number' && typeof sp.y === 'number') {
         n.x = sp.x;
         n.y = sp.y;
-        // Figé : au retour sur l’onglet le graphe ne repart pas sous les forces.
-        // Le drag libère implicitement via fx/fy (start fixe, drag suit la souris, end re-fige).
+        // Figé au reload : pas de dérive au changement d’onglet. Au drag, seul le nœud déplacé est piloté.
         n.fx = sp.x;
         n.fy = sp.y;
       }
@@ -203,32 +185,9 @@ export function renderGraph() {
   const node = zoomGroup.append('g').selectAll('g').data(nodes).join('g')
     .attr('class', (d) => (d.type === 'vps' ? 'nv' : d.type === 'hop' ? 'na nh' : 'na'))
     .call(d3.drag()
-      .on('start', (event, dnd) => {
-        const elastic = neighborIdSet(dnd.id, links);
-        nodes.forEach((n) => {
-          if (elastic.has(n.id)) {
-            n.fx = null;
-            n.fy = null;
-          } else {
-            n.fx = n.x;
-            n.fy = n.y;
-          }
-        });
-        dnd.fx = dnd.x;
-        dnd.fy = dnd.y;
-        if (!event.active) sim.alphaTarget(0.3).restart();
-      })
-      .on('drag', (event, dnd) => {
-        dnd.fx = event.x;
-        dnd.fy = event.y;
-      })
-      .on('end', (event) => {
-        if (!event.active) sim.alphaTarget(0);
-        nodes.forEach((n) => {
-          n.fx = n.x;
-          n.fy = n.y;
-        });
-      }));
+      .on('start', (e, d) => { if (!e.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+      .on('drag', (e, d) => { d.fx = e.x; d.fy = e.y; })
+      .on('end', (e, d) => { if (!e.active) sim.alphaTarget(0); d.fx = d.x; d.fy = d.y; }));
   const graphZoomPct = document.getElementById('graph-zoom-pct');
   if (graphZoomPct) graphZoomPct.textContent = '100%';
   svg.call(d3.zoom()
