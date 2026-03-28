@@ -9,6 +9,9 @@ const POS_KEY = 'honeypot-network-positions-v1';
 
 /** Icône PNG des nœuds attaquants (chemin relatif à la page du dashboard). */
 const GRAPH_ATK_ICON = 'img/pirate.png';
+/** Icône PNG des hops (relais traceroute). */
+const GRAPH_HOP_ICON = 'img/hop.png';
+const GRAPH_HOP_ICON_PX = 18;
 
 function loadSavedPositions() {
   try {
@@ -193,8 +196,14 @@ export function renderGraph() {
     .filter((event) => !event.target.closest('.na') && !event.target.closest('.nv'))
     .on('zoom', (event) => zoomGroup.attr('transform', event.transform)));
   const atkIconPx = (d) => ((d.vuln || 0) > 0 ? 22 : 18);
-  node.filter((d) => d.type === 'vps' || d.type === 'hop').append('circle')
-    .attr('r', (d) => (d.type === 'vps' ? 17 : 4));
+  node.filter((d) => d.type === 'vps').append('circle').attr('r', 17);
+  node.filter((d) => d.type === 'hop').append('image')
+    .attr('class', 'graph-hop-icon')
+    .attr('href', GRAPH_HOP_ICON)
+    .attr('width', GRAPH_HOP_ICON_PX)
+    .attr('height', GRAPH_HOP_ICON_PX)
+    .attr('x', -GRAPH_HOP_ICON_PX / 2)
+    .attr('y', -GRAPH_HOP_ICON_PX / 2);
   node.filter((d) => d.type === 'atk').append('image')
     .attr('class', 'graph-atk-icon')
     .attr('href', GRAPH_ATK_ICON)
@@ -261,7 +270,7 @@ function cssVar(name, fallback) {
 const EXPORT_STYLE = (a2, a3, tx, mu) => `
     svg { font-family: "Share Tech Mono", "DejaVu Sans Mono", monospace; }
     .nv circle { fill: ${a3}; filter: drop-shadow(0 0 6px ${a3}); }
-    .na.nh circle { fill: ${mu}; opacity: 0.75; }
+    .na.nh .graph-hop-icon { opacity: 0.88; }
     .na:not(.nh) .graph-atk-icon { opacity: 0.9; }
     .nl { fill: ${tx}; font-family: "Share Tech Mono", "DejaVu Sans Mono", monospace; font-size: 10px; }
     .nl.vp { fill: ${a3}; font-family: Orbitron, "DejaVu Sans", sans-serif; font-weight: 700; font-size: 11px; }
