@@ -240,3 +240,99 @@ export function renderGraph() {
 export function resetSim() {
   if (sim) sim.alpha(1).restart();
 }
+
+function cssVar(name, fallback) {
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return v || fallback;
+}
+
+/**
+ * Télécharge un PNG du graphe (#gsvg) tel qu’affiché (zoom / pan inclus).
+ * Les styles CSS du page sont réinjectés en couleurs fixes pour le raster.
+ */
+export function exportNetworkGraphPng() {
+  const svgEl = document.getElementById('gsvg');
+  const wrap = document.getElementById('gwrap');
+  if (!svgEl || !wrap) return;
+  const lineCount = svgEl.querySelectorAll('line').length;
+  if (lineCount === 0) {
+    window.alert('Aucun graphe à exporter — charge des données et ouvre l’onglet Réseau.');
+    return;
+  }
+
+  const W2 = wrap.clientWidth || 360;
+  const H2 = wrap.clientHeight || 400;
+  const scale = 2;
+  const svgNS = 'http://www.w3.org/2000/svg';
+
+  const a2 = cssVar('--a2', '#ff3e6c');
+  const a3 = cssVar('--a3', '#39ff14');
+  const tx = cssVar('--tx', '#c8e6ff');
+  const mu = cssVar('--mu', '#4a7a9b');
+  const bg = cssVar('--s', '#0a1520');
+
+  const clone = svgEl.cloneNode(true);
+  clone.setAttribute('xmlns', svgNS);
+  clone.setAttribute('width', String(W2 * scale));
+  clone.setAttribute('height', String(H2 * scale));
+
+  const rect = document.createElementNS(svgNS, 'rect');
+  rect.setAttribute('width', '100%');
+  rect.setAttribute('height', '100%');
+  rect.setAttribute('fill', bg);
+  clone.insertBefore(rect, clone.firstChild);
+
+  let defs = clone.querySelector('defs');
+  if (!defs) {
+    defs = document.createElementNS(svgNS, 'defs');
+    clone.insertBefore(defs, clone.firstChild.nextSibling);
+  }
+  const styleEl = document.createElementNS(svgNS, 'style');
+  styleEl.setAttribute('type', 'text/css');
+  styleEl.textContent = `
+    svg { font-family: "Share Tech Mono", "DejaVu Sans Mono", monospace; }
+    .nv circle { fill: ${a3}; filter: drop-shadow(0 0 6px ${a3}); }
+    .na circle { fill: ${a2}; opacity: 0.85; }
+    .na.nh circle { fill: ${mu}; opacity: 0.75; }
+    .nl { fill: ${tx}; font-family: "Share Tech Mono", "DejaVu Sans Mono", monospace; font-size: 10px; }
+    .nl.vp { fill: ${a3}; font-family: Orbitron, "DejaVu Sans", sans-serif; font-weight: 700; font-size: 11px; }
+    .edge { stroke: ${a2}; stroke-opacity: 0.38; fill: none; }
+    .edge.hot { stroke-opacity: 0.58; }
+    .ah { fill: ${a2}; }
+  `;
+  defs.appendChild(styleEl);
+
+  const serializer = new XMLSerializer();
+  const source = serializer.serializeToString(clone);
+  const svgBlob = new Blob([`<?xml version="1.0" encoding="UTF-8"?>${source}`], {
+    type: 'image/svg+xml;charset=utf-8',
+  });
+  const url = URL.createObjectURL(svgBlob);
+
+  const img = new Image();
+  img.onload = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = W2 * scale;
+    canvas.height = H2 * scale;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    URL.revokeObjectURL(url);
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const a = document.createElement('a');
+      const d = new Date();
+      const pad = (n) => String(n).padStart(2, '0');
+      a.download = `honeypot-reseau-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}.png`;
+      a.href = URL.createObjectURL(blob);
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    }, 'image/png');
+  };
+  img.onerror = () => {
+    URL.revokeObjectURL(url);
+    window.alert('Export PNG impossible depuis ce navigateur. Réessaie avec Chromium / Firefox récent.');
+  };
+  img.src = url;
+}

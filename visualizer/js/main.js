@@ -1,7 +1,7 @@
 import { state, setData, getByCountry } from './state.js';
 import { loadInitialData, loadCSV as parseCSV, runRegenerateAndReload } from './data-loader.js';
 import { initMap, onDataChanged } from './map-tab.js';
-import { renderGraph, resetSim } from './network-tab.js';
+import { renderGraph, resetSim, exportNetworkGraphPng } from './network-tab.js';
 import { renderStats } from './stats-tab.js';
 import { renderIPTable } from './ips-tab.js';
 import { initSonde } from './sonde-tab.js';
@@ -260,12 +260,15 @@ function loadDemo() {
 
 window.loadDemo = loadDemo;
 window.resetSim = resetSim;
+window.exportNetworkGraphPng = exportNetworkGraphPng;
 window.loadCSV = loadCSV;
 window.regenerateDashboardData = () => runRegenerateAndReload(loadJSON);
 
 document.getElementById('btn-regenerate-data')?.addEventListener('click', () => {
   runRegenerateAndReload(loadJSON);
 });
+
+document.getElementById('graph-export-png')?.addEventListener('click', () => exportNetworkGraphPng());
 
 fetch('/api/vulners/status')
   .then((r) => r.json())
