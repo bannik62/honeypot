@@ -145,7 +145,7 @@ header{
 .vlbl{fill:var(--a3);font-family:'Orbitron',monospace;font-weight:700;font-size:9px;pointer-events:none}
 .dlbl{fill:var(--tx);font-size:7px;pointer-events:none;opacity:.85}
 .mleg{position:absolute;bottom:8px;right:8px;background:rgba(5,10,15,.92);border:1px solid var(--b);border-radius:6px;padding:7px 11px;font-size:.64rem}
-#zoom-pct,#graph-zoom-pct{position:absolute;bottom:8px;left:8px;background:rgba(5,10,15,.92);border:1px solid var(--b);border-radius:6px;padding:5px 9px;font-size:.7rem;font-family:'Orbitron',monospace;color:var(--a);pointer-events:none}
+#zoom-pct{position:absolute;bottom:8px;left:8px;background:rgba(5,10,15,.92);border:1px solid var(--b);border-radius:6px;padding:5px 9px;font-size:.7rem;font-family:'Orbitron',monospace;color:var(--a);pointer-events:none}
 .lr{display:flex;align-items:center;gap:6px;margin:3px 0}
 .ld{width:9px;height:9px;border-radius:50%;flex-shrink:0}
 #map-loader{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--s);font-size:.8rem;color:var(--mu);font-family:'Orbitron',monospace;letter-spacing:2px}
@@ -347,9 +347,8 @@ tr:hover td{background:rgba(0,212,255,.03)}
 <div id="panel-graph" class="panel">
   <div id="gwrap">
     <svg id="gsvg"></svg>
-    <div id="graph-zoom-pct">100%</div>
     <div id="graph-meta">Réseau: —</div>
-    <div class="gctl"><button type="button" class="btn" id="graph-export-png" title="PNG : zone visible (zoom / pan actuels)">📷 Vue</button><button type="button" class="btn" id="graph-export-png-global" title="PNG : tout le réseau (cadrage automatique)">🌐 Tout</button><button type="button" class="btn graph-reset" id="graph-reset-sim" title="Réinitialiser le layout (confirmation)">↺ Reset</button></div>
+    <div class="gctl"><button type="button" class="btn" id="graph-export-png" title="PNG : zone visible (zoom / pan actuels)">📷 Vue</button><button type="button" class="btn" id="graph-export-png-global" title="PNG : tout le réseau (cadrage automatique)">🌐 Tout</button><button type="button" class="btn graph-reset" id="graph-reset-sim" title="Relancer le layout force">↺ Reset</button></div>
   </div>
 </div>
 

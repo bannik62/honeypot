@@ -162,9 +162,6 @@ export function renderGraph() {
       if (sp && typeof sp.x === 'number' && typeof sp.y === 'number') {
         n.x = sp.x;
         n.y = sp.y;
-        // Figé au reload : pas de dérive au changement d’onglet. Au drag, seul le nœud déplacé est piloté.
-        n.fx = sp.x;
-        n.fy = sp.y;
       }
     });
   }
@@ -188,15 +185,10 @@ export function renderGraph() {
       .on('start', (e, d) => { if (!e.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
       .on('drag', (e, d) => { d.fx = e.x; d.fy = e.y; })
       .on('end', (e, d) => { if (!e.active) sim.alphaTarget(0); d.fx = d.x; d.fy = d.y; }));
-  const graphZoomPct = document.getElementById('graph-zoom-pct');
-  if (graphZoomPct) graphZoomPct.textContent = '100%';
   svg.call(d3.zoom()
     .scaleExtent([0.2, 4])
     .filter((event) => !event.target.closest('.na') && !event.target.closest('.nv'))
-    .on('zoom', (event) => {
-      zoomGroup.attr('transform', event.transform);
-      if (graphZoomPct) graphZoomPct.textContent = `${Math.round(event.transform.k * 100)}%`;
-    }));
+    .on('zoom', (event) => zoomGroup.attr('transform', event.transform)));
   node.append('circle').attr('r', (d) => (d.type === 'vps' ? 17 : d.type === 'hop' ? 4 : (d.vuln > 0 ? 8 : 5)));
   node.append('text').attr('class', (d) => (d.type === 'vps' ? 'nl vp' : 'nl'))
     .attr('dx', (d) => (d.type === 'vps' ? -12 : 12))
@@ -246,23 +238,7 @@ export function renderGraph() {
 }
 
 export function resetSim() {
-  if (!sim) return;
-  const ok = window.confirm(
-    'Réinitialiser le graphe réseau ?\n\n'
-    + 'Les positions enregistrées (glisser-déposer) seront effacées et le recalcul automatique reprendra.',
-  );
-  if (!ok) return;
-  try {
-    localStorage.removeItem(POS_KEY);
-  } catch (e) {
-    // eslint-disable-next-line no-console
-    console.warn('Impossible d’effacer les positions réseau', e);
-  }
-  sim.nodes().forEach((d) => {
-    d.fx = null;
-    d.fy = null;
-  });
-  sim.alpha(1).restart();
+  if (sim) sim.alpha(1).restart();
 }
 
 function cssVar(name, fallback) {
