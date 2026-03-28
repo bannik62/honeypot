@@ -7,6 +7,9 @@ let sim = null;
 
 const POS_KEY = 'honeypot-network-positions-v1';
 
+/** Icône VPS / honeypot (SVG). */
+const GRAPH_VPS_ICON = 'img/honeypot.svg';
+const GRAPH_VPS_ICON_PX = 34;
 /** Icône PNG des nœuds attaquants (chemin relatif à la page du dashboard). */
 const GRAPH_ATK_ICON = 'img/pirate.png';
 /** Icône PNG des hops (relais traceroute). */
@@ -180,7 +183,12 @@ export function renderGraph() {
     .force('link', d3.forceLink(links).id((d) => d.id).distance(80))
     .force('charge', d3.forceManyBody().strength(-55))
     .force('center', d3.forceCenter(W2 / 2, H2 / 2))
-    .force('collide', d3.forceCollide().radius(20));
+    .force('collide', d3.forceCollide().radius((d) => {
+      if (d.type === 'vps') return 22;
+      if (d.type === 'atk') return 12;
+      if (d.type === 'hop') return 11;
+      return 10;
+    }));
 
   const edge = zoomGroup.append('g').selectAll('line').data(links).join('line')
     .attr('class', (d) => `edge${d.hot ? ' hot' : ''}`)
@@ -196,7 +204,13 @@ export function renderGraph() {
     .filter((event) => !event.target.closest('.na') && !event.target.closest('.nv'))
     .on('zoom', (event) => zoomGroup.attr('transform', event.transform)));
   const atkIconPx = (d) => ((d.vuln || 0) > 0 ? 22 : 18);
-  node.filter((d) => d.type === 'vps').append('circle').attr('r', 17);
+  node.filter((d) => d.type === 'vps').append('image')
+    .attr('class', 'graph-vps-icon')
+    .attr('href', GRAPH_VPS_ICON)
+    .attr('width', GRAPH_VPS_ICON_PX)
+    .attr('height', GRAPH_VPS_ICON_PX)
+    .attr('x', -GRAPH_VPS_ICON_PX / 2)
+    .attr('y', -GRAPH_VPS_ICON_PX / 2);
   node.filter((d) => d.type === 'hop').append('image')
     .attr('class', 'graph-hop-icon')
     .attr('href', GRAPH_HOP_ICON)
@@ -215,7 +229,7 @@ export function renderGraph() {
     .attr('dx', (d) => (d.type === 'vps' ? -12 : 12))
     .attr('dy', (d) => (d.type === 'vps' ? -22 : d.type === 'hop' ? 0 : 4))
     // Les hops traceroute représentent des "routeurs intermédiaires" : on affiche au moins leur IP.
-    .text((d) => (d.type === 'vps' ? '🍯 VPS' : d.type === 'hop' ? d.id : d.id));
+    .text((d) => (d.type === 'vps' ? 'VPS' : d.type === 'hop' ? d.id : d.id));
   node.filter((d) => d.type === 'atk')
     .on('mouseenter', (e, d) => showPointTip(e, {
       ip: d.id,
@@ -269,7 +283,7 @@ function cssVar(name, fallback) {
 
 const EXPORT_STYLE = (a2, a3, tx, mu) => `
     svg { font-family: "Share Tech Mono", "DejaVu Sans Mono", monospace; }
-    .nv circle { fill: ${a3}; filter: drop-shadow(0 0 6px ${a3}); }
+    .nv .graph-vps-icon { filter: drop-shadow(0 0 6px ${a3}); }
     .na.nh .graph-hop-icon { opacity: 0.88; }
     .na:not(.nh) .graph-atk-icon { opacity: 0.9; }
     .nl { fill: ${tx}; font-family: "Share Tech Mono", "DejaVu Sans Mono", monospace; font-size: 10px; }
