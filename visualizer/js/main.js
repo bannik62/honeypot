@@ -3,7 +3,7 @@ import { loadInitialData, loadCSV as parseCSV, runRegenerateAndReload } from './
 import { initMap, onDataChanged } from './map-tab.js';
 import { renderGraph, resetSim, exportNetworkGraphPng } from './network-tab.js';
 import { renderStats } from './stats-tab.js';
-import { renderIPTable } from './ips-tab.js';
+import { renderIPTable, exportIPsJson } from './ips-tab.js';
 import { initSonde } from './sonde-tab.js';
 import { initAudit } from './audit-tab.js';
 import { syncHeaderContextFeed } from './header-context-feed.js';
@@ -261,12 +261,14 @@ function loadDemo() {
 window.loadDemo = loadDemo;
 window.resetSim = resetSim;
 window.exportNetworkGraphPng = exportNetworkGraphPng;
+window.exportIPsJson = exportIPsJson;
 window.loadCSV = loadCSV;
 window.regenerateDashboardData = () => runRegenerateAndReload(loadJSON);
 
 document.getElementById('btn-regenerate-data')?.addEventListener('click', () => {
   runRegenerateAndReload(loadJSON);
 });
+document.getElementById('btn-export-ips-json')?.addEventListener('click', () => exportIPsJson());
 
 document.getElementById('graph-export-png')?.addEventListener('click', () => exportNetworkGraphPng());
 document.getElementById('graph-export-png-global')?.addEventListener('click', () => exportNetworkGraphPng({ mode: 'global' }));

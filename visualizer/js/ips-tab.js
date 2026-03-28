@@ -1,6 +1,36 @@
 import { state } from './state.js';
 import { syncHeaderContextFeed } from './header-context-feed.js';
 
+function pad2(n) {
+  return n < 10 ? `0${n}` : `${n}`;
+}
+
+/** Télécharge les IPs chargées + champs agrégés (même forme que les entrées data.json). */
+export function exportIPsJson() {
+  const D = state.D;
+  if (!Array.isArray(D) || D.length === 0) {
+    window.alert('Aucune IP à exporter — charge data.json ou connections.csv.');
+    return;
+  }
+  const records = JSON.parse(JSON.stringify(D));
+  const now = new Date();
+  const payload = {
+    exported_at: now.toISOString(),
+    schema: 'honeypot-ips-v1',
+    count: records.length,
+    records,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `honeypot-ips-${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}-${pad2(now.getHours())}${pad2(now.getMinutes())}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 export function renderIPTable(filter, search) {
   const D = state.D;
   if (!D.length) return;
