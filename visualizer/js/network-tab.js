@@ -162,6 +162,10 @@ export function renderGraph() {
       if (sp && typeof sp.x === 'number' && typeof sp.y === 'number') {
         n.x = sp.x;
         n.y = sp.y;
+        // Figé : au retour sur l’onglet le graphe ne repart pas sous les forces.
+        // Le drag libère implicitement via fx/fy (start fixe, drag suit la souris, end re-fige).
+        n.fx = sp.x;
+        n.fy = sp.y;
       }
     });
   }
@@ -238,7 +242,23 @@ export function renderGraph() {
 }
 
 export function resetSim() {
-  if (sim) sim.alpha(1).restart();
+  if (!sim) return;
+  const ok = window.confirm(
+    'Réinitialiser le graphe réseau ?\n\n'
+    + 'Les positions enregistrées (glisser-déposer) seront effacées et le recalcul automatique reprendra.',
+  );
+  if (!ok) return;
+  try {
+    localStorage.removeItem(POS_KEY);
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.warn('Impossible d’effacer les positions réseau', e);
+  }
+  sim.nodes().forEach((d) => {
+    d.fx = null;
+    d.fy = null;
+  });
+  sim.alpha(1).restart();
 }
 
 function cssVar(name, fallback) {

@@ -152,7 +152,8 @@ header{
 /* GRAPH */
 #gwrap{position:relative;width:100%;height:clamp(320px,65vw,560px);background:var(--s);border:1px solid var(--b);border-radius:8px;overflow:hidden}
 #gsvg{width:100%;height:100%}
-.gctl{position:absolute;top:8px;right:8px;display:flex;gap:6px}
+.gctl{position:absolute;top:8px;right:8px;display:flex;gap:6px;align-items:center}
+#gwrap .gctl .graph-reset{margin-left:12px}
 #graph-meta{position:absolute;top:8px;left:8px;background:rgba(5,10,15,.92);border:1px solid var(--b);border-radius:6px;padding:5px 8px;font-size:.62rem;color:var(--mu)}
 .nv circle{fill:var(--a3);filter:drop-shadow(0 0 6px var(--a3))}
 .na circle{fill:var(--a2);opacity:.8;cursor:pointer}
@@ -347,7 +348,7 @@ tr:hover td{background:rgba(0,212,255,.03)}
   <div id="gwrap">
     <svg id="gsvg"></svg>
     <div id="graph-meta">Réseau: —</div>
-    <div class="gctl"><button type="button" class="btn" id="graph-export-png" title="PNG : zone visible (zoom / pan actuels)">📷 Vue</button><button type="button" class="btn" id="graph-export-png-global" title="PNG : tout le réseau (cadrage automatique)">🌐 Tout</button><button class="btn" onclick="resetSim()">↺ Reset</button></div>
+    <div class="gctl"><button type="button" class="btn" id="graph-export-png" title="PNG : zone visible (zoom / pan actuels)">📷 Vue</button><button type="button" class="btn" id="graph-export-png-global" title="PNG : tout le réseau (cadrage automatique)">🌐 Tout</button><button type="button" class="btn graph-reset" id="graph-reset-sim" title="Réinitialiser le layout (confirmation)">↺ Reset</button></div>
   </div>
 </div>
 

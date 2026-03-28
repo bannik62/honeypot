@@ -20,3 +20,6 @@ data/
 # Python cache
 __pycache__/
 *.pyc
+
+# Cursor — règles / préprompt perso (non versionnés)
+.cursor/

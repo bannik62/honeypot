@@ -270,6 +270,7 @@ document.getElementById('btn-regenerate-data')?.addEventListener('click', () => 
 
 document.getElementById('graph-export-png')?.addEventListener('click', () => exportNetworkGraphPng());
 document.getElementById('graph-export-png-global')?.addEventListener('click', () => exportNetworkGraphPng({ mode: 'global' }));
+document.getElementById('graph-reset-sim')?.addEventListener('click', () => resetSim());
 
 fetch('/api/vulners/status')
   .then((r) => r.json())
