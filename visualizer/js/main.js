@@ -269,6 +269,7 @@ document.getElementById('btn-regenerate-data')?.addEventListener('click', () => 
 });
 
 document.getElementById('graph-export-png')?.addEventListener('click', () => exportNetworkGraphPng());
+document.getElementById('graph-export-png-global')?.addEventListener('click', () => exportNetworkGraphPng({ mode: 'global' }));
 
 fetch('/api/vulners/status')
   .then((r) => r.json())

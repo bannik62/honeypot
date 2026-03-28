@@ -246,11 +246,29 @@ function cssVar(name, fallback) {
   return v || fallback;
 }
 
+const EXPORT_STYLE = (a2, a3, tx, mu) => `
+    svg { font-family: "Share Tech Mono", "DejaVu Sans Mono", monospace; }
+    .nv circle { fill: ${a3}; filter: drop-shadow(0 0 6px ${a3}); }
+    .na circle { fill: ${a2}; opacity: 0.85; }
+    .na.nh circle { fill: ${mu}; opacity: 0.75; }
+    .nl { fill: ${tx}; font-family: "Share Tech Mono", "DejaVu Sans Mono", monospace; font-size: 10px; }
+    .nl.vp { fill: ${a3}; font-family: Orbitron, "DejaVu Sans", sans-serif; font-weight: 700; font-size: 11px; }
+    .edge { stroke: ${a2}; stroke-opacity: 0.38; fill: none; }
+    .edge.hot { stroke-opacity: 0.58; }
+    .ah { fill: ${a2}; }
+  `;
+
+function findGraphZoomGroup(svg) {
+  return Array.from(svg.children).find((el) => el.tagName === 'g') || null;
+}
+
 /**
- * Télécharge un PNG du graphe (#gsvg) tel qu’affiché (zoom / pan inclus).
- * Les styles CSS du page sont réinjectés en couleurs fixes pour le raster.
+ * @param {{ mode?: 'viewport' | 'global' }} [opts]
+ * - viewport : PNG de la zone visible (zoom / pan inclus), comme à l’écran.
+ * - global : reset du transform sur le clone + viewBox sur tout le graphe (marges).
  */
-export function exportNetworkGraphPng() {
+export function exportNetworkGraphPng(opts = {}) {
+  const mode = opts.mode === 'global' ? 'global' : 'viewport';
   const svgEl = document.getElementById('gsvg');
   const wrap = document.getElementById('gwrap');
   if (!svgEl || !wrap) return;
@@ -262,7 +280,7 @@ export function exportNetworkGraphPng() {
 
   const W2 = wrap.clientWidth || 360;
   const H2 = wrap.clientHeight || 400;
-  const scale = 2;
+  const pixelScale = 2;
   const svgNS = 'http://www.w3.org/2000/svg';
 
   const a2 = cssVar('--a2', '#ff3e6c');
@@ -273,34 +291,77 @@ export function exportNetworkGraphPng() {
 
   const clone = svgEl.cloneNode(true);
   clone.setAttribute('xmlns', svgNS);
-  clone.setAttribute('width', String(W2 * scale));
-  clone.setAttribute('height', String(H2 * scale));
-
-  const rect = document.createElementNS(svgNS, 'rect');
-  rect.setAttribute('width', '100%');
-  rect.setAttribute('height', '100%');
-  rect.setAttribute('fill', bg);
-  clone.insertBefore(rect, clone.firstChild);
 
   let defs = clone.querySelector('defs');
   if (!defs) {
     defs = document.createElementNS(svgNS, 'defs');
-    clone.insertBefore(defs, clone.firstChild.nextSibling);
+    clone.insertBefore(defs, clone.firstChild);
   }
   const styleEl = document.createElementNS(svgNS, 'style');
   styleEl.setAttribute('type', 'text/css');
-  styleEl.textContent = `
-    svg { font-family: "Share Tech Mono", "DejaVu Sans Mono", monospace; }
-    .nv circle { fill: ${a3}; filter: drop-shadow(0 0 6px ${a3}); }
-    .na circle { fill: ${a2}; opacity: 0.85; }
-    .na.nh circle { fill: ${mu}; opacity: 0.75; }
-    .nl { fill: ${tx}; font-family: "Share Tech Mono", "DejaVu Sans Mono", monospace; font-size: 10px; }
-    .nl.vp { fill: ${a3}; font-family: Orbitron, "DejaVu Sans", sans-serif; font-weight: 700; font-size: 11px; }
-    .edge { stroke: ${a2}; stroke-opacity: 0.38; fill: none; }
-    .edge.hot { stroke-opacity: 0.58; }
-    .ah { fill: ${a2}; }
-  `;
+  styleEl.textContent = EXPORT_STYLE(a2, a3, tx, mu);
   defs.appendChild(styleEl);
+
+  let outW;
+  let outH;
+
+  if (mode === 'global') {
+    const zoomG = findGraphZoomGroup(clone);
+    if (zoomG) zoomG.removeAttribute('transform');
+
+    const holder = document.createElement('div');
+    holder.setAttribute('aria-hidden', 'true');
+    holder.style.cssText = 'position:absolute;left:-99999px;top:0;width:1px;height:1px;overflow:hidden;pointer-events:none';
+    document.body.appendChild(holder);
+    clone.setAttribute('width', String(W2));
+    clone.setAttribute('height', String(H2));
+    holder.appendChild(clone);
+
+    let bbox;
+    try {
+      bbox = clone.getBBox();
+    } catch {
+      bbox = null;
+    }
+    holder.remove();
+
+    if (!bbox || !(bbox.width > 0) || !(bbox.height > 0)) {
+      window.alert('Impossible de calculer le cadre du graphe pour l’export « tout le réseau ».');
+      return;
+    }
+
+    const pad = 64;
+    const vbX = bbox.x - pad;
+    const vbY = bbox.y - pad;
+    const vbW = bbox.width + 2 * pad;
+    const vbH = bbox.height + 2 * pad;
+    clone.setAttribute('viewBox', `${vbX} ${vbY} ${vbW} ${vbH}`);
+
+    const bgRect = document.createElementNS(svgNS, 'rect');
+    bgRect.setAttribute('x', String(vbX));
+    bgRect.setAttribute('y', String(vbY));
+    bgRect.setAttribute('width', String(vbW));
+    bgRect.setAttribute('height', String(vbH));
+    bgRect.setAttribute('fill', bg);
+    clone.insertBefore(bgRect, clone.firstChild);
+
+    const maxSide = 2800;
+    const fit = Math.min(maxSide / vbW, maxSide / vbH, pixelScale * 1.25);
+    outW = Math.max(1, Math.round(vbW * fit));
+    outH = Math.max(1, Math.round(vbH * fit));
+    clone.setAttribute('width', String(outW));
+    clone.setAttribute('height', String(outH));
+  } else {
+    const rect = document.createElementNS(svgNS, 'rect');
+    rect.setAttribute('width', '100%');
+    rect.setAttribute('height', '100%');
+    rect.setAttribute('fill', bg);
+    clone.insertBefore(rect, clone.firstChild);
+    outW = Math.round(W2 * pixelScale);
+    outH = Math.round(H2 * pixelScale);
+    clone.setAttribute('width', String(outW));
+    clone.setAttribute('height', String(outH));
+  }
 
   const serializer = new XMLSerializer();
   const source = serializer.serializeToString(clone);
@@ -312,8 +373,8 @@ export function exportNetworkGraphPng() {
   const img = new Image();
   img.onload = () => {
     const canvas = document.createElement('canvas');
-    canvas.width = W2 * scale;
-    canvas.height = H2 * scale;
+    canvas.width = outW;
+    canvas.height = outH;
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -323,8 +384,9 @@ export function exportNetworkGraphPng() {
       if (!blob) return;
       const a = document.createElement('a');
       const d = new Date();
-      const pad = (n) => String(n).padStart(2, '0');
-      a.download = `honeypot-reseau-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}.png`;
+      const pad2 = (n) => String(n).padStart(2, '0');
+      const tag = mode === 'global' ? 'complet' : 'vue';
+      a.download = `honeypot-reseau-${tag}-${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}-${pad2(d.getHours())}${pad2(d.getMinutes())}.png`;
       a.href = URL.createObjectURL(blob);
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 4000);
