@@ -7,6 +7,9 @@ let sim = null;
 
 const POS_KEY = 'honeypot-network-positions-v1';
 
+/** Icône PNG des nœuds attaquants (chemin relatif à la page du dashboard). */
+const GRAPH_ATK_ICON = 'img/pirate.png';
+
 function loadSavedPositions() {
   try {
     const raw = localStorage.getItem(POS_KEY);
@@ -189,7 +192,16 @@ export function renderGraph() {
     .scaleExtent([0.2, 4])
     .filter((event) => !event.target.closest('.na') && !event.target.closest('.nv'))
     .on('zoom', (event) => zoomGroup.attr('transform', event.transform)));
-  node.append('circle').attr('r', (d) => (d.type === 'vps' ? 17 : d.type === 'hop' ? 4 : (d.vuln > 0 ? 8 : 5)));
+  const atkIconPx = (d) => ((d.vuln || 0) > 0 ? 22 : 18);
+  node.filter((d) => d.type === 'vps' || d.type === 'hop').append('circle')
+    .attr('r', (d) => (d.type === 'vps' ? 17 : 4));
+  node.filter((d) => d.type === 'atk').append('image')
+    .attr('class', 'graph-atk-icon')
+    .attr('href', GRAPH_ATK_ICON)
+    .attr('width', atkIconPx)
+    .attr('height', atkIconPx)
+    .attr('x', (d) => -atkIconPx(d) / 2)
+    .attr('y', (d) => -atkIconPx(d) / 2);
   node.append('text').attr('class', (d) => (d.type === 'vps' ? 'nl vp' : 'nl'))
     .attr('dx', (d) => (d.type === 'vps' ? -12 : 12))
     .attr('dy', (d) => (d.type === 'vps' ? -22 : d.type === 'hop' ? 0 : 4))
@@ -249,8 +261,8 @@ function cssVar(name, fallback) {
 const EXPORT_STYLE = (a2, a3, tx, mu) => `
     svg { font-family: "Share Tech Mono", "DejaVu Sans Mono", monospace; }
     .nv circle { fill: ${a3}; filter: drop-shadow(0 0 6px ${a3}); }
-    .na circle { fill: ${a2}; opacity: 0.85; }
     .na.nh circle { fill: ${mu}; opacity: 0.75; }
+    .na:not(.nh) .graph-atk-icon { opacity: 0.9; }
     .nl { fill: ${tx}; font-family: "Share Tech Mono", "DejaVu Sans Mono", monospace; font-size: 10px; }
     .nl.vp { fill: ${a3}; font-family: Orbitron, "DejaVu Sans", sans-serif; font-weight: 700; font-size: 11px; }
     .edge { stroke: ${a2}; stroke-opacity: 0.38; fill: none; }
