@@ -68,3 +68,6 @@ VULNERS_API_KEY=""
 # En plus de 127.0.0.1 et des IPs de data/logs/connections.csv
 # LAB_ALLOW_IPS="10.0.0.5,192.168.1.10"
 
+# LAB — plafond de requêtes HTTP+TCP par minute et par client (IP du tunnel / navigateur), défaut 60
+# LAB_RATE_PER_MINUTE=60
+

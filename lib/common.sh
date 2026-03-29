@@ -48,23 +48,23 @@ load_config() {
 
 # Valider les valeurs de configuration
 validate_config_values() {
-    # Valider les valeurs numériques
-    if [ -n "${NMAP_PARALLEL:-}" ] && ! [[ "${NMAP_PARALLEL}" =~ ^[0-9]+$ ]] || [ "${NMAP_PARALLEL:-0}" -lt 1 ]; then
+    # Valider les valeurs numériques (conditions groupées : vide OU non numérique OU < 1)
+    if [[ -z "${NMAP_PARALLEL:-}" ]] || ! [[ "${NMAP_PARALLEL}" =~ ^[0-9]+$ ]] || [ "${NMAP_PARALLEL}" -lt 1 ]; then
         log_warn "NMAP_PARALLEL invalide (${NMAP_PARALLEL:-}), utilisation de 10 par défaut"
         export NMAP_PARALLEL=10
     fi
-    
-    if [ -n "${CAPTURE_PARALLEL:-}" ] && ! [[ "${CAPTURE_PARALLEL}" =~ ^[0-9]+$ ]] || [ "${CAPTURE_PARALLEL:-0}" -lt 1 ]; then
+
+    if [[ -z "${CAPTURE_PARALLEL:-}" ]] || ! [[ "${CAPTURE_PARALLEL}" =~ ^[0-9]+$ ]] || [ "${CAPTURE_PARALLEL}" -lt 1 ]; then
         log_warn "CAPTURE_PARALLEL invalide (${CAPTURE_PARALLEL:-}), utilisation de 5 par défaut"
         export CAPTURE_PARALLEL=5
     fi
-    
-    if [ -n "${DIG_PARALLEL:-}" ] && ! [[ "${DIG_PARALLEL}" =~ ^[0-9]+$ ]] || [ "${DIG_PARALLEL:-0}" -lt 1 ]; then
+
+    if [[ -z "${DIG_PARALLEL:-}" ]] || ! [[ "${DIG_PARALLEL}" =~ ^[0-9]+$ ]] || [ "${DIG_PARALLEL}" -lt 1 ]; then
         log_warn "DIG_PARALLEL invalide (${DIG_PARALLEL:-}), utilisation de 10 par défaut"
         export DIG_PARALLEL=10
     fi
-    
-    if [ -n "${REFRESH_INTERVAL:-}" ] && ! [[ "${REFRESH_INTERVAL}" =~ ^[0-9]+$ ]] || [ "${REFRESH_INTERVAL:-0}" -lt 1 ]; then
+
+    if [[ -z "${REFRESH_INTERVAL:-}" ]] || ! [[ "${REFRESH_INTERVAL}" =~ ^[0-9]+$ ]] || [ "${REFRESH_INTERVAL}" -lt 1 ]; then
         log_warn "REFRESH_INTERVAL invalide (${REFRESH_INTERVAL:-}), utilisation de 5 par défaut"
         export REFRESH_INTERVAL=5
     fi

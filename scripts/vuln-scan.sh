@@ -16,16 +16,21 @@ trap cleanup_temp_files EXIT INT TERM
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_FILE="$SCRIPT_DIR/../config/config"
 
-if [ -f "$CONFIG_FILE" ]; then
-    source "$CONFIG_FILE"
+# Défauts avant chargement config (évite variables vides si fichier absent ou incomplet)
+DATA_DIR=""
+NMAP_PARALLEL=1
+NMAP_MAX_RTT_TIMEOUT="500ms"
+NMAP_HOST_TIMEOUT="600s"
 
-# Valeurs par défaut pour les timeouts nmap
+if [ -f "$CONFIG_FILE" ]; then
+    # shellcheck source=/dev/null
+    source "$CONFIG_FILE"
+fi
+
+DATA_DIR="${DATA_DIR:-$SCRIPT_DIR/../data}"
+NMAP_PARALLEL="${NMAP_PARALLEL:-1}"
 NMAP_MAX_RTT_TIMEOUT="${NMAP_MAX_RTT_TIMEOUT:-500ms}"
 NMAP_HOST_TIMEOUT="${NMAP_HOST_TIMEOUT:-600s}"
-else
-    DATA_DIR="$SCRIPT_DIR/../data"
-    NMAP_PARALLEL=1
-fi
 
 if [ -z "$NMAP_PARALLEL" ] || [ "$NMAP_PARALLEL" -lt 1 ]; then
     NMAP_PARALLEL=1

@@ -268,5 +268,14 @@ done
 
 echo "]" >> "$OUTPUT"
 
+# Détection des JSON cassés (guillemets / antislash dans PTR, pays, etc. non échappés dans le heredoc)
+if command -v jq &>/dev/null; then
+    if ! jq -e . "$OUTPUT" >/dev/null 2>&1; then
+        echo "⚠️  WARN: data.json invalide après génération — vérifiez les caractères spéciaux dans PTR / pays / ports." >&2
+    fi
+else
+    echo "ℹ️  jq absent : pas de validation JSON automatique (apt install jq)." >&2
+fi
+
 echo "✅ Parse data.json terminé — $total IPs parsées ($OUTPUT)"
 echo "📊 Traceroute détectés (fichier présent): $count_tr — dont avec hops (IPv4 extraits): $count_hops_nonempty"

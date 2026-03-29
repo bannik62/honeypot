@@ -5,6 +5,12 @@ import { syncHeaderContextFeed } from './header-context-feed.js';
 
 let sim = null;
 
+/**
+ * Persistance des positions du graphe (pan utilisateur). Nécessite un navigateur
+ * avec localStorage (usage normal sur le PC via tunnel SSH vers le visualiseur).
+ * Les contextes sandboxés / automatisés sans stockage peuvent ignorer silencieusement
+ * la sauvegarde — c’est attendu, pas un bug du VPS.
+ */
 const POS_KEY = 'honeypot-network-positions-v1';
 
 /** Icône VPS / honeypot (SVG). */

@@ -11,6 +11,7 @@ import json
 import re
 import socket
 import ssl
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -27,6 +28,40 @@ TCP_TIMEOUT_MAX = 60
 
 _PRESET_WEB = VISUALIZER_DIR / "lab" / "presets-web.json"
 _PRESET_TCP = VISUALIZER_DIR / "lab" / "presets-tcp.json"
+
+# Rate-limit par client (IP du navigateur / tunnel) : compteur par minute calendaire
+_RATE_BUCKET: dict[tuple[str, int], int] = {}
+
+
+def _lab_max_per_minute() -> int:
+    raw = (CONFIG.get("LAB_RATE_PER_MINUTE") or CONFIG.get("LAB_RATE_PER_MIN") or "60").strip()
+    try:
+        n = int(raw)
+    except ValueError:
+        n = 60
+    return max(5, min(n, 600))
+
+
+def _lab_rate_wipe_old(minute_epoch: int) -> None:
+    keys = [k for k in _RATE_BUCKET if k[1] < minute_epoch - 1]
+    for k in keys:
+        del _RATE_BUCKET[k]
+
+
+def _lab_rate_ok(handler) -> bool:
+    try:
+        client = handler.client_address[0] if getattr(handler, "client_address", None) else "unknown"
+    except Exception:
+        client = "unknown"
+    minute_epoch = int(time.time() // 60)
+    _lab_rate_wipe_old(minute_epoch)
+    key = (str(client), minute_epoch)
+    cap = _lab_max_per_minute()
+    cur = _RATE_BUCKET.get(key, 0) + 1
+    if cur > cap:
+        return False
+    _RATE_BUCKET[key] = cur
+    return True
 
 
 def _read_json_body(handler, max_bytes: int = MAX_BODY_IN) -> dict[str, Any] | None:
@@ -151,6 +186,14 @@ def _serve_presets_file(handler, path: Path) -> None:
 
 
 def serve_lab_http(handler) -> None:
+    if not _lab_rate_ok(handler):
+        _send_json(
+            handler,
+            {"ok": False, "error": "Limite LAB atteinte (requêtes par minute). Réessayez plus tard."},
+            429,
+        )
+        return
+
     allowed = get_allowed_ipv4s()
     payload = _read_json_body(handler)
     if not payload:
@@ -286,6 +329,14 @@ def _decode_tcp_payload(payload: str, encoding: str) -> tuple[bytes | None, str 
 
 
 def serve_lab_tcp(handler) -> None:
+    if not _lab_rate_ok(handler):
+        _send_json(
+            handler,
+            {"ok": False, "error": "Limite LAB atteinte (requêtes par minute). Réessayez plus tard."},
+            429,
+        )
+        return
+
     allowed = get_allowed_ipv4s()
     payload = _read_json_body(handler)
     if not payload:
