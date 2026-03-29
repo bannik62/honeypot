@@ -74,10 +74,9 @@ function ifaceRoleClientHint(name) {
 
 /**
  * @param {unknown} payload — tableau de {name, role} ou de chaînes (ancien format)
+ * @returns {{ merged: string[], byName: Map<string, string> }}
  */
-function fillSondeIfaceSelect(ifaceEl, payload) {
-  if (!ifaceEl) return;
-  const prev = ifaceEl.value;
+function buildIfaceRowsFromPayload(payload) {
   /** @type {{name: string, role: string}[]} */
   let rows = [];
   if (Array.isArray(payload)) {
@@ -102,34 +101,102 @@ function fillSondeIfaceSelect(ifaceEl, payload) {
     if (b === 'any') return 1;
     return a.localeCompare(b);
   });
-  ifaceEl.innerHTML = '';
+  return { merged, byName };
+}
+
+function ifaceTriggerLabel(name) {
+  return name === 'any' ? 'any ▾' : `${name} ▾`;
+}
+
+/**
+ * Liste déroulante HTML (pas un &lt;select&gt;) : les infobulles `title` sur chaque ligne
+ * s’affichent au survol dans tous les navigateurs courants.
+ */
+function fillSondeIfaceCombo(hidden, trigger, panel, payload) {
+  const { merged, byName } = buildIfaceRowsFromPayload(payload);
+  const prev = (hidden.value || 'any').trim() || 'any';
+  panel.innerHTML = '';
   merged.forEach((name) => {
-    const o = document.createElement('option');
-    o.value = name;
-    o.textContent = name;
     const role = byName.get(name) || ifaceRoleClientHint(name);
-    if (role) o.title = role;
-    ifaceEl.appendChild(o);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.setAttribute('role', 'option');
+    btn.className = 'sonde-iface-opt';
+    btn.dataset.name = name;
+    btn.textContent = name;
+    btn.title = role;
+    btn.setAttribute('aria-selected', name === prev ? 'true' : 'false');
+    panel.appendChild(btn);
   });
-  if (merged.includes(prev)) ifaceEl.value = prev;
-  else ifaceEl.value = 'any';
-  syncSondeIfaceSelectTitle(ifaceEl);
+  const chosen = merged.includes(prev) ? prev : 'any';
+  hidden.value = chosen;
+  const chRole = byName.get(chosen) || ifaceRoleClientHint(chosen);
+  trigger.textContent = ifaceTriggerLabel(chosen);
+  trigger.title = chRole;
+  panel.querySelectorAll('.sonde-iface-opt').forEach((b) => {
+    b.setAttribute('aria-selected', b.dataset.name === chosen ? 'true' : 'false');
+  });
 }
 
-/** Infobulle sur le <select> fermé (les <option title> sont peu fiables selon les navigateurs). */
-function syncSondeIfaceSelectTitle(ifaceEl) {
-  if (!ifaceEl) return;
-  const opt = ifaceEl.selectedOptions[0];
-  ifaceEl.title = opt?.title || ifaceRoleClientHint(ifaceEl.value);
+/** @type {((e: MouseEvent) => void) | null} */
+let sondeIfaceDocClick = null;
+/** @type {((e: KeyboardEvent) => void) | null} */
+let sondeIfaceKeydown = null;
+
+function setupSondeIfaceCombo(wrap, hidden, trigger, panel) {
+  function closePanel() {
+    panel.hidden = true;
+    trigger.setAttribute('aria-expanded', 'false');
+  }
+  function openPanel() {
+    panel.hidden = false;
+    trigger.setAttribute('aria-expanded', 'true');
+  }
+  function togglePanel() {
+    if (panel.hidden) openPanel();
+    else closePanel();
+  }
+
+  trigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    togglePanel();
+  });
+
+  panel.addEventListener('click', (e) => {
+    const btn = e.target.closest('.sonde-iface-opt');
+    if (!btn) return;
+    e.stopPropagation();
+    const name = btn.dataset.name || 'any';
+    const role = btn.title || ifaceRoleClientHint(name);
+    hidden.value = name;
+    trigger.textContent = ifaceTriggerLabel(name);
+    trigger.title = role;
+    panel.querySelectorAll('.sonde-iface-opt').forEach((b) => {
+      b.setAttribute('aria-selected', b.dataset.name === name ? 'true' : 'false');
+    });
+    closePanel();
+  });
+
+  if (sondeIfaceDocClick) document.removeEventListener('click', sondeIfaceDocClick);
+  sondeIfaceDocClick = (e) => {
+    if (!wrap.contains(/** @type {Node} */ (e.target))) closePanel();
+  };
+  document.addEventListener('click', sondeIfaceDocClick);
+
+  if (sondeIfaceKeydown) document.removeEventListener('keydown', sondeIfaceKeydown);
+  sondeIfaceKeydown = (e) => {
+    if (e.key === 'Escape' && !panel.hidden) closePanel();
+  };
+  document.addEventListener('keydown', sondeIfaceKeydown);
 }
 
-async function loadSondeInterfaces(ifaceEl) {
+async function loadSondeInterfaces(hidden, trigger, panel) {
   try {
     const r = await fetch('/api/sonde/interfaces');
     const j = await r.json();
-    fillSondeIfaceSelect(ifaceEl, j.interfaces);
+    fillSondeIfaceCombo(hidden, trigger, panel, j.interfaces);
   } catch {
-    fillSondeIfaceSelect(ifaceEl, []);
+    fillSondeIfaceCombo(hidden, trigger, panel, []);
   }
 }
 
@@ -140,14 +207,24 @@ export function initSonde() {
   const layerEl = document.getElementById('sonde-layer');
   const portEl = document.getElementById('sonde-port');
   const grepEl = document.getElementById('sonde-grep');
-  const ifaceEl = document.getElementById('sonde-iface');
+  const ifaceWrap = document.getElementById('sonde-iface-wrap');
+  const ifaceHidden = document.getElementById('sonde-iface-value');
+  const ifaceTrigger = document.getElementById('sonde-iface-trigger');
+  const ifacePanel = document.getElementById('sonde-iface-panel');
   const ifaceRefresh = document.getElementById('sonde-iface-refresh');
   if (!pre || !startBtn || !stopBtn || !layerEl || !portEl || !grepEl) return;
 
-  fillSondeIfaceSelect(ifaceEl, []);
-  loadSondeInterfaces(ifaceEl);
-  ifaceRefresh?.addEventListener('click', () => loadSondeInterfaces(ifaceEl));
-  ifaceEl?.addEventListener('change', () => syncSondeIfaceSelectTitle(ifaceEl));
+  /** @type {() => string} */
+  let getSondeIface = () => 'any';
+  if (ifaceWrap && ifaceHidden && ifaceTrigger && ifacePanel) {
+    setupSondeIfaceCombo(ifaceWrap, ifaceHidden, ifaceTrigger, ifacePanel);
+    fillSondeIfaceCombo(ifaceHidden, ifaceTrigger, ifacePanel, []);
+    loadSondeInterfaces(ifaceHidden, ifaceTrigger, ifacePanel);
+    ifaceRefresh?.addEventListener('click', () =>
+      loadSondeInterfaces(ifaceHidden, ifaceTrigger, ifacePanel),
+    );
+    getSondeIface = () => (ifaceHidden.value || 'any').trim() || 'any';
+  }
 
   let es = null;
   /** @param {boolean} running — true = capture en cours (Arrêter en bleu, Démarrer grisé) */
@@ -247,7 +324,7 @@ export function initSonde() {
     // Grep "tel quel" : recherche littérale, sensible à la casse.
     // Exemple : "In" ne doit pas matcher "win".
     const grepNeedle = String(grepEl.value || '').trim();
-    const iface = ifaceEl?.value?.trim() || 'any';
+    const iface = getSondeIface();
     const qs = new URLSearchParams({
       port: String(port),
       layer,
