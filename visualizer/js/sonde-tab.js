@@ -40,6 +40,36 @@ function truncateLine(text) {
   return `${text.slice(0, MAX_LINE_CHARS)} … [tronqué ${text.length} car.]`;
 }
 
+function fillSondeIfaceSelect(ifaceEl, names) {
+  if (!ifaceEl) return;
+  const prev = ifaceEl.value;
+  const merged = [...new Set([...(names || []), 'any', 'lo', 'docker0'])];
+  merged.sort((a, b) => {
+    if (a === 'any') return -1;
+    if (b === 'any') return 1;
+    return a.localeCompare(b);
+  });
+  ifaceEl.innerHTML = '';
+  merged.forEach((name) => {
+    const o = document.createElement('option');
+    o.value = name;
+    o.textContent = name;
+    ifaceEl.appendChild(o);
+  });
+  if (merged.includes(prev)) ifaceEl.value = prev;
+  else ifaceEl.value = 'any';
+}
+
+async function loadSondeInterfaces(ifaceEl) {
+  try {
+    const r = await fetch('/api/sonde/interfaces');
+    const j = await r.json();
+    fillSondeIfaceSelect(ifaceEl, j.interfaces);
+  } catch {
+    fillSondeIfaceSelect(ifaceEl, []);
+  }
+}
+
 export function initSonde() {
   const pre = document.getElementById('sonde-log');
   const startBtn = document.getElementById('sonde-start');
@@ -47,7 +77,13 @@ export function initSonde() {
   const layerEl = document.getElementById('sonde-layer');
   const portEl = document.getElementById('sonde-port');
   const grepEl = document.getElementById('sonde-grep');
+  const ifaceEl = document.getElementById('sonde-iface');
+  const ifaceRefresh = document.getElementById('sonde-iface-refresh');
   if (!pre || !startBtn || !stopBtn || !layerEl || !portEl || !grepEl) return;
+
+  fillSondeIfaceSelect(ifaceEl, []);
+  loadSondeInterfaces(ifaceEl);
+  ifaceRefresh?.addEventListener('click', () => loadSondeInterfaces(ifaceEl));
 
   let es = null;
   /** @param {boolean} running — true = capture en cours (Arrêter en bleu, Démarrer grisé) */
@@ -147,7 +183,14 @@ export function initSonde() {
     // Grep "tel quel" : recherche littérale, sensible à la casse.
     // Exemple : "In" ne doit pas matcher "win".
     const grepNeedle = String(grepEl.value || '').trim();
-    const qs = new URLSearchParams({ port: String(port), layer, filter, direction });
+    const iface = ifaceEl?.value?.trim() || 'any';
+    const qs = new URLSearchParams({
+      port: String(port),
+      layer,
+      filter,
+      direction,
+      iface,
+    });
     const url = `/api/sonde/stream?${qs}`;
 
     setSondeToggle(true);

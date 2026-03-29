@@ -551,8 +551,13 @@ tr:hover td{background:rgba(0,212,255,.03)}
     Un seul flux à la fois — un nouveau démarrage arrête l’écoute précédente.
     <strong>L7</strong> affiche le payload en ASCII : trafic chargé = beaucoup de texte — l’affichage est <strong>limité</strong> (lignes + longueur) pour ne pas faire planter le navigateur.
     <strong>Sens</strong> : filtre côté tcpdump — <strong>Entrant</strong> ≈ paquets <code>dst port</code> (lignes <strong>In</strong>), <strong>Sortant</strong> ≈ <code>src port</code> (<strong>Out</strong>).
+    <strong>Interface</strong> : <code>any</code> = tout le trafic ; <code>ens*</code> = face publique (souvent TLS sur 443) ; <code>lo</code> = loopback ; <code>docker0</code> / <code>br-*</code> / <code>veth*</code> = trafic vers les conteneurs (HTTP clair proxy→backend selon ta conf).
   </p>
   <div class="sonde-row">
+    <label title="tcpdump -i (liste depuis le VPS, noms validés côté serveur)">Interface
+      <select id="sonde-iface" style="min-width:168px"></select>
+    </label>
+    <button type="button" class="btn" id="sonde-iface-refresh" title="Rafraîchir la liste des interfaces">↻ Ifaces</button>
     <label>Port <input type="number" id="sonde-port" min="1" max="65535" value="22" title="Port TCP/UDP"></label>
     <label>Couche
       <select id="sonde-layer" title="L3 tout protocole, L4 fanions TCP, L7 payload ASCII">

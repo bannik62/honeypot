@@ -11,6 +11,7 @@ import re
 import shutil
 import subprocess
 import threading
+from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 _sonde_lock = threading.Lock()
@@ -23,15 +24,62 @@ _FILTERS_L4 = frozenset({"syn", "fin", "rst", "synfinrst"})
 _FILTERS_L7 = frozenset({"gt50", "gt128"})
 _VALID_DIRECTION = frozenset({"both", "in", "out"})
 
-# Lignes de démarrage tcpdump sur « -i any » (promiscuous, LINUX_SLL2, etc.) — bruit sans intérêt.
+# Lignes de démarrage tcpdump (promiscuous, LINUX_SLL2, etc.) — bruit sans intérêt.
 _TCPDUMP_STARTUP_NOISE = re.compile(
     r"(?i)(tcpdump:\s*)?(WARNING:.*promiscuous|"
     r"\(Promiscuous mode not supported|"
     r"data link type LINUX_|"
     r"verbose output suppressed|"
-    r"listening on any, link-type|"
+    r"listening on [^,]+, link-type|"
     r"snapshot length \d+ bytes\s*$)",
 )
+
+# Noms d’interface autorisés pour -i (pas de shell, argv seul) — évite l’injection.
+_IFACE_LITERALS = frozenset({"any", "lo", "docker0"})
+_IFACE_REGEX = (
+    re.compile(r"^ens\d+$"),
+    re.compile(r"^enp\d+s\d+$"),
+    re.compile(r"^enx[0-9a-f]{12}$", re.I),
+    re.compile(r"^eth\d+$"),
+    re.compile(r"^wlan\d+$"),
+    re.compile(r"^tun\d+$"),
+    re.compile(r"^tap\d+$"),
+    re.compile(r"^br-[0-9a-f]{12}$", re.I),
+    re.compile(r"^veth[a-z0-9]{4,24}$", re.I),
+)
+
+
+def normalize_sonde_iface(raw: str | None) -> str | None:
+    """Retourne le nom d’interface sûr ou None si refusé."""
+    s = (raw or "").strip() or "any"
+    if len(s) > 32:
+        return None
+    if not re.match(r"^[a-zA-Z0-9._-]+$", s):
+        return None
+    if s in _IFACE_LITERALS:
+        return s
+    for pat in _IFACE_REGEX:
+        if pat.match(s):
+            return s
+    return None
+
+
+def list_sonde_interfaces() -> list[str]:
+    """Interfaces présentes sur l’hôte et autorisées pour la sonde."""
+    found: set[str] = set()
+    try:
+        net = Path("/sys/class/net")
+        if net.is_dir():
+            for p in net.iterdir():
+                n = normalize_sonde_iface(p.name)
+                if n is not None and n == p.name:
+                    found.add(p.name)
+    except OSError:
+        pass
+    # Toujours proposer les choix usuels même si sysfs vide
+    for lit in ("any", "lo", "docker0"):
+        found.add(lit)
+    return sorted(found, key=lambda x: (0 if x == "any" else 1, x.lower()))
 
 
 def _kill_sonde_unlocked() -> None:
@@ -115,9 +163,9 @@ def _build_filter_expr(port: int, layer: str, filt: str, direction: str) -> str:
     raise ValueError("layer")
 
 
-def _tcpdump_cmd(port: int, layer: str, filt: str, direction: str) -> list[str]:
+def _tcpdump_cmd(port: int, layer: str, filt: str, direction: str, iface: str) -> list[str]:
     expr = _build_filter_expr(port, layer, filt, direction)
-    cmd = ["sudo", "tcpdump", "-n", "-i", "any", "-l"]
+    cmd = ["sudo", "tcpdump", "-n", "-i", iface, "-l"]
     if layer == "L7":
         cmd.append("-A")
     cmd.append(expr)
@@ -132,8 +180,19 @@ def _sse_write(handler, text: str) -> None:
     handler.wfile.flush()
 
 
+def serve_sonde_interfaces(handler) -> None:
+    """GET /api/sonde/interfaces — liste des interfaces pour le sélecteur UI."""
+    names = list_sonde_interfaces()
+    body = json.dumps({"interfaces": names}, ensure_ascii=False).encode("utf-8")
+    handler.send_response(200)
+    handler.send_header("Content-Type", "application/json; charset=utf-8")
+    handler.send_header("Content-Length", str(len(body)))
+    handler.end_headers()
+    handler.wfile.write(body)
+
+
 def serve_sonde_stream(handler) -> None:
-    """GET /api/sonde/stream?port=&layer=&filter= — SSE."""
+    """GET /api/sonde/stream?port=&layer=&filter=&iface= — SSE."""
     global _sonde_proc
 
     qs = parse_qs(urlparse(handler.path).query)
@@ -148,6 +207,15 @@ def serve_sonde_stream(handler) -> None:
         handler.send_header("Content-Type", "text/plain; charset=utf-8")
         handler.end_headers()
         handler.wfile.write(b"port/layer/filter invalides.\n")
+        return
+
+    iface_raw = (qs.get("iface") or qs.get("interface") or ["any"])[0]
+    iface = normalize_sonde_iface(iface_raw)
+    if iface is None:
+        handler.send_response(400)
+        handler.send_header("Content-Type", "text/plain; charset=utf-8")
+        handler.end_headers()
+        handler.wfile.write("iface invalide (nom d'interface non autorise).\n".encode("utf-8"))
         return
 
     if not (1 <= port <= 65535) or layer not in _VALID_LAYER:
@@ -167,7 +235,7 @@ def serve_sonde_stream(handler) -> None:
     if direction not in _VALID_DIRECTION:
         direction = "both"
 
-    cmd = _tcpdump_cmd(port, layer, filt, direction)
+    cmd = _tcpdump_cmd(port, layer, filt, direction, iface)
 
     my_proc: subprocess.Popen | None = None
     with _sonde_lock:
@@ -200,7 +268,7 @@ def serve_sonde_stream(handler) -> None:
     # Ligne d’info (JSON) pour le front
     info = json.dumps(
         {
-            "t": f"# tcpdump layer={layer} filter={filt} port={port} direction={direction}",
+            "t": f"# tcpdump -i {iface} layer={layer} filter={filt} port={port} direction={direction}",
             "info": True,
         },
         ensure_ascii=False,
