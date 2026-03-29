@@ -82,6 +82,56 @@ def list_sonde_interfaces() -> list[str]:
     return sorted(found, key=lambda x: (0 if x == "any" else 1, x.lower()))
 
 
+def sonde_iface_role_hint(iface: str) -> str:
+    """
+    Rôle indicatif d’après le nom (heuristique, pas une vérité matérielle).
+    Les noms varient selon les distros ; le texte reste générique.
+    """
+    if iface == "any":
+        return (
+            "Toutes les interfaces : vue globale, souvent plus de bruit. "
+            "Utile pour explorer sans choisir une carte."
+        )
+    if iface == "lo":
+        return (
+            "Loopback : trafic 127.0.0.1 / ::1 sur cet hôte. "
+            "Pas le trafic Internet direct ; rarement le trafic des conteneurs sauf config spéciale."
+        )
+    if iface == "docker0":
+        return (
+            "Bridge Docker par défaut : échanges hôte ↔ conteneurs sur le réseau classique 172.17.x."
+        )
+    if re.match(r"^ens\d+$", iface):
+        return (
+            "Interface Ethernet (nom ens…) : souvent carte principale LAN/WAN sur serveur. "
+            "Sur un VPS, typiquement le trafic public entrant (ex. TLS 443)."
+        )
+    if re.match(r"^enp\d+s\d+$", iface):
+        return (
+            "Interface Ethernet (nom enp…s…) : même usage qu’une carte physique selon la machine."
+        )
+    if re.match(r"^eth\d+$", iface):
+        return "Interface Ethernet classique (eth…) : LAN/WAN selon ta configuration."
+    if re.match(r"^enx[0-9a-f]{12}$", iface, re.I):
+        return "Ethernet USB (enx…) : rôle identique à une carte filaire selon le branchement."
+    if re.match(r"^wlan\d+$", iface):
+        return "Interface Wi-Fi."
+    if re.match(r"^br-[0-9a-f]{12}$", iface, re.I):
+        return (
+            "Bridge Linux : souvent un réseau Docker Compose ou custom. "
+            "Trafic entre conteneurs ; parfois la jambe proxy→backend selon Apache/nginx."
+        )
+    if re.match(r"^veth[a-z0-9]{4,24}$", iface, re.I):
+        return (
+            "Paire virtuelle hôte ↔ conteneur : trafic d’un conteneur ; le nom seul n’identifie pas le service."
+        )
+    if re.match(r"^tun\d+$", iface):
+        return "Tunnel (souvent VPN)."
+    if re.match(r"^tap\d+$", iface):
+        return "TAP (VPN ou réseau virtuel)."
+    return "Interface réseau Linux : le rôle exact dépend de ton installation (ip -br link, test tcpdump)."
+
+
 def _kill_sonde_unlocked() -> None:
     global _sonde_proc
     if _sonde_proc is None:
@@ -181,9 +231,10 @@ def _sse_write(handler, text: str) -> None:
 
 
 def serve_sonde_interfaces(handler) -> None:
-    """GET /api/sonde/interfaces — liste des interfaces pour le sélecteur UI."""
+    """GET /api/sonde/interfaces — liste {name, role} pour le sélecteur UI (infobulle)."""
     names = list_sonde_interfaces()
-    body = json.dumps({"interfaces": names}, ensure_ascii=False).encode("utf-8")
+    items = [{"name": n, "role": sonde_iface_role_hint(n)} for n in names]
+    body = json.dumps({"interfaces": items}, ensure_ascii=False).encode("utf-8")
     handler.send_response(200)
     handler.send_header("Content-Type", "application/json; charset=utf-8")
     handler.send_header("Content-Length", str(len(body)))

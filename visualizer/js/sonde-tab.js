@@ -40,11 +40,64 @@ function truncateLine(text) {
   return `${text.slice(0, MAX_LINE_CHARS)} … [tronqué ${text.length} car.]`;
 }
 
-function fillSondeIfaceSelect(ifaceEl, names) {
+/** Infobulles de secours si l’API renvoie l’ancien format ou est indisponible. */
+const IFACE_ROLE_FALLBACK = {
+  any:
+    'Toutes les interfaces : vue globale, souvent plus de bruit. Utile pour explorer sans choisir une carte.',
+  lo:
+    'Loopback : trafic 127.0.0.1 sur cet hôte. Pas le trafic Internet direct ; rarement les conteneurs sauf config spéciale.',
+  docker0:
+    'Bridge Docker par défaut : échanges hôte ↔ conteneurs sur le réseau classique 172.17.x.',
+};
+
+function ifaceRoleClientHint(name) {
+  if (IFACE_ROLE_FALLBACK[name]) return IFACE_ROLE_FALLBACK[name];
+  if (/^ens\d+$/.test(name)) {
+    return 'Interface Ethernet (ens…) : souvent carte principale ; sur un VPS, typiquement trafic public (ex. TLS 443).';
+  }
+  if (/^enp\d+s\d+$/.test(name)) {
+    return 'Interface Ethernet (enp…) : LAN/WAN selon la machine.';
+  }
+  if (/^eth\d+$/.test(name)) return 'Interface Ethernet classique (eth…) : LAN/WAN selon ta configuration.';
+  if (/^enx[0-9a-f]{12}$/i.test(name)) return 'Ethernet USB (enx…) : rôle comme une carte filaire selon le branchement.';
+  if (/^wlan\d+$/.test(name)) return 'Interface Wi-Fi.';
+  if (/^br-[0-9a-f]{12}$/i.test(name)) {
+    return 'Bridge Linux : souvent réseau Docker Compose ; trafic conteneurs ou proxy→backend selon ta conf.';
+  }
+  if (/^veth[a-z0-9]{4,24}$/i.test(name)) {
+    return 'Paire hôte ↔ conteneur : le nom seul n’identifie pas le service.';
+  }
+  if (/^tun\d+$/.test(name)) return 'Tunnel (souvent VPN).';
+  if (/^tap\d+$/.test(name)) return 'TAP (VPN ou réseau virtuel).';
+  return "Interface réseau : rôle selon ton installation (ip -br link, test tcpdump).";
+}
+
+/**
+ * @param {unknown} payload — tableau de {name, role} ou de chaînes (ancien format)
+ */
+function fillSondeIfaceSelect(ifaceEl, payload) {
   if (!ifaceEl) return;
   const prev = ifaceEl.value;
-  const merged = [...new Set([...(names || []), 'any', 'lo', 'docker0'])];
-  merged.sort((a, b) => {
+  /** @type {{name: string, role: string}[]} */
+  let rows = [];
+  if (Array.isArray(payload)) {
+    if (payload.length && typeof payload[0] === 'object' && payload[0] !== null && 'name' in payload[0]) {
+      rows = payload.map((x) => ({
+        name: String(x.name),
+        role: typeof x.role === 'string' && x.role ? x.role : ifaceRoleClientHint(String(x.name)),
+      }));
+    } else {
+      rows = payload.map((name) => ({
+        name: String(name),
+        role: ifaceRoleClientHint(String(name)),
+      }));
+    }
+  }
+  const byName = new Map(rows.map((r) => [r.name, r.role]));
+  ['any', 'lo', 'docker0'].forEach((n) => {
+    if (!byName.has(n)) byName.set(n, IFACE_ROLE_FALLBACK[n] || ifaceRoleClientHint(n));
+  });
+  const merged = [...byName.keys()].sort((a, b) => {
     if (a === 'any') return -1;
     if (b === 'any') return 1;
     return a.localeCompare(b);
@@ -54,10 +107,20 @@ function fillSondeIfaceSelect(ifaceEl, names) {
     const o = document.createElement('option');
     o.value = name;
     o.textContent = name;
+    const role = byName.get(name) || ifaceRoleClientHint(name);
+    if (role) o.title = role;
     ifaceEl.appendChild(o);
   });
   if (merged.includes(prev)) ifaceEl.value = prev;
   else ifaceEl.value = 'any';
+  syncSondeIfaceSelectTitle(ifaceEl);
+}
+
+/** Infobulle sur le <select> fermé (les <option title> sont peu fiables selon les navigateurs). */
+function syncSondeIfaceSelectTitle(ifaceEl) {
+  if (!ifaceEl) return;
+  const opt = ifaceEl.selectedOptions[0];
+  ifaceEl.title = opt?.title || ifaceRoleClientHint(ifaceEl.value);
 }
 
 async function loadSondeInterfaces(ifaceEl) {
@@ -84,6 +147,7 @@ export function initSonde() {
   fillSondeIfaceSelect(ifaceEl, []);
   loadSondeInterfaces(ifaceEl);
   ifaceRefresh?.addEventListener('click', () => loadSondeInterfaces(ifaceEl));
+  ifaceEl?.addEventListener('change', () => syncSondeIfaceSelectTitle(ifaceEl));
 
   let es = null;
   /** @param {boolean} running — true = capture en cours (Arrêter en bleu, Démarrer grisé) */
