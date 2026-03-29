@@ -3,13 +3,13 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Charger la bibliothèque commune
 LIB_DIR="$SCRIPT_DIR/../lib"
-if [ -f "$LIB_DIR/common.sh" ]; then
-    source "$LIB_DIR/common.sh"
+if [ ! -f "$LIB_DIR/common.sh" ]; then
+    echo "❌ lib/common.sh introuvable — installation incomplète." >&2
+    exit 1
 fi
-
-# Charger la configuration
+# shellcheck source=../lib/common.sh
+source "$LIB_DIR/common.sh"
 load_config "$SCRIPT_DIR" || die "Erreur lors du chargement de la configuration"
 
 init_logging "cleanup-old-data"

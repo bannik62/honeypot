@@ -3,14 +3,14 @@
 # Script qui affiche les statistiques du honeypot
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE="$SCRIPT_DIR/../config/config"
-
-if [ -f "$CONFIG_FILE" ]; then
-    source "$CONFIG_FILE"
-else
-    DATA_DIR="$SCRIPT_DIR/../data"
-    SERVICE_NAME="endlessh"
+LIB_DIR="$SCRIPT_DIR/../lib"
+if [ ! -f "$LIB_DIR/common.sh" ]; then
+    echo "❌ lib/common.sh introuvable — installation incomplète." >&2
+    exit 1
 fi
+# shellcheck source=../lib/common.sh
+source "$LIB_DIR/common.sh"
+load_config "$SCRIPT_DIR" || die "Erreur chargement configuration"
 
 LOG_FILE="$DATA_DIR/logs/connections.csv"
 PARSER_SCRIPT="$SCRIPT_DIR/parser.sh"
@@ -42,7 +42,7 @@ fi
 unique_ips=$(tail -n +2 "$LOG_FILE" 2>/dev/null | cut -d',' -f2 | sort -u | wc -l | tr -d ' ')
 
 echo "🍯 HONEYPOT STATISTICS"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+log_section
 echo ""
 echo "📈 Total Connections: $total"
 echo "🌍 Unique IPs: $unique_ips"

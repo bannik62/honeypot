@@ -11,14 +11,15 @@ cleanup_temp_files() {
 trap cleanup_temp_files EXIT INT TERM
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# Charger la bibliothèque commune
 LIB_DIR="$SCRIPT_DIR/../lib"
-if [ -f "$LIB_DIR/common.sh" ]; then
-    source "$LIB_DIR/common.sh"
+if [ ! -f "$LIB_DIR/common.sh" ]; then
+    echo "❌ lib/common.sh introuvable — installation incomplète." >&2
+    exit 1
 fi
+# shellcheck source=../lib/common.sh
+source "$LIB_DIR/common.sh"
+load_config "$SCRIPT_DIR" || die "Erreur chargement configuration"
 
-# Vérifier les dépendances
 for cmd in nmap curl; do
     if ! command -v "$cmd" &> /dev/null; then
         echo "❌ Erreur: $cmd n'est pas installé" >&2
@@ -27,28 +28,9 @@ for cmd in nmap curl; do
     fi
 done
 
-CONFIG_FILE="$SCRIPT_DIR/../config/config"
-
-# Charger la configuration
-
-if [ -f "$CONFIG_FILE" ]; then
-
-    source "$CONFIG_FILE"
-
-    export NMAP_PARALLEL
-
-else
-
-    DATA_DIR="$SCRIPT_DIR/../data"
-
-    SCAN_PORTS="80,443,8080,8443,8000,8888"
-
-fi
-
+export NMAP_PARALLEL
 if [ -z "$NMAP_PARALLEL" ] || [ "$NMAP_PARALLEL" -lt 1 ]; then
-
     NMAP_PARALLEL=1
-
 fi
 
 LOG_FILE="$DATA_DIR/logs/connections.csv"

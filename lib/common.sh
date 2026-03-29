@@ -308,6 +308,52 @@ rotate_file_if_needed() {
     return 0
 }
 
+# Ligne de séparation standard pour les logs / sorties script (évite les longueurs différentes partout)
+log_section() {
+    local line='━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+    if [ -n "${1:-}" ]; then
+        echo "$line"
+        echo "$1"
+        echo "$line"
+    else
+        echo "$line"
+    fi
+}
+
+# Quitte avec erreur si pas root (traceroute, raw sockets, etc.)
+require_root() {
+    if [ "$(id -u)" -ne 0 ]; then
+        log_error "Ce script doit être exécuté en root (raw sockets / privilèges système)."
+        log_info "Relancez avec : sudo bash ${BASH_SOURCE[1]:-scripts/…}"
+        exit 1
+    fi
+}
+
+# Résout DATA_DIR (layout parent ../honeypot/data vs sibling honeypot/honeypot/data + heuristique traceroute).
+# Appeler après load_config "$SCRIPT_DIR" pour respecter la config tout en corrigeant un DATA_DIR vide ou incohérent.
+get_data_dir() {
+    local script_dir="${1:?get_data_dir: script_dir requis}"
+    local parent data_sibling
+    parent="$(cd "$script_dir/../.." && pwd)/data"
+    data_sibling="$(cd "$script_dir/.." && pwd)/data"
+
+    if [ -z "${DATA_DIR:-}" ] || [ ! -d "${DATA_DIR}/screenshotAndLog" ]; then
+        if [ -d "$parent/screenshotAndLog" ]; then
+            export DATA_DIR="$parent"
+        else
+            export DATA_DIR="$data_sibling"
+        fi
+    elif [ -d "$parent/screenshotAndLog" ] && [ "$DATA_DIR" != "$parent" ]; then
+        local n_cfg n_par
+        n_cfg="$(find "$DATA_DIR/screenshotAndLog" -type f -name '*_traceroute.txt' 2>/dev/null | wc -l)"
+        n_par="$(find "$parent/screenshotAndLog" -type f -name '*_traceroute.txt' 2>/dev/null | wc -l)"
+        if [ "${n_cfg// /}" -eq 0 ] && [ "${n_par// /}" -gt 0 ]; then
+            log_warn "DATA_DIR=$DATA_DIR ne contient aucun *_traceroute.txt ; utilisation de $parent ($n_par fichier(s))."
+            export DATA_DIR="$parent"
+        fi
+    fi
+}
+
 # Nettoyer les anciens fichiers de backup (garder les N derniers)
 cleanup_old_backups() {
     local pattern="$1"

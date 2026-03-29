@@ -196,6 +196,8 @@ Ce script remplit les `_traceroute.txt` **manquants** dans `data/screenshotAndLo
 
 > Voir aussi `vuln-scan.sh` (commentaire dans le script) : `--traceroute` n’y est pas ajouté, pour les mêmes raisons (root + cron user).
 
+**Décision produit (review) :** `scripts/traceroute-ip.sh` reste **volontairement** à part du socle `lib/common.sh` : enrichir ou non les **routes / hops** relève du **choix de l’opérateur**, pas du flux cron. Le script **n’impose pas** un arrêt dur si tu n’es pas root (`require_root`) : sans `sudo`, `nmap` peut donner des traceroutes **vides ou incomplets** (comportement déjà constaté sous user non privilégié) — d’où l’**avertissement** dans le script, sans bloquer l’exécution. Garder ce fichier **autonome** (config + résolution `DATA_DIR` locale) évite de le traiter comme les scripts **100 % automatisés** (droits, échecs, attentes différents). Une revue peut suggérer de factoriser via `get_data_dir` : tant que cette **séparation est assumée**, ce point peut être noté **hors scope** ou **duplication acceptée** pour la lisibilité.
+
 ### Scans automatiques
 
 ```bash
@@ -209,6 +211,14 @@ La séquence automatique (`run-all-scans.sh`) exécute dans l'ordre :
 4. `vuln-scan` (nmap --script vuln) — **sans** `--traceroute` (voir section Traceroute ci‑dessus)
 5. `cleanup-old-data` (nettoyage)
 6. `generate-data` (→ data.json pour le dashboard)
+
+### `lib/common.sh` — périmètre (maintenance / review)
+
+- **Objectif** : centraliser `load_config`, validation des variables, logging, rotation de fichiers, helpers SQL, etc., et faire **échouer tôt** (`exit` explicite) si `lib/common.sh` est introuvable sur les scripts du **pipeline principal** (génération de données, parsing, scans réguliers, dashboard terminal).
+- **Exception assumée** : `traceroute-ip.sh` — voir **Traceroute (manuel, ponctuel)** ci‑dessus ; ce n’est **pas** un oubli de review.
+- **Travail de fond possible** : d’autres scripts (`vuln-scan.sh`, `parse-nikto.sh`, `web-capture.sh`, `monitor.sh`, `setup-auto-scan.sh`, etc.) peuvent encore sourcer `config/config` seul ; migration progressive pour homogénéité, impact souvent moindre.
+- **`run-all-scans.sh`** : la rotation du log pourrait un jour réutiliser `rotate_file_if_needed` / `cleanup_old_backups` depuis `common.sh` (réduction de duplication).
+- **`honeypot-check.sh`** : rester avec `source config` **sans** dépendre de `common.sh` peut être **voulu** (diagnostic utilisable même si la lib est absente) — si c’est le cas, un **commentaire en tête de script** évite qu’on le prenne pour un oubli.
 
 ---
 

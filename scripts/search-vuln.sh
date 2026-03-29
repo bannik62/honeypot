@@ -2,52 +2,22 @@
 # Recherche dans la base vulnérabilités Nikto / SQLite (menu interactif + CLI)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LIB_DIR="$SCRIPT_DIR/../lib"
+if [ ! -f "$LIB_DIR/common.sh" ]; then
+    echo "❌ lib/common.sh introuvable — installation incomplète." >&2
+    exit 1
+fi
+# shellcheck source=../lib/common.sh
+source "$LIB_DIR/common.sh"
+load_config "$SCRIPT_DIR" || die "Erreur chargement configuration"
 
-# Vérifier les dépendances
 if ! command -v sqlite3 &> /dev/null; then
     echo "❌ Erreur: sqlite3 n'est pas installé" >&2
     echo "💡 Installez-le avec: sudo apt install sqlite3" >&2
     exit 1
 fi
 
-CONFIG_FILE="$SCRIPT_DIR/../config/config"
-
-if [ -f "$CONFIG_FILE" ]; then
-    source "$CONFIG_FILE"
-else
-    DATA_DIR="$SCRIPT_DIR/../data"
-fi
-
 DB_FILE="$DATA_DIR/logs/nikto.db"
-
-# Fonction pour échapper les chaînes SQL (prévention injection SQL)
-escape_sql() {
-    local input="$1"
-    # Échapper les guillemets simples en les doublant
-    echo "$input" | sed "s/'/''/g"
-}
-
-# Fonction pour valider une IP ou partie d'IP
-validate_ip_input() {
-    local input="$1"
-    # Autoriser seulement des caractères alphanumériques, points, deux-points et tirets
-    if [[ "$input" =~ ^[0-9a-fA-F.:-]+$ ]]; then
-        return 0
-    else
-        return 1
-    fi
-}
-
-# Fonction pour valider un mot-clé (pas de caractères SQL dangereux)
-validate_keyword() {
-    local input="$1"
-    # Autoriser seulement des caractères alphanumériques, espaces, tirets, underscores, points
-    if [[ "$input" =~ ^[0-9a-zA-Z\s._-]+$ ]]; then
-        return 0
-    else
-        return 1
-    fi
-}
 
 # Fonction pour afficher le menu
 show_menu() {

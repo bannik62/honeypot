@@ -3,15 +3,14 @@
 # Dashboard temps réel du honeypot - Lit uniquement le CSV
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE="$SCRIPT_DIR/../config/config"
-
-if [ -f "$CONFIG_FILE" ]; then
-    source "$CONFIG_FILE"
-else
-    DATA_DIR="$SCRIPT_DIR/../data"
-    REFRESH_INTERVAL=3
-    SERVICE_NAME="endlessh"
+LIB_DIR="$SCRIPT_DIR/../lib"
+if [ ! -f "$LIB_DIR/common.sh" ]; then
+    echo "❌ lib/common.sh introuvable — installation incomplète." >&2
+    exit 1
 fi
+# shellcheck source=../lib/common.sh
+source "$LIB_DIR/common.sh"
+load_config "$SCRIPT_DIR" || die "Erreur chargement configuration"
 
 LOG_FILE="$DATA_DIR/logs/connections.csv"
 

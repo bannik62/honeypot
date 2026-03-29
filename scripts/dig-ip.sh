@@ -14,26 +14,16 @@ cleanup_temp_files() {
 trap cleanup_temp_files EXIT INT TERM
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# Vérifier les dépendances
-if ! command -v dig &> /dev/null; then
-    echo "❌ Erreur: dig n'est pas installé" >&2
-    echo "💡 Installez-le avec: sudo apt install dnsutils" >&2
+LIB_DIR="$SCRIPT_DIR/../lib"
+if [ ! -f "$LIB_DIR/common.sh" ]; then
+    echo "❌ lib/common.sh introuvable — installation incomplète." >&2
     exit 1
 fi
+# shellcheck source=../lib/common.sh
+source "$LIB_DIR/common.sh"
+load_config "$SCRIPT_DIR" || die "Erreur chargement configuration"
 
-CONFIG_FILE="$SCRIPT_DIR/../config/config"
-
-if [ -f "$CONFIG_FILE" ]; then
-    source "$CONFIG_FILE"
-else
-    DATA_DIR="$SCRIPT_DIR/../data"
-    DIG_PARALLEL=1
-fi
-
-if [ -z "$DIG_PARALLEL" ] || [ "$DIG_PARALLEL" -lt 1 ]; then
-    DIG_PARALLEL=1
-fi
+check_command dig dnsutils || exit 1
 
 CSV_FILE="$DATA_DIR/logs/web_interfaces.csv"
 OUTPUT_DIR="$DATA_DIR/screenshotAndLog"
