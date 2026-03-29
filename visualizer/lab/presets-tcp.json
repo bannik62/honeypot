@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "presets": [
+    {
+      "id": "read-banner-22",
+      "name": "Lecture bannière SSH (port 22)",
+      "description": "Connexion TCP vers 127.0.0.1:22, envoi vide, lit jusqu’à 512 octets — utile pour voir le format de réponse brute",
+      "host": "127.0.0.1",
+      "port": 22,
+      "payload_encoding": "text",
+      "payload": "",
+      "read_max": 512,
+      "timeout_sec": 5
+    },
+    {
+      "id": "local-http-raw",
+      "name": "Probe HTTP minimal (port 8765)",
+      "description": "Envoie une ligne GET minimale vers le visualiseur (réponse HTTP brute en TCP)",
+      "host": "127.0.0.1",
+      "port": 8765,
+      "payload_encoding": "text",
+      "payload": "GET /api/lab/meta HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n",
+      "read_max": 8192,
+      "timeout_sec": 8
+    }
+  ]
+}

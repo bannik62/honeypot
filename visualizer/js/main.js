@@ -6,6 +6,7 @@ import { renderStats } from './stats-tab.js';
 import { renderIPTable, exportIPsJson } from './ips-tab.js';
 import { initSonde } from './sonde-tab.js';
 import { initAudit } from './audit-tab.js';
+import { initLab } from './lab-tab.js';
 import { syncHeaderContextFeed } from './header-context-feed.js';
 
 function updateHeader() {
@@ -350,5 +351,6 @@ fetch('/api/vulners/status')
 initMap();
 initSonde();
 initAudit();
+initLab();
 syncHeaderContextFeed();
 loadInitialData(loadJSON);

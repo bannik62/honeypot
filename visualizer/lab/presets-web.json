@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "presets": [
+    {
+      "id": "meta-lab",
+      "name": "GET /api/lab/meta",
+      "description": "Infos LAB (nombre d’IPs autorisées) — requête sûre vers le visualiseur local",
+      "method": "GET",
+      "url": "http://127.0.0.1:8765/api/lab/meta",
+      "headers": { "Accept": "application/json" },
+      "body": ""
+    },
+    {
+      "id": "audit-get",
+      "name": "GET /api/audit",
+      "description": "Snapshot audit réseau (UFW / ports) si disponible sur le VPS",
+      "method": "GET",
+      "url": "http://127.0.0.1:8765/api/audit",
+      "headers": { "Accept": "application/json" },
+      "body": ""
+    },
+    {
+      "id": "vulners-status",
+      "name": "GET /api/vulners/status",
+      "description": "Statut clé Vulners (sans exposer la clé)",
+      "method": "GET",
+      "url": "http://127.0.0.1:8765/api/vulners/status",
+      "headers": { "Accept": "application/json" },
+      "body": ""
+    }
+  ]
+}

@@ -252,6 +252,18 @@ tr:hover td{background:rgba(0,212,255,.03)}
 #panel-sonde .sonde-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px}
 #panel-sonde input,#panel-sonde select{background:var(--s);border:1px solid var(--b);color:var(--tx);padding:6px 8px;border-radius:4px;font-family:'Share Tech Mono',monospace;font-size:.72rem}
 #sonde-log{width:100%;max-height:min(55vh,520px);min-height:180px;overflow:auto;background:rgba(0,0,0,.4);border:1px solid var(--b);border-radius:8px;padding:10px 12px;font-size:.65rem;line-height:1.35;color:var(--a3);white-space:pre-wrap;word-break:break-word}
+/* LAB */
+#panel-lab .lab-warn{font-size:.68rem;color:var(--mu);line-height:1.5;max-width:960px;padding:12px 14px;background:rgba(255,170,0,.06);border:1px solid rgba(255,170,0,.35);border-radius:8px;margin-bottom:14px}
+#panel-lab .lab-warn strong{color:var(--w)}
+#panel-lab .lab-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px}
+#panel-lab label.lab-inline{display:flex;flex-direction:column;gap:4px;font-size:.62rem;color:var(--mu)}
+#panel-lab input,#panel-lab select,#panel-lab textarea{background:var(--s);border:1px solid var(--b);color:var(--tx);padding:6px 8px;border-radius:4px;font-family:'Share Tech Mono',monospace;font-size:.72rem}
+#panel-lab textarea{min-height:72px;width:100%;max-width:100%}
+#panel-lab #lab-http-body,#panel-lab #lab-tcp-payload{min-height:100px}
+#panel-lab #lab-result{min-height:120px;max-height:min(50vh,480px);overflow:auto;background:rgba(0,0,0,.4);border:1px solid var(--b);border-radius:8px;padding:10px 12px;font-size:.65rem;line-height:1.35;color:var(--a3);white-space:pre-wrap;word-break:break-word}
+#panel-lab .lab-sub{font-family:'Orbitron',monospace;font-size:.74rem;color:var(--a);letter-spacing:1px;margin:14px 0 8px}
+#panel-lab fieldset.lab-mod{border:1px solid rgba(26,58,92,.6);border-radius:8px;padding:12px;margin-bottom:12px}
+#panel-lab fieldset.lab-mod legend{font-size:.68rem;color:var(--mu);padding:0 6px}
 </style>
 </head>
 <body>
@@ -291,6 +303,7 @@ tr:hover td{background:rgba(0,212,255,.03)}
   <button class="tab" data-tab="ips">🔎 IPs</button>
   <button class="tab" data-tab="sonde">📡 SONDE</button>
   <button class="tab" data-tab="audit">🛡️ AUDIT</button>
+  <button class="tab" data-tab="lab">🔬 LAB</button>
 </nav>
 
 <div id="panel-map" class="panel active">
@@ -456,6 +469,80 @@ tr:hover td{background:rgba(0,212,255,.03)}
       </table>
     </div>
   </div>
+</div>
+
+<div id="panel-lab" class="panel">
+  <div class="lab-warn">
+    <strong>Usage réservé à l’étude et à des environnements autorisés.</strong>
+    Ne ciblez pas des systèmes sans permission explicite. Ce module envoie des requêtes réelles depuis le serveur.
+    Les <strong>IPv4 autorisées</strong> sont : <code>127.0.0.1</code>, les IPs présentes dans <code>data/logs/connections.csv</code>,
+    et celles listées dans <code>LAB_ALLOW_IPS</code> (config). Les URLs HTTP doivent utiliser une <strong>IPv4 littérale</strong> (pas de DNS).
+  </div>
+  <label class="lab-row" style="align-items:center;cursor:pointer">
+    <input type="checkbox" id="lab-agree" />
+    <span style="font-size:.72rem;color:var(--tx)">J’ai lu l’avertissement et j’utilise cet outil uniquement dans un cadre légal et autorisé.</span>
+  </label>
+  <div class="lab-row" style="margin-top:12px">
+    <span style="font-size:.68rem;color:var(--mu)">Module :</span>
+    <label><input type="radio" name="lab-module" value="web" checked /> Web (HTTP)</label>
+    <label><input type="radio" name="lab-module" value="tcp" /> TCP brut</label>
+  </div>
+
+  <fieldset class="lab-mod" id="lab-mod-web">
+    <legend>HTTP + bibliothèque Web</legend>
+    <div class="lab-row">
+      <label class="lab-inline">Preset
+        <select id="lab-preset-web" style="min-width:220px"></select>
+      </label>
+      <label class="lab-inline">Méthode
+        <select id="lab-http-method">
+          <option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>HEAD</option><option>OPTIONS</option>
+        </select>
+      </label>
+    </div>
+    <label class="lab-inline" style="width:100%;max-width:720px">URL (IPv4 littérale, ex. http://127.0.0.1:8765/api/lab/meta)
+      <input type="text" id="lab-http-url" placeholder="http://127.0.0.1:8765/api/lab/meta" style="width:100%" />
+    </label>
+    <div class="lab-sub">En-têtes (JSON)</div>
+    <textarea id="lab-http-headers" placeholder='{ "Accept": "application/json" }' rows="4"></textarea>
+    <div class="lab-sub">Corps (optionnel)</div>
+    <textarea id="lab-http-body" placeholder="{}"></textarea>
+    <div class="lab-row">
+      <button type="button" class="btn pri" id="lab-send-http" disabled>Envoyer HTTP</button>
+    </div>
+  </fieldset>
+
+  <fieldset class="lab-mod" id="lab-mod-tcp" hidden>
+    <legend>TCP + bibliothèque TCP</legend>
+    <div class="lab-row">
+      <label class="lab-inline">Preset
+        <select id="lab-preset-tcp" style="min-width:220px"></select>
+      </label>
+      <label class="lab-inline">Hôte (IPv4)
+        <input type="text" id="lab-tcp-host" placeholder="127.0.0.1" style="width:140px" />
+      </label>
+      <label class="lab-inline">Port
+        <input type="number" id="lab-tcp-port" min="1" max="65535" value="22" style="width:80px" />
+      </label>
+      <label class="lab-inline">Encodage payload
+        <select id="lab-tcp-encoding"><option value="text">texte (UTF-8)</option><option value="hex">hex</option></select>
+      </label>
+      <label class="lab-inline">Lecture max (octets)
+        <input type="number" id="lab-tcp-readmax" min="0" max="262144" value="4096" style="width:100px" />
+      </label>
+      <label class="lab-inline">Timeout (s)
+        <input type="number" id="lab-tcp-timeout" min="1" max="60" value="8" step="0.5" style="width:80px" />
+      </label>
+    </div>
+    <div class="lab-sub">Payload</div>
+    <textarea id="lab-tcp-payload" placeholder="Laissez vide pour lecture seule après connexion"></textarea>
+    <div class="lab-row">
+      <button type="button" class="btn pri" id="lab-send-tcp" disabled>Envoyer TCP</button>
+    </div>
+  </fieldset>
+
+  <div class="lab-sub">Résultat</div>
+  <div id="lab-result">—</div>
 </div>
 
 <div id="panel-sonde" class="panel">

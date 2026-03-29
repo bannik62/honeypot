@@ -41,6 +41,16 @@ Système de monitoring temps réel pour **Endlessh** (honeypot SSH) avec géoloc
 
 ## 📋 Prérequis
 
+### Plateforme supportée
+
+Le projet vise **GNU/Linux** avec **systemd** et **APT** (famille **Debian / Ubuntu**). Ce n’est **pas** une install « universelle » :
+
+- **`install.sh`** utilise **`apt-get`**, **`dpkg`** et le dépôt **Google Chrome .deb** (amd64) — **inadapté tel quel** à Fedora, Arch, Alpine, macOS, etc.
+- Le monitoring et le **parser** s’appuient sur **`journalctl`** pour lire le service **Endlessh** ; sans systemd / journaux équivalents, il faut **adapter** les scripts ou la source de logs.
+- Les scripts sont en **bash** ; le dépôt doit rester **complet** (`lib/common.sh`, `scripts/`, etc.) pour les chemins relatifs.
+
+Sur **Ubuntu Server / Debian** récents, l’installation documentée est la référence. Pour une autre distro, installez les paquets **à la main** (équivalents `geoip-bin`, `jq`, `nmap`, …) et ajustez les commandes ; ne vous attendez pas à ce que `sudo ./install.sh` suffise sans modification.
+
 ### 1. Endlessh installé et configuré
 
 - ✅ `sudo apt install endlessh`
@@ -61,7 +71,8 @@ Le service systemd doit avoir `AmbientCapabilities=CAP_NET_BIND_SERVICE` et `Pri
 
 ### 2. Système et dépendances
 
-- Ubuntu/Debian récents (22.04/24.04, Debian 11/12 recommandés), `sudo` pour accéder aux logs systemd
+- **Ubuntu / Debian** récents (22.04/24.04, Debian 11/12 recommandés) — voir **Plateforme supportée** ci‑dessus
+- `sudo` pour accéder aux logs systemd et lancer certains scans
 - `geoip-bin`, `geoip-database` — géolocalisation (installés automatiquement)
 - `jq` — manipulation JSON (installé automatiquement)
 - `google-chrome-stable` — captures d'écran headless (installé automatiquement via repo APT)

@@ -17,6 +17,13 @@ from routes.sonde import serve_sonde_stop, serve_sonde_stream
 from routes.audit import serve_audit
 from routes.static import serve_data_json, serve_debug
 from routes.vulners import serve_vulners_events, serve_vulners_lookup, serve_vulners_status
+from routes.lab import (
+    serve_lab_http,
+    serve_lab_meta,
+    serve_lab_presets_tcp,
+    serve_lab_presets_web,
+    serve_lab_tcp,
+)
 
 
 class VisualizerHandler(SimpleHTTPRequestHandler):
@@ -39,6 +46,15 @@ class VisualizerHandler(SimpleHTTPRequestHandler):
             return
         if path == "/api/dashboard/startup-log-stream":
             serve_dashboard_startup_log_stream(self)
+            return
+        if path == "/api/lab/meta":
+            serve_lab_meta(self)
+            return
+        if path == "/api/lab/presets/web":
+            serve_lab_presets_web(self)
+            return
+        if path == "/api/lab/presets/tcp":
+            serve_lab_presets_tcp(self)
             return
         if path == "/":
             self.path = "/honeypot-dashboard.html"
@@ -73,6 +89,12 @@ class VisualizerHandler(SimpleHTTPRequestHandler):
             return
         if path == "/api/sonde/stop":
             serve_sonde_stop(self)
+            return
+        if path == "/api/lab/http":
+            serve_lab_http(self)
+            return
+        if path == "/api/lab/tcp":
+            serve_lab_tcp(self)
             return
         self.send_error(404)
 

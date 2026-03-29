@@ -64,3 +64,7 @@ NMAP_HOST_TIMEOUT="600s"
 # Clé API Vulners (obtenir sur https://vulners.com)
 VULNERS_API_KEY=""
 
+# LAB (visualiseur) — IPv4 supplémentaires autorisées pour les tests HTTP/TCP (séparées par des virgules)
+# En plus de 127.0.0.1 et des IPs de data/logs/connections.csv
+# LAB_ALLOW_IPS="10.0.0.5,192.168.1.10"
+
