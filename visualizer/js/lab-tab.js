@@ -30,6 +30,15 @@ const KONAMI = [
   'KeyA',
 ];
 
+/** Flèches : e.code. B/A : code US (KeyB/KeyA) ou caractère (AZERTY : « a » sur KeyQ, pas KeyA). */
+function konamiMatchesStep(idx, e) {
+  if (idx < 8) return e.code === KONAMI[idx];
+  const ch = e.key && e.key.length === 1 ? e.key.toLowerCase() : '';
+  if (idx === 8) return e.code === 'KeyB' || ch === 'b';
+  if (idx === 9) return e.code === 'KeyA' || ch === 'a';
+  return false;
+}
+
 export function initLab() {
   const agree = document.getElementById('lab-agree');
   const sendHttp = document.getElementById('lab-send-http');
@@ -80,13 +89,14 @@ export function initLab() {
   godOff?.addEventListener('click', () => setGodUi(false));
 
   document.addEventListener('keydown', (e) => {
-    const onLab = document.querySelector('.tab.active')?.dataset?.tab === 'lab';
+    const onLab = document.getElementById('panel-lab')?.classList.contains('active');
     if (e.key === 'Escape' && onLab && godModal?.classList.contains('open')) {
       closeGodModal();
       return;
     }
     if (!onLab) return;
-    if (e.code === KONAMI[konamiIdx]) {
+    if (e.repeat) return;
+    if (konamiMatchesStep(konamiIdx, e)) {
       konamiIdx += 1;
       if (konamiIdx >= KONAMI.length) {
         konamiIdx = 0;
@@ -94,7 +104,7 @@ export function initLab() {
         openGodModal();
       }
     } else {
-      konamiIdx = e.code === KONAMI[0] ? 1 : 0;
+      konamiIdx = konamiMatchesStep(0, e) ? 1 : 0;
     }
   });
 
