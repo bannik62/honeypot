@@ -515,7 +515,7 @@ def serve_lab_tcp(handler) -> None:
     if err:
         _send_json(handler, {"ok": False, "error": err}, 400)
         return
-    assert raw is not None
+    assert raw is not  None
 
     if len(raw) > MAX_BODY_IN:
         _send_json(handler, {"ok": False, "error": "payload trop volumineux"}, 400)
