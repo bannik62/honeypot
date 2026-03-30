@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 """
-routes/lab.py — LAB (étude) : requêtes HTTP et envoi TCP depuis le serveur,
-avec liste d’IPs autorisées. Pas d’usage contre des tiers sans autorisation.
+routes/lab.py — LAB (étude) : requêtes HTTP et envoi TCP depuis le serveur.
+
+IPv4 littérales : autorisées seulement si présentes dans la liste (dossiers
+data/screenshotAndLog/<ip>/ + LAB_ALLOW_IPS + 127.0.0.1).
+
+Mode « GOD » (header X-Lab-God) : un nom DNS dans l’URL ou l’hôte est résolu vers
+la première IPv4 ; cette IP n’est pas filtrée par la whitelist (responsabilité de
+l’opérateur). Pas d’usage contre des tiers sans autorisation.
 """
 
 from __future__ import annotations
@@ -16,9 +22,9 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlunparse
 
-from config import CONFIG, IP_RE, ROOT, VISUALIZER_DIR
+from config import CONFIG, IP_RE, ROOT, SCAN_DIR, VISUALIZER_DIR
 
 MAX_BODY_IN = 512 * 1024
 MAX_HTTP_RESPONSE = 2 * 1024 * 1024
@@ -92,27 +98,61 @@ def _send_json(handler, payload: dict[str, Any], status: int = 200) -> None:
 
 
 def get_allowed_ipv4s() -> set[str]:
-    """IPs autorisées : 127.0.0.1, IPs vues dans connections.csv, LAB_ALLOW_IPS."""
+    """IPs autorisées : 127.0.0.1, dossiers data/screenshotAndLog/<ip>/ (attaquants), LAB_ALLOW_IPS.
+
+    On n'utilise pas connections.csv ni data.json enrichi (traceroute, etc.) pour éviter d'autoriser de l'infra par erreur.
+    """
     s: set[str] = {"127.0.0.1"}
-    csv_path = ROOT / "data" / "logs" / "connections.csv"
-    if csv_path.is_file():
-        try:
-            with csv_path.open("r", encoding="utf-8", errors="ignore") as f:
-                next(f, None)
-                for line in f:
-                    parts = line.strip().split(",")
-                    if len(parts) >= 2:
-                        ip = parts[1].strip()
-                        if IP_RE.match(ip):
-                            s.add(ip)
-        except OSError:
-            pass
+    try:
+        if SCAN_DIR.is_dir():
+            for p in SCAN_DIR.iterdir():
+                if not p.is_dir():
+                    continue
+                name = p.name.strip()
+                if name and IP_RE.match(name):
+                    s.add(name)
+    except OSError:
+        pass
     extra = (CONFIG.get("LAB_ALLOW_IPS") or "").strip()
     for part in extra.split(","):
         p = part.strip()
         if p and IP_RE.match(p):
             s.add(p)
     return s
+
+
+def _is_god_mode(handler) -> bool:
+    try:
+        v = (handler.headers.get("X-Lab-God", "") or "").strip().lower()
+    except Exception:
+        v = ""
+    return v in ("1", "true", "yes", "on")
+
+
+_HOST_HEADER_RE = re.compile(r"^[a-zA-Z0-9._-]{1,253}$")
+
+
+def _sanitize_host_header(raw: Any) -> str | None:
+    if raw is None:
+        return None
+    s = str(raw).strip()
+    if not s or len(s) > 253:
+        return None
+    if not _HOST_HEADER_RE.match(s):
+        return None
+    return s
+
+
+def _url_with_ip_netloc(parsed, ip_str: str) -> str:
+    """Recolle une URL avec l'hôte = IPv4 (port conservé)."""
+    port = parsed.port
+    if port is None:
+        netloc = ip_str
+    else:
+        netloc = f"{ip_str}:{port}"
+    return urlunparse(
+        (parsed.scheme, netloc, parsed.path or "", parsed.params, parsed.query, parsed.fragment)
+    )
 
 
 def _ipv4_allowed(ip: str, allowed: set[str]) -> bool:
@@ -155,7 +195,9 @@ def serve_lab_meta(handler) -> None:
         handler,
         {
             "allowed_ip_count": len(allowed),
-            "has_connections_csv": (ROOT / "data" / "logs" / "connections.csv").is_file(),
+            "scan_dir": str(SCAN_DIR),
+            "scan_dir_exists": SCAN_DIR.is_dir(),
+            "god_mode_header": _is_god_mode(handler),
         },
     )
 
@@ -194,6 +236,7 @@ def serve_lab_http(handler) -> None:
         )
         return
 
+    god = _is_god_mode(handler)
     allowed = get_allowed_ipv4s()
     payload = _read_json_body(handler)
     if not payload:
@@ -220,25 +263,53 @@ def serve_lab_http(handler) -> None:
         _send_json(handler, {"ok": False, "error": "Hôte manquant dans l’URL"}, 400)
         return
 
+    host_for_header: str | None = None
+    ip_str: str | None = None
     try:
         ip_obj = ipaddress.ip_address(host)
     except ValueError:
+        ip_obj = None
+
+    if ip_obj is not None:
+        if ip_obj.version != 4:
+            _send_json(handler, {"ok": False, "error": "IPv6 non supporté (IPv4 uniquement)."}, 400)
+            return
+        ip_str = str(ip_obj)
+    else:
+        if not god:
+            _send_json(
+                handler,
+                {
+                    "ok": False,
+                    "error": "Nom DNS dans l’URL : activez le mode GOD (Konami) côté LAB, ou utilisez une IPv4 littérale.",
+                },
+                400,
+            )
+            return
+        
+        # En mode GOD, on résout le nom d'hôte vers la première IPv4 trouvée,
+        # sans vérifier si elle est dans la liste autorisée.
+        try:
+            infos = socket.getaddrinfo(host, None, socket.AF_INET, socket.SOCK_STREAM)
+            if not infos:
+                _send_json(handler, {"ok": False, "error": f"Impossible de résoudre le nom d'hôte : {host}"}, 403)
+                return
+            # On prend la première IPv4 retournée
+            ip_str = infos[0][4][0]
+            host_for_header = host
+            url = _url_with_ip_netloc(parsed, ip_str)
+        except OSError:
+            _send_json(handler, {"ok": False, "error": f"Erreur de résolution DNS pour {host}"}, 403)
+            return
+
+    # IPv4 littérale : whitelist. DNS + GOD : pas de filtre sur l’IP résolue (ip_str déjà défini ci-dessus).
+    if ip_obj is not None and not _ipv4_allowed(ip_str, allowed):
         _send_json(
             handler,
-            {"ok": False, "error": "Utilisez une adresse IPv4 littérale dans l’URL (pas de nom DNS)."},
-            400,
-        )
-        return
-
-    if ip_obj.version != 4:
-        _send_json(handler, {"ok": False, "error": "IPv4 uniquement pour ce premier jet."}, 400)
-        return
-
-    ip_str = str(ip_obj)
-    if not _ipv4_allowed(ip_str, allowed):
-        _send_json(
-            handler,
-            {"ok": False, "error": f"IP non autorisée : {ip_str}. Ajoutez-la dans connections.csv ou LAB_ALLOW_IPS."},
+            {
+                "ok": False,
+                "error": f"IP non autorisée : {ip_str}. Vérifiez data/screenshotAndLog/<ip>/ ou LAB_ALLOW_IPS.",
+            },
             403,
         )
         return
@@ -248,6 +319,12 @@ def serve_lab_http(handler) -> None:
         _send_json(handler, {"ok": False, "error": herr}, 400)
         return
     assert hdrs is not None
+
+    override = _sanitize_host_header(payload.get("host_header"))
+    if override is not None:
+        hdrs["Host"] = override
+    elif host_for_header is not None:
+        hdrs["Host"] = host_for_header
 
     body_raw = payload.get("body")
     data: bytes | None = None
@@ -308,6 +385,10 @@ def serve_lab_http(handler) -> None:
                 "body_text": body_text,
                 "body_length": len(chunk),
                 "truncated": truncated,
+                "request_url": url,
+                "resolved_ipv4": ip_str,
+                "dns_used": bool(host_for_header),
+                "god_mode": god,
             },
         },
     )
@@ -337,6 +418,7 @@ def serve_lab_tcp(handler) -> None:
         )
         return
 
+    god = _is_god_mode(handler)
     allowed = get_allowed_ipv4s()
     payload = _read_json_body(handler)
     if not payload:
@@ -348,18 +430,43 @@ def serve_lab_tcp(handler) -> None:
         _send_json(handler, {"ok": False, "error": "host manquant"}, 400)
         return
 
+    ip_str: str | None = None
     try:
         ip_obj = ipaddress.ip_address(host)
     except ValueError:
-        _send_json(handler, {"ok": False, "error": "host doit être une IPv4 littérale"}, 400)
-        return
+        ip_obj = None
 
-    if ip_obj.version != 4:
-        _send_json(handler, {"ok": False, "error": "IPv4 uniquement"}, 400)
-        return
+    if ip_obj is not None:
+        if ip_obj.version != 4:
+            _send_json(handler, {"ok": False, "error": "IPv6 non supporté (IPv4 uniquement)."}, 400)
+            return
+        ip_str = str(ip_obj)
+    else:
+        if not god:
+            _send_json(
+                handler,
+                {
+                    "ok": False,
+                    "error": "Host non-IPv4 : activez le mode GOD (Konami) ou utilisez une IPv4 littérale.",
+                },
+                400,
+            )
+            return
 
-    ip_str = str(ip_obj)
-    if not _ipv4_allowed(ip_str, allowed):
+        # En mode GOD, on résout le nom d'hôte vers la première IPv4 trouvée,
+        # sans vérifier si elle est dans la liste autorisée.
+        try:
+            infos = socket.getaddrinfo(host, None, socket.AF_INET, socket.SOCK_STREAM)
+            if not infos:
+                _send_json(handler, {"ok": False, "error": f"Impossible de résoudre le nom d'hôte : {host}"}, 403)
+                return
+            ip_str = infos[0][4][0]
+        except OSError:
+            _send_json(handler, {"ok": False, "error": f"Erreur de résolution DNS pour {host}"}, 403)
+            return
+
+    assert ip_str is not None
+    if ip_obj is not None and not _ipv4_allowed(ip_str, allowed):
         _send_json(
             handler,
             {"ok": False, "error": f"IP non autorisée : {ip_str}"},

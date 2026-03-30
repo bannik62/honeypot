@@ -269,6 +269,14 @@ tr:hover td{background:rgba(0,212,255,.03)}
 /* LAB */
 #panel-lab .lab-warn{font-size:.68rem;color:var(--mu);line-height:1.5;max-width:960px;padding:12px 14px;background:rgba(255,170,0,.06);border:1px solid rgba(255,170,0,.35);border-radius:8px;margin-bottom:14px}
 #panel-lab .lab-warn strong{color:var(--w)}
+#panel-lab .lab-god-banner{display:none;font-size:.65rem;color:var(--a2);line-height:1.45;max-width:960px;padding:10px 12px;background:rgba(255,62,108,.1);border:1px solid rgba(255,62,108,.45);border-radius:8px;margin-bottom:12px}
+#panel-lab .lab-god-banner.lab-god-on{display:block}
+#panel-lab .lab-god-modal{position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center;padding:20px}
+#panel-lab .lab-god-modal.open{display:flex}
+#panel-lab .lab-god-modal-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.65)}
+#panel-lab .lab-god-modal-box{position:relative;max-width:520px;width:100%;padding:18px 20px;border-radius:10px;border:1px solid var(--b);background:var(--s2);box-shadow:0 16px 48px rgba(0,0,0,.55)}
+#panel-lab .lab-god-modal-title{font-family:'Orbitron',monospace;color:var(--a2);font-size:.9rem;margin-bottom:10px}
+#panel-lab .lab-god-modal p{font-size:.68rem;color:var(--tx);line-height:1.5;margin:8px 0}
 #panel-lab .lab-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px}
 #panel-lab label.lab-inline{display:flex;flex-direction:column;gap:4px;font-size:.62rem;color:var(--mu)}
 #panel-lab input,#panel-lab select,#panel-lab textarea{background:var(--s);border:1px solid var(--b);color:var(--tx);padding:6px 8px;border-radius:4px;font-family:'Share Tech Mono',monospace;font-size:.72rem}
@@ -486,11 +494,25 @@ tr:hover td{background:rgba(0,212,255,.03)}
 </div>
 
 <div id="panel-lab" class="panel">
+  <div id="lab-god-banner" class="lab-god-banner" aria-live="polite">
+    <strong>MODE GOD activé.</strong> Un nom DNS dans l’URL est résolu (première IPv4) sans contrôle par la whitelist ; les <strong>IPv4 littérales</strong> restent soumises à la liste (<code>data/screenshotAndLog/&lt;ip&gt;/</code>, <code>LAB_ALLOW_IPS</code>).
+    Le serveur envoie toujours les requêtes réelles depuis le VPS : usage réservé à l’audit autorisé.
+    <button type="button" class="btn" id="lab-god-off" style="margin-left:8px">Désactiver GOD</button>
+  </div>
+  <div id="lab-god-modal" class="lab-god-modal" aria-hidden="true">
+    <div class="lab-god-modal-backdrop" id="lab-god-modal-backdrop"></div>
+    <div class="lab-god-modal-box" role="dialog" aria-labelledby="lab-god-modal-title">
+      <div class="lab-god-modal-title" id="lab-god-modal-title">MODE GOD</div>
+      <p>Vous avez débloqué le <strong>mode GOD</strong> (séquence Konami). Les requêtes HTTP/TCP peuvent utiliser un <strong>nom DNS</strong> : le serveur prend la <strong>première IPv4</strong> résolue (non comparée à la whitelist). Les cibles en <strong>IPv4 littérale</strong> restent limitées aux IPs autorisées (dossiers attaquants + config).</p>
+      <p><strong>Ce module reste un outil d’étude :</strong> n’utilisez pas ce mode contre des systèmes sans autorisation. Le trafic part du serveur (risque pivot SSRF si mal configuré ailleurs).</p>
+      <button type="button" class="btn pri" id="lab-god-modal-ok">OK</button>
+    </div>
+  </div>
   <div class="lab-warn">
     <strong>Usage réservé à l’étude et à des environnements autorisés.</strong>
     Ne ciblez pas des systèmes sans permission explicite. Ce module envoie des requêtes réelles depuis le serveur.
-    Les <strong>IPv4 autorisées</strong> sont : <code>127.0.0.1</code>, les IPs présentes dans <code>data/logs/connections.csv</code>,
-    et celles listées dans <code>LAB_ALLOW_IPS</code> (config). Les URLs HTTP doivent utiliser une <strong>IPv4 littérale</strong> (pas de DNS).
+    Les <strong>IPv4 autorisées</strong> sont : <code>127.0.0.1</code>, les noms de dossiers <code>data/screenshotAndLog/&lt;ip&gt;/</code> (attaquants),
+    et celles listées dans <code>LAB_ALLOW_IPS</code> (config). Sans <strong>mode GOD</strong> (Konami), les URLs HTTP doivent utiliser une <strong>IPv4 littérale</strong> (pas de DNS).
   </div>
   <label class="lab-row" style="align-items:center;cursor:pointer">
     <input type="checkbox" id="lab-agree" />
@@ -514,8 +536,11 @@ tr:hover td{background:rgba(0,212,255,.03)}
         </select>
       </label>
     </div>
-    <label class="lab-inline" style="width:100%;max-width:720px">URL (IPv4 littérale, ex. http://127.0.0.1:8765/api/lab/meta)
+    <label class="lab-inline" style="width:100%;max-width:720px">URL (IPv4 littérale whitelistée ; avec GOD : hostname → première IPv4, sans filtre whitelist)
       <input type="text" id="lab-http-url" placeholder="http://127.0.0.1:8765/api/lab/meta" style="width:100%" />
+    </label>
+    <label class="lab-inline" style="width:100%;max-width:720px">Host (vhost, optionnel — remplace l’en-tête <code>Host</code> pour reverse proxy)
+      <input type="text" id="lab-http-host-header" placeholder="ex. vitalinfo.site" style="width:100%" />
     </label>
     <div class="lab-sub">En-têtes (JSON)</div>
     <textarea id="lab-http-headers" placeholder='{ "Accept": "application/json" }' rows="4"></textarea>
@@ -532,7 +557,7 @@ tr:hover td{background:rgba(0,212,255,.03)}
       <label class="lab-inline">Preset
         <select id="lab-preset-tcp" style="min-width:220px"></select>
       </label>
-      <label class="lab-inline">Hôte (IPv4)
+      <label class="lab-inline">Hôte (IPv4 whitelistée ; avec GOD : hostname → première IPv4)
         <input type="text" id="lab-tcp-host" placeholder="127.0.0.1" style="width:140px" />
       </label>
       <label class="lab-inline">Port

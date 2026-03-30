@@ -17,6 +17,19 @@ function formatJsonPretty(s) {
   }
 }
 
+const KONAMI = [
+  'ArrowUp',
+  'ArrowUp',
+  'ArrowDown',
+  'ArrowDown',
+  'ArrowLeft',
+  'ArrowRight',
+  'ArrowLeft',
+  'ArrowRight',
+  'KeyB',
+  'KeyA',
+];
+
 export function initLab() {
   const agree = document.getElementById('lab-agree');
   const sendHttp = document.getElementById('lab-send-http');
@@ -26,6 +39,64 @@ export function initLab() {
   const modTcp = document.getElementById('lab-mod-tcp');
   const presetWeb = document.getElementById('lab-preset-web');
   const presetTcp = document.getElementById('lab-preset-tcp');
+  const godBanner = document.getElementById('lab-god-banner');
+  const godModal = document.getElementById('lab-god-modal');
+  const godModalOk = document.getElementById('lab-god-modal-ok');
+  const godOff = document.getElementById('lab-god-off');
+  const godBackdrop = document.getElementById('lab-god-modal-backdrop');
+
+  /** @type {boolean} */
+  let labGodMode = false;
+  let konamiIdx = 0;
+
+  function labGodFetchHeaders() {
+    return {
+      'Content-Type': 'application/json',
+      'X-Lab-God': labGodMode ? '1' : '0',
+    };
+  }
+
+  function setGodUi(on) {
+    labGodMode = on;
+    if (godBanner) godBanner.classList.toggle('lab-god-on', on);
+  }
+
+  function closeGodModal() {
+    if (godModal) {
+      godModal.classList.remove('open');
+      godModal.setAttribute('aria-hidden', 'true');
+    }
+  }
+
+  function openGodModal() {
+    if (godModal) {
+      godModal.classList.add('open');
+      godModal.setAttribute('aria-hidden', 'false');
+    }
+  }
+
+  godModalOk?.addEventListener('click', closeGodModal);
+  godBackdrop?.addEventListener('click', closeGodModal);
+  godOff?.addEventListener('click', () => setGodUi(false));
+
+  document.addEventListener('keydown', (e) => {
+    const onLab = document.querySelector('.tab.active')?.dataset?.tab === 'lab';
+    if (e.key === 'Escape' && onLab && godModal?.classList.contains('open')) {
+      closeGodModal();
+      return;
+    }
+    if (!onLab) return;
+    if (e.code === KONAMI[konamiIdx]) {
+      konamiIdx += 1;
+      if (konamiIdx >= KONAMI.length) {
+        konamiIdx = 0;
+        setGodUi(true);
+        openGodModal();
+      }
+    } else {
+      konamiIdx = e.code === KONAMI[0] ? 1 : 0;
+    }
+  });
 
   function refreshEnabled() {
     const ok = agree && agree.checked;
@@ -125,16 +196,18 @@ export function initLab() {
         return;
       }
     }
+    const hostHeader = document.getElementById('lab-http-host-header')?.value?.trim();
     const body = {
       method: document.getElementById('lab-http-method')?.value || 'GET',
       url: document.getElementById('lab-http-url')?.value?.trim() || '',
       headers,
       body: document.getElementById('lab-http-body')?.value ?? '',
     };
+    if (hostHeader) body.host_header = hostHeader;
     out.textContent = 'Requête en cours…';
     fetch('/api/lab/http', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: labGodFetchHeaders(),
       body: JSON.stringify(body),
     })
       .then((r) => r.json())
@@ -147,7 +220,11 @@ export function initLab() {
         const head = JSON.stringify(h.headers || {}, null, 2);
         const txt = h.body_text || '';
         const pretty = formatJsonPretty(txt);
+        const metaLine = h.request_url
+          ? `<div style="color:var(--mu);font-size:.62rem;margin-bottom:6px">${h.dns_used ? `DNS → ${escapeHtml(String(h.resolved_ipv4 || ''))} — ` : ''}<span style="word-break:break-all">${escapeHtml(String(h.request_url))}</span></div>`
+          : '';
         out.innerHTML = `<div style="color:var(--a3);margin-bottom:8px">HTTP ${escapeHtml(String(h.status))} — ${h.truncated ? 'tronqué' : 'complet'}</div>`
+          + metaLine
           + `<div style="color:var(--mu);font-size:.65rem;margin-bottom:4px">En-têtes réponse</div>`
           + `<pre style="white-space:pre-wrap;word-break:break-all;margin-bottom:12px">${escapeHtml(head)}</pre>`
           + `<div style="color:var(--mu);font-size:.65rem;margin-bottom:4px">Corps</div>`
@@ -173,7 +250,7 @@ export function initLab() {
     out.textContent = 'TCP en cours…';
     fetch('/api/lab/tcp', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: labGodFetchHeaders(),
       body: JSON.stringify(payload),
     })
       .then((r) => r.json())
