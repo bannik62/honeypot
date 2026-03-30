@@ -190,6 +190,57 @@ function setupSondeIfaceCombo(wrap, hidden, trigger, panel) {
   document.addEventListener('keydown', sondeIfaceKeydown);
 }
 
+function clampTopEntries(map, limit = 6) {
+  return [...map.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit);
+}
+
+function parseIfaceFromTcpdumpLine(line) {
+  // Ex: "13:20:08.283494 lo    In  IP 127.0.0.1.3002 > ..."
+  //     "13:20:08.283494 ens3  Out IP ..."
+  const m = /^\S+\s+([a-zA-Z0-9._-]+)\s+(In|Out)\s+/.exec(line);
+  return m ? m[1] : null;
+}
+
+function parsePortsFromTcpdumpLine(line) {
+  // IPv4/IPv6: "... IP 127.0.0.1.3002 > 127.0.0.1.53454:" / "... IP6 ... .443 > ... .51515:"
+  const m = /\bIP6?\s+[^ ]+\.([0-9]{1,5})\s+>\s+[^ ]+\.([0-9]{1,5})(?::|\s)/.exec(line);
+  if (!m) return null;
+  const a = parseInt(m[1], 10);
+  const b = parseInt(m[2], 10);
+  if (!(a >= 1 && a <= 65535 && b >= 1 && b <= 65535)) return null;
+  return { src: a, dst: b };
+}
+
+function renderSondeSummary(summaryEl, ifaceCounts, portCounts) {
+  if (!summaryEl) return;
+  const ifaceTop = clampTopEntries(ifaceCounts, 7);
+  const portTop = clampTopEntries(portCounts, 9);
+
+  if (!ifaceTop.length && !portTop.length) {
+    summaryEl.hidden = true;
+    summaryEl.innerHTML = '';
+    return;
+  }
+
+  summaryEl.hidden = false;
+  summaryEl.innerHTML = [
+    `<div class="sr"><span class="k">Interfaces</span>`,
+    ...ifaceTop.map(
+      ([name, n]) =>
+        `<span class="chip" data-kind="iface" data-value="${name}">${name} <span class="n">${n}</span></span>`,
+    ),
+    `</div>`,
+    `<div class="sr"><span class="k">Ports</span>`,
+    ...portTop.map(
+      ([p, n]) =>
+        `<span class="chip" data-kind="port" data-value="${p}">${p} <span class="n">${n}</span></span>`,
+    ),
+    `</div>`,
+  ].join('');
+}
+
 async function loadSondeInterfaces(hidden, trigger, panel) {
   try {
     const r = await fetch('/api/sonde/interfaces');
@@ -207,6 +258,8 @@ export function initSonde() {
   const layerEl = document.getElementById('sonde-layer');
   const portEl = document.getElementById('sonde-port');
   const grepEl = document.getElementById('sonde-grep');
+  const exploreEl = document.getElementById('sonde-explore');
+  const summaryEl = document.getElementById('sonde-summary');
   const ifaceWrap = document.getElementById('sonde-iface-wrap');
   const ifaceHidden = document.getElementById('sonde-iface-value');
   const ifaceTrigger = document.getElementById('sonde-iface-trigger');
@@ -216,6 +269,8 @@ export function initSonde() {
 
   /** @type {() => string} */
   let getSondeIface = () => 'any';
+  /** @type {(name: string) => void} */
+  let setSondeIface = () => {};
   if (ifaceWrap && ifaceHidden && ifaceTrigger && ifacePanel) {
     setupSondeIfaceCombo(ifaceWrap, ifaceHidden, ifaceTrigger, ifacePanel);
     fillSondeIfaceCombo(ifaceHidden, ifaceTrigger, ifacePanel, []);
@@ -224,7 +279,39 @@ export function initSonde() {
       loadSondeInterfaces(ifaceHidden, ifaceTrigger, ifacePanel),
     );
     getSondeIface = () => (ifaceHidden.value || 'any').trim() || 'any';
+    setSondeIface = (name) => {
+      const chosen = String(name || 'any').trim() || 'any';
+      ifaceHidden.value = chosen;
+      const btn = ifacePanel.querySelector(`.sonde-iface-opt[data-name="${CSS.escape(chosen)}"]`);
+      const role = btn?.title || ifaceRoleClientHint(chosen);
+      ifaceTrigger.textContent = ifaceTriggerLabel(chosen);
+      ifaceTrigger.title = role;
+      ifacePanel.querySelectorAll('.sonde-iface-opt').forEach((b) => {
+        b.setAttribute('aria-selected', b.dataset.name === chosen ? 'true' : 'false');
+      });
+    };
   }
+
+  function isExploration() {
+    return Boolean(exploreEl?.checked);
+  }
+
+  function applyExplorationUiState() {
+    const exploring = isExploration();
+    if (portEl) {
+      portEl.disabled = exploring;
+      if (exploring) portEl.title = 'Mode exploration : port désactivé (tous les ports).';
+      else portEl.title = 'Port TCP/UDP';
+    }
+    if (ifaceTrigger) ifaceTrigger.disabled = exploring;
+    if (ifaceRefresh) ifaceRefresh.disabled = exploring;
+    if (exploring) setSondeIface('any');
+  }
+
+  exploreEl?.addEventListener('change', () => {
+    applyExplorationUiState();
+  });
+  applyExplorationUiState();
 
   let es = null;
   /** @param {boolean} running — true = capture en cours (Arrêter en bleu, Démarrer grisé) */
@@ -251,6 +338,10 @@ export function initSonde() {
   /** @type {string[]} */
   let inbox = [];
   let flushScheduled = false;
+  /** @type {Map<string, number>} */
+  let ifaceCounts = new Map();
+  /** @type {Map<number, number>} */
+  let portCounts = new Map();
 
   function applyRingToDom() {
     while (ring.length > MAX_LINES) ring.shift();
@@ -274,6 +365,16 @@ export function initSonde() {
   }
 
   function enqueueLine(text) {
+    if (isExploration()) {
+      const iface = parseIfaceFromTcpdumpLine(text);
+      if (iface) ifaceCounts.set(iface, (ifaceCounts.get(iface) || 0) + 1);
+      const ports = parsePortsFromTcpdumpLine(text);
+      if (ports) {
+        portCounts.set(ports.src, (portCounts.get(ports.src) || 0) + 1);
+        portCounts.set(ports.dst, (portCounts.get(ports.dst) || 0) + 1);
+      }
+      renderSondeSummary(summaryEl, ifaceCounts, portCounts);
+    }
     inbox.push(text);
     if (!flushScheduled) {
       flushScheduled = true;
@@ -292,6 +393,12 @@ export function initSonde() {
     inbox = [];
     flushScheduled = false;
     pre.textContent = '';
+    ifaceCounts = new Map();
+    portCounts = new Map();
+    if (summaryEl) {
+      summaryEl.hidden = true;
+      summaryEl.innerHTML = '';
+    }
   }
 
   function stopStream() {
@@ -309,8 +416,9 @@ export function initSonde() {
   buildFilterOptions(layerEl.value);
 
   startBtn.addEventListener('click', () => {
+    const exploring = isExploration();
     const port = parseInt(portEl.value, 10);
-    if (Number.isNaN(port) || port < 1 || port > 65535) {
+    if (!exploring && (Number.isNaN(port) || port < 1 || port > 65535)) {
       resetLog();
       appendLineSync('# Port invalide (1–65535).');
       return;
@@ -319,19 +427,24 @@ export function initSonde() {
     resetLog();
 
     const layer = layerEl.value;
+    if (exploring && layer === 'L7') {
+      appendLineSync('# Exploration : L7 (payload) est désactivé (trop volumineux / souvent chiffré).');
+      return;
+    }
     const filter = document.getElementById('sonde-filter').value;
     const direction = document.getElementById('sonde-direction')?.value || 'both';
     // Grep "tel quel" : recherche littérale, sensible à la casse.
     // Exemple : "In" ne doit pas matcher "win".
     const grepNeedle = String(grepEl.value || '').trim();
-    const iface = getSondeIface();
+    const iface = exploring ? 'any' : getSondeIface();
     const qs = new URLSearchParams({
-      port: String(port),
       layer,
       filter,
       direction,
       iface,
     });
+    if (exploring) qs.set('explore', '1');
+    else qs.set('port', String(port));
     const url = `/api/sonde/stream?${qs}`;
 
     setSondeToggle(true);
@@ -378,6 +491,27 @@ export function initSonde() {
     flushScheduled = false;
     stopStream();
     appendLineSync('# Arrêt demandé.');
+  });
+
+  summaryEl?.addEventListener('click', (e) => {
+    const chip = e.target.closest('.chip');
+    if (!chip) return;
+    const kind = chip.dataset.kind;
+    const value = chip.dataset.value;
+    if (!kind || !value) return;
+
+    // Cliquer sur un chip = raccourci vers mode ciblé
+    if (exploreEl) exploreEl.checked = false;
+    applyExplorationUiState();
+
+    if (kind === 'iface') {
+      setSondeIface(value);
+      return;
+    }
+    if (kind === 'port') {
+      portEl.value = String(value);
+      return;
+    }
   });
 
   setSondeToggle(false);

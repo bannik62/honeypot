@@ -259,6 +259,12 @@ tr:hover td{background:rgba(0,212,255,.03)}
 #panel-sonde .sonde-iface-opt:hover{background:rgba(0,212,255,.1);color:var(--a)}
 #panel-sonde .sonde-iface-opt[aria-selected="true"]{background:rgba(0,212,255,.14);color:var(--a)}
 #panel-sonde .sonde-iface-opt:last-child{border-bottom:none}
+#panel-sonde .sonde-summary{margin:8px 0 0;padding:8px 10px;border:1px solid var(--b);border-radius:8px;background:rgba(0,0,0,.28);font-family:'Share Tech Mono',monospace;font-size:.66rem;color:var(--a3)}
+#panel-sonde .sonde-summary .sr{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;margin:2px 0}
+#panel-sonde .sonde-summary .k{opacity:.9;color:var(--tx)}
+#panel-sonde .sonde-summary .chip{display:inline-flex;gap:6px;align-items:center;border:1px solid rgba(26,58,92,.6);border-radius:999px;padding:3px 8px;background:rgba(0,212,255,.06);cursor:pointer;color:var(--tx)}
+#panel-sonde .sonde-summary .chip:hover{border-color:var(--a);color:var(--a)}
+#panel-sonde .sonde-summary .n{opacity:.85;color:var(--a3)}
 #sonde-log{width:100%;max-height:min(55vh,520px);min-height:180px;overflow:auto;background:rgba(0,0,0,.4);border:1px solid var(--b);border-radius:8px;padding:10px 12px;font-size:.65rem;line-height:1.35;color:var(--a3);white-space:pre-wrap;word-break:break-word}
 /* LAB */
 #panel-lab .lab-warn{font-size:.68rem;color:var(--mu);line-height:1.5;max-width:960px;padding:12px 14px;background:rgba(255,170,0,.06);border:1px solid rgba(255,170,0,.35);border-radius:8px;margin-bottom:14px}
@@ -562,6 +568,10 @@ tr:hover td{background:rgba(0,212,255,.03)}
     <strong>Interface</strong> : <code>any</code> = tout le trafic ; <code>ens*</code> = face publique (souvent TLS sur 443) ; <code>lo</code> = loopback ; <code>docker0</code> / <code>br-*</code> / <code>veth*</code> = trafic vers les conteneurs (HTTP clair proxy→backend selon ta conf).
   </p>
   <div class="sonde-row">
+    <label title="Mode découverte : capture tous les ports (plus de bruit). Désactive le port et force l'interface any.">
+      Exploration
+      <input type="checkbox" id="sonde-explore" />
+    </label>
     <label class="sonde-iface-label" title="Ouvrir la liste : survolez un nom pour voir le rôle (infobulle native du navigateur).">Interface
       <div class="sonde-iface-wrap" id="sonde-iface-wrap">
         <input type="hidden" id="sonde-iface-value" value="any" />
@@ -598,6 +608,7 @@ tr:hover td{background:rgba(0,212,255,.03)}
     <button type="button" class="btn pri" id="sonde-start">▶ Démarrer</button>
     <button type="button" class="btn sonde-muted" id="sonde-stop" disabled>■ Arrêter</button>
   </div>
+  <div id="sonde-summary" class="sonde-summary" hidden></div>
   <pre id="sonde-log"></pre>
 </div>
 

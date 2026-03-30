@@ -161,16 +161,25 @@ def _tcp_port(port: str, direction: str, proto: str = "tcp") -> str:
     return f"{proto} and port {port}"
 
 
-def _build_filter_expr(port: int, layer: str, filt: str, direction: str) -> str:
-    """Expression tcpdump (sans shell). direction: both | in (dst) | out (src)."""
-    p = str(port)
+def _build_filter_expr(port: int | None, layer: str, filt: str, direction: str) -> str:
+    """Expression tcpdump (sans shell). direction: both | in (dst) | out (src).
+
+    Si port is None (mode exploration), on ignore direction (pas de dst/src port possible).
+    """
     if direction not in _VALID_DIRECTION:
         direction = "both"
+    if port is None:
+        direction = "both"
+        p = None
+    else:
+        p = str(port)
 
     if layer == "L3":
         # Pas de « not broadcast / not multicast » : avec -i any (LINUX_SLL2),
         # tcpdump renvoie « not a broadcast link » et quitte en erreur (code 1).
         if filt == "all":
+            if p is None:
+                return "(tcp or udp or icmp)"
             if direction == "both":
                 return f"(tcp or udp or icmp) and port {p}"
             if direction == "in":
@@ -183,10 +192,16 @@ def _build_filter_expr(port: int, layer: str, filt: str, direction: str) -> str:
                 f"(icmp and src port {p})"
             )
         if filt == "tcp":
+            if p is None:
+                return "tcp"
             return _tcp_port(p, direction, "tcp")
         if filt == "udp":
+            if p is None:
+                return "udp"
             return _tcp_port(p, direction, "udp")
         if filt == "icmp":
+            if p is None:
+                return "icmp"
             if direction == "both":
                 return f"icmp and port {p}"
             if direction == "in":
@@ -204,16 +219,23 @@ def _build_filter_expr(port: int, layer: str, filt: str, direction: str) -> str:
                 "(tcp[tcpflags] & tcp-syn != 0) or (tcp[tcpflags] & tcp-fin != 0) or "
                 "(tcp[tcpflags] & tcp-rst != 0)"
             )
-        base = _tcp_port(p, direction, "tcp")
+        if p is None:
+            base = "tcp"
+        else:
+            base = _tcp_port(p, direction, "tcp")
         return f"{base} and ({flags})"
     if layer == "L7":
+        if p is None:
+            raise ValueError("port")
         gt = "50" if filt == "gt50" else "128"
         base = _tcp_port(p, direction, "tcp")
         return f"{base} and greater {gt}"
     raise ValueError("layer")
 
 
-def _tcpdump_cmd(port: int, layer: str, filt: str, direction: str, iface: str) -> list[str]:
+def _tcpdump_cmd(
+    port: int | None, layer: str, filt: str, direction: str, iface: str
+) -> list[str]:
     expr = _build_filter_expr(port, layer, filt, direction)
     cmd = ["sudo", "tcpdump", "-n", "-i", iface, "-l"]
     if layer == "L7":
@@ -243,22 +265,29 @@ def serve_sonde_interfaces(handler) -> None:
 
 
 def serve_sonde_stream(handler) -> None:
-    """GET /api/sonde/stream?port=&layer=&filter=&iface= — SSE."""
+    """GET /api/sonde/stream?port=&layer=&filter=&iface=&explore= — SSE.
+
+    explore=1 : mode découverte (pas de port, interface any recommandée).
+    """
     global _sonde_proc
 
     qs = parse_qs(urlparse(handler.path).query)
-    try:
-        port_s = (qs.get("port") or [""])[0]
-        layer = (qs.get("layer") or ["L3"])[0].upper()
-        filt = (qs.get("filter") or [""])[0] or "all"
-        direction = (qs.get("direction") or ["both"])[0].lower()
-        port = int(port_s)
-    except (ValueError, TypeError):
-        handler.send_response(400)
-        handler.send_header("Content-Type", "text/plain; charset=utf-8")
-        handler.end_headers()
-        handler.wfile.write(b"port/layer/filter invalides.\n")
-        return
+    layer = (qs.get("layer") or ["L3"])[0].upper()
+    filt = (qs.get("filter") or [""])[0] or "all"
+    direction = (qs.get("direction") or ["both"])[0].lower()
+    explore = (qs.get("explore") or [""])[0] in ("1", "true", "yes", "on")
+
+    port: int | None = None
+    if not explore:
+        try:
+            port_s = (qs.get("port") or [""])[0]
+            port = int(port_s)
+        except (ValueError, TypeError):
+            handler.send_response(400)
+            handler.send_header("Content-Type", "text/plain; charset=utf-8")
+            handler.end_headers()
+            handler.wfile.write(b"port/layer/filter invalides.\n")
+            return
 
     iface_raw = (qs.get("iface") or qs.get("interface") or ["any"])[0]
     iface = normalize_sonde_iface(iface_raw)
@@ -269,12 +298,28 @@ def serve_sonde_stream(handler) -> None:
         handler.wfile.write("iface invalide (nom d'interface non autorise).\n".encode("utf-8"))
         return
 
-    if not (1 <= port <= 65535) or layer not in _VALID_LAYER:
+    if layer not in _VALID_LAYER:
         handler.send_response(400)
         handler.send_header("Content-Type", "text/plain; charset=utf-8")
         handler.end_headers()
-        handler.wfile.write(b"port (1-65535) ou layer (L3|L4|L7) invalide.\n")
+        handler.wfile.write(b"layer (L3|L4|L7) invalide.\n")
         return
+    if not explore:
+        assert port is not None
+        if not (1 <= port <= 65535):
+            handler.send_response(400)
+            handler.send_header("Content-Type", "text/plain; charset=utf-8")
+            handler.end_headers()
+            handler.wfile.write(b"port (1-65535) invalide.\n")
+            return
+    else:
+        # Exploration : pas de payload ASCII (-A), trop volumineux et souvent TLS illisible
+        if layer == "L7":
+            handler.send_response(400)
+            handler.send_header("Content-Type", "text/plain; charset=utf-8")
+            handler.end_headers()
+            handler.wfile.write(b"exploration: L7 interdit (choisir L3 ou L4).\n")
+            return
 
     if layer == "L3" and filt not in _FILTERS_L3:
         filt = "all"
@@ -286,7 +331,7 @@ def serve_sonde_stream(handler) -> None:
     if direction not in _VALID_DIRECTION:
         direction = "both"
 
-    cmd = _tcpdump_cmd(port, layer, filt, direction, iface)
+    cmd = _tcpdump_cmd(port if not explore else None, layer, filt, direction, iface)
 
     my_proc: subprocess.Popen | None = None
     with _sonde_lock:
@@ -317,9 +362,11 @@ def serve_sonde_stream(handler) -> None:
     handler.end_headers()
 
     # Ligne d’info (JSON) pour le front
+    port_str = "*" if explore else str(port)
+    explore_str = "1" if explore else "0"
     info = json.dumps(
         {
-            "t": f"# tcpdump -i {iface} layer={layer} filter={filt} port={port} direction={direction}",
+            "t": f"# tcpdump -i {iface} layer={layer} filter={filt} port={port_str} direction={direction} explore={explore_str}",
             "info": True,
         },
         ensure_ascii=False,
