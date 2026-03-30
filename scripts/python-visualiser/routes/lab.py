@@ -159,6 +159,16 @@ def _ipv4_allowed(ip: str, allowed: set[str]) -> bool:
     return ip in allowed
 
 
+def _normalize_lab_http_url(url: str) -> str:
+    """Sans schéma, urllib met le domaine dans path → hostname vide. On préfixe https://."""
+    u = url.strip()
+    if not u:
+        return u
+    if "://" not in u:
+        return f"https://{u}"
+    return u
+
+
 def _parse_headers_dict(raw: Any) -> tuple[dict[str, str] | None, str | None]:
     if raw is None:
         return {}, None
@@ -248,7 +258,7 @@ def serve_lab_http(handler) -> None:
         _send_json(handler, {"ok": False, "error": "Méthode HTTP non supportée"}, 400)
         return
 
-    url = str(payload.get("url", "")).strip()
+    url = _normalize_lab_http_url(str(payload.get("url", "")))
     if not url or len(url) > 4096:
         _send_json(handler, {"ok": False, "error": "URL manquante ou trop longue"}, 400)
         return

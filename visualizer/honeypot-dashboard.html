@@ -536,11 +536,11 @@ tr:hover td{background:rgba(0,212,255,.03)}
         </select>
       </label>
     </div>
-    <label class="lab-inline" style="width:100%;max-width:720px">URL (IPv4 littérale whitelistée ; avec GOD : hostname → première IPv4, sans filtre whitelist)
-      <input type="text" id="lab-http-url" placeholder="http://127.0.0.1:8765/api/lab/meta" style="width:100%" />
+    <label class="lab-inline" style="width:100%;max-width:720px">URL complète (<code>https://…</code> ou <code>http://…</code>) — si tu ne mets que le domaine, <code>https://</code> est ajouté automatiquement. IPv4 littérale whitelistée ; avec GOD + DNS : première IPv4 sans filtre whitelist.
+      <input type="text" id="lab-http-url" placeholder="https://codeurbase.fr/" style="width:100%" />
     </label>
-    <label class="lab-inline" style="width:100%;max-width:720px">Host (vhost, optionnel — remplace l’en-tête <code>Host</code> pour reverse proxy)
-      <input type="text" id="lab-http-host-header" placeholder="ex. vitalinfo.site" style="width:100%" />
+    <label class="lab-inline" style="width:100%;max-width:720px">En-tête <code>Host</code> (optionnel) — seulement si tu te connectes en <strong>IP</strong> dans l’URL mais que le serveur attend un autre nom (vhost / reverse proxy). Sinon laisser vide : l’hôte vient de l’URL.
+      <input type="text" id="lab-http-host-header" placeholder="vide en usage normal" style="width:100%" />
     </label>
     <div class="lab-sub">En-têtes (JSON)</div>
     <textarea id="lab-http-headers" placeholder='{ "Accept": "application/json" }' rows="4"></textarea>

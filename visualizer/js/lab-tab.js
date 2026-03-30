@@ -17,6 +17,13 @@ function formatJsonPretty(s) {
   }
 }
 
+function normalizeLabHttpUrl(raw) {
+  const u = (raw || '').trim();
+  if (!u) return u;
+  if (!u.includes('://')) return `https://${u}`;
+  return u;
+}
+
 const KONAMI = [
   'ArrowUp',
   'ArrowUp',
@@ -209,7 +216,7 @@ export function initLab() {
     const hostHeader = document.getElementById('lab-http-host-header')?.value?.trim();
     const body = {
       method: document.getElementById('lab-http-method')?.value || 'GET',
-      url: document.getElementById('lab-http-url')?.value?.trim() || '',
+      url: normalizeLabHttpUrl(document.getElementById('lab-http-url')?.value || ''),
       headers,
       body: document.getElementById('lab-http-body')?.value ?? '',
     };
