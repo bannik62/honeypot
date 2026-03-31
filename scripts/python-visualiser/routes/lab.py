@@ -247,6 +247,27 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
+class _HttpsConnectionWithSni(http.client.HTTPSConnection):
+    """HTTPSConnection that forces SNI hostname (vhosts over IP)."""
+
+    def __init__(self, host, port=None, *, sni_hostname: str | None = None, **kwargs):
+        self._sni_hostname = sni_hostname
+        super().__init__(host, port=port, **kwargs)
+
+    def connect(self):
+        # Based on http.client.HTTPSConnection.connect (stdlib)
+        sock = socket.create_connection(
+            (self.host, self.port),
+            self.timeout,
+            self.source_address,
+        )
+        if self._tunnel_host:
+            self.sock = sock
+            self._tunnel()
+        server_hostname = self._sni_hostname or self.host
+        self.sock = self._context.wrap_socket(sock, server_hostname=server_hostname)
+
+
 class _HttpsHandlerWithSni(urllib.request.HTTPSHandler):
     """HTTPS handler that forces SNI hostname (for vhosts over IP)."""
 
@@ -258,8 +279,8 @@ class _HttpsHandlerWithSni(urllib.request.HTTPSHandler):
         sni = self._sni
 
         def _conn(host, **kwargs):
-            # urllib passes host as 'host:port' sometimes; HTTPSConnection accepts host + port in kwargs.
-            return http.client.HTTPSConnection(host, server_hostname=sni, **kwargs)
+            # urllib passes host as 'host:port' sometimes; do_open handles port separately in kwargs.
+            return _HttpsConnectionWithSni(host, sni_hostname=sni, **kwargs)
 
         return self.do_open(_conn, req)
 
