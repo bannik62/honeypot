@@ -48,6 +48,29 @@ function toFormUrlEncoded(fields) {
   return params.toString();
 }
 
+/** Évite de remplacer le champ URL par une IPv4 (TLS/SNI attend le hostname). */
+function isIPv4LiteralHost(hostname) {
+  if (!hostname) return false;
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(hostname);
+  if (!m) return false;
+  return m.slice(1).every((x) => {
+    const n = Number(x);
+    return n >= 0 && n <= 255;
+  });
+}
+
+/** Préremplit l’URL POST si le serveur fournit un hostname (pas une IP seule). */
+function applyLabPrefillUrl(urlInput, postUrl) {
+  if (!urlInput || !postUrl) return;
+  try {
+    const pu = new URL(postUrl);
+    if (isIPv4LiteralHost(pu.hostname)) return;
+    urlInput.value = postUrl;
+  } catch {
+    urlInput.value = postUrl;
+  }
+}
+
 export function initLab() {
   const agree = document.getElementById('lab-agree');
   const sendHttp = document.getElementById('lab-send-http');
@@ -324,7 +347,7 @@ export function initLab() {
           const hh = document.getElementById('lab-http-headers');
           const b = document.getElementById('lab-http-body');
           if (m) m.value = 'POST';
-          if (u && pf.post_url) u.value = pf.post_url;
+          if (u && pf.post_url) applyLabPrefillUrl(u, pf.post_url);
           if (hh && pf.headers) hh.value = JSON.stringify(pf.headers, null, 2);
           if (b && pf.body_fields) b.value = toFormUrlEncoded(pf.body_fields);
         }

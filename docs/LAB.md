@@ -55,6 +55,7 @@ Case **“Extraire + préremplir (CSRF/hidden)”** (après une réponse HTML) :
     - `Origin` / `Referer`
     - `X-CSRF-Token` si `meta csrf-token` est présent
   - body urlencoded (hidden + token + clés des champs visibles)
+- **URL logique (mode GOD / DNS)** : l’extraction (`urljoin`) et le préremplissage (`post_url`, `Origin`, `Referer`) partent de l’**URL que tu as saisie** (hostname), pas de l’IPv4 résolue en interne, pour éviter de remplacer le champ URL par une IP (erreur TLS / certificat). La réponse JSON inclut `logical_url` (URL affichable) et `request_url` (URL réellement utilisée pour la socket, peut être IP).
 
 ---
 

@@ -208,6 +208,34 @@ def _url_with_ip_netloc(parsed, ip_str: str) -> str:
     )
 
 
+def _replace_resolved_ip_netloc_with_hostname(
+    target: str,
+    logical_url: str,
+    resolved_ip: str,
+) -> str:
+    """Si target pointe vers l’IPv4 résolue (GOD) alors que logical_url est un hostname, réécrit le netloc."""
+    try:
+        t = urlparse(target)
+        if t.hostname != resolved_ip:
+            return target
+        l = urlparse(logical_url)
+        lhn = l.hostname
+        if not lhn:
+            return target
+        try:
+            ipaddress.ip_address(lhn)
+            return target
+        except ValueError:
+            pass
+        if t.port and not ((t.scheme == "https" and t.port == 443) or (t.scheme == "http" and t.port == 80)):
+            netloc = f"{lhn}:{t.port}"
+        else:
+            netloc = lhn
+        return urlunparse((t.scheme, netloc, t.path, t.params, t.query, t.fragment))
+    except Exception:
+        return target
+
+
 def _ipv4_allowed(ip: str, allowed: set[str]) -> bool:
     return ip in allowed
 
@@ -479,6 +507,9 @@ def serve_lab_http(handler) -> None:
             )
             return
 
+        # URL affichée côté client / préremplissage (avant réécriture éventuelle en IP pour la socket).
+        logical_url = url
+
         host_for_header: str | None = None
         ip_str: str | None = None
         try:
@@ -621,7 +652,7 @@ def serve_lab_http(handler) -> None:
         if extract_prefill:
             ctype = (resp_headers.get("Content-Type") or resp_headers.get("content-type") or "").lower()
             if ("text/html" in ctype) or ("<html" in body_text.lower()) or ("<form" in body_text.lower()):
-                extracted = _extract_html_fields(url, body_text)
+                extracted = _extract_html_fields(logical_url, body_text)
                 if extracted:
                     hidden = extracted.get("hidden_fields") or {}
                     # Rails: include authenticity_token and utf8 if present
@@ -641,11 +672,15 @@ def serve_lab_http(handler) -> None:
                     atok = csrf.get("authenticity_token") if isinstance(csrf, dict) else None
                     if atok and "authenticity_token" not in body_fields:
                         body_fields["authenticity_token"] = atok
-                    post_url = extracted.get("form_action") or url
+                    post_url = extracted.get("form_action") or logical_url
+                    post_url = _replace_resolved_ip_netloc_with_hostname(post_url, logical_url, ip_str)
+                    pl = urlparse(logical_url)
+                    origin_host = pl.hostname or host
+                    origin = f"{pl.scheme}://{origin_host}" if origin_host else f"{parsed.scheme}://{host}"
                     headers_out = {
                         "Content-Type": "application/x-www-form-urlencoded",
-                        "Origin": f"{parsed.scheme}://{host}",
-                        "Referer": url,
+                        "Origin": origin,
+                        "Referer": logical_url,
                     }
                     # If meta csrf token exists, also suggest X-CSRF-Token (some apps use it)
                     mtok = csrf.get("csrf_token_meta") if isinstance(csrf, dict) else None
@@ -660,6 +695,7 @@ def serve_lab_http(handler) -> None:
             "body_length": len(chunk),
             "truncated": truncated,
             "request_url": url,
+            "logical_url": logical_url,
             "resolved_ipv4": ip_str,
             "dns_used": bool(host_for_header),
             "god_mode": god,
