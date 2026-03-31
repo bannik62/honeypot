@@ -28,6 +28,7 @@ Système de monitoring temps réel pour **Endlessh** (honeypot SSH) avec géoloc
 - 🔗 **Graphe réseau D3** (onglet Réseau) — traceroute des hops
 - 📋 **Tableau IPs** avec modales de détail (rapports nmap, DNS, screenshots)
 - 📊 **Onglet Statistiques** — top pays, top ports, timeline
+- 🔬 **Onglet LAB (HTTP/TCP)** — outil d’étude (mode GOD, sessions/cookies, extraction CSRF/hidden, historique)
 - 🖥️ **Serveur local** Python (`127.0.0.1:8765`), accès exclusivement via tunnel SSH
 - 🔌 **Filtre carte** par catégorie : tous, avec ports, avec vulns HIGH, avec rapports
 
@@ -157,6 +158,9 @@ Le dashboard contient 4 onglets :
 - **Réseau** — graphe de force D3 des traceroutes (hops entre routeurs)
 - **Statistiques** — top pays, top ports, timeline des connexions
 - **IPs** — tableau complet avec filtres et modales de détail (nmap, DNS, screenshots)
+- **LAB** — requêtes HTTP/TCP depuis le serveur (outil d’étude)
+
+Doc LAB : voir `docs/LAB.md`.
 
 Depuis l’interface, **↻ Régénérer data.json** lance `scripts/dashboard-regenerate.sh` : **`sudo traceroute-ip.sh`** puis **`generate-data.sh`** (flux `regenerate-stream`).
 

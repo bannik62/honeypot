@@ -53,6 +53,18 @@ Pré-requis sudo (serveur non interactif) :
 
 Le serveur utilise **`ThreadingHTTPServer`** pour ne pas bloquer les autres requêtes pendant un flux SSE.
 
+## Onglet LAB (HTTP/TCP)
+
+Le dashboard inclut un onglet **LAB** (outil d’étude) pour envoyer des requêtes HTTP(S) et du TCP brut depuis le VPS.
+
+Fonctions clés :
+- **Mode GOD** (DNS) via séquence Konami (UI dans l’onglet LAB)
+- **Rate-limit + concurrence** (protections)
+- **Session cookies** (CookieJar) et **extraction+préremplissage** CSRF/hidden pour flows type Rails
+- **Historique** et **raccourci IPs → LAB**
+
+Doc complète : `docs/LAB.md`.
+
 ## API — Audit Réseau (phase 1, read-only)
 
 ### `GET /api/audit` (utilisé par l’onglet « AUDIT »)

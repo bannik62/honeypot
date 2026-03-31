@@ -458,7 +458,7 @@ def serve_lab_http(handler) -> None:
                     handler,
                     {
                         "ok": False,
-                        "error": "Nom DNS dans l’URL : activez le mode GOD (Konami) côté LAB, ou utilisez une IPv4 littérale.",
+                        "error": "Nom DNS dans l’URL non autorisé. Utilisez une IPv4 littérale.",
                     },
                     400,
                 )
@@ -689,7 +689,7 @@ def serve_lab_tcp(handler) -> None:
                     handler,
                     {
                         "ok": False,
-                        "error": "Host non-IPv4 : activez le mode GOD (Konami) ou utilisez une IPv4 littérale.",
+                    "error": "Host non-IPv4 non autorisé. Utilisez une IPv4 littérale.",
                     },
                     400,
                 )
