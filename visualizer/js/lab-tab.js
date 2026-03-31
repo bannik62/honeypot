@@ -17,17 +17,6 @@ function formatJsonPretty(s) {
   }
 }
 
-function normalizeLabHttpUrl(raw) {
-  const u = (raw || '').trim();
-  if (!u) return u;
-  if (!u.includes('://')) {
-    const low = u.replace(/\/+$/, '').toLowerCase();
-    if (low === 'http' || low === 'https') return u;
-    return `https://${u}`;
-  }
-  return u;
-}
-
 const KONAMI = [
   'ArrowUp',
   'ArrowUp',
@@ -59,6 +48,8 @@ export function initLab() {
   const modTcp = document.getElementById('lab-mod-tcp');
   const presetWeb = document.getElementById('lab-preset-web');
   const presetTcp = document.getElementById('lab-preset-tcp');
+  const historyEl = document.getElementById('lab-history');
+
   const godBanner = document.getElementById('lab-god-banner');
   const godModal = document.getElementById('lab-god-modal');
   const godModalOk = document.getElementById('lab-god-modal-ok');
@@ -68,6 +59,23 @@ export function initLab() {
   /** @type {boolean} */
   let labGodMode = false;
   let konamiIdx = 0;
+  const history = [];
+
+  function pushHistory(entry) {
+    history.unshift(entry);
+    if (history.length > 10) history.pop();
+    if (!historyEl) return;
+    if (!history.length) {
+      historyEl.textContent = '—';
+      return;
+    }
+    historyEl.innerHTML = history
+      .map(
+        (h, idx) =>
+          `<button type="button" class="btn tiny" data-idx="${idx}" data-kind="${h.kind}">${idx + 1}. ${h.kind.toUpperCase()} ${escapeHtml(h.label)}</button>`,
+      )
+      .join(' ');
+  }
 
   function labGodFetchHeaders() {
     return {
@@ -206,6 +214,8 @@ export function initLab() {
 
   sendHttp?.addEventListener('click', () => {
     if (!agree?.checked) return;
+    if (sendHttp) sendHttp.disabled = true;
+    if (sendTcp) sendTcp.disabled = true;
     let headers = {};
     const raw = document.getElementById('lab-http-headers')?.value?.trim();
     if (raw) {
@@ -220,7 +230,7 @@ export function initLab() {
     const hostHeader = document.getElementById('lab-http-host-header')?.value?.trim();
     const body = {
       method: document.getElementById('lab-http-method')?.value || 'GET',
-      url: normalizeLabHttpUrl(document.getElementById('lab-http-url')?.value || ''),
+      url: document.getElementById('lab-http-url')?.value?.trim() || '',
       headers,
       body: document.getElementById('lab-http-body')?.value ?? '',
     };
@@ -253,11 +263,21 @@ export function initLab() {
       })
       .catch((e) => {
         out.innerHTML = `<span style="color:var(--a2)">${escapeHtml(String(e))}</span>`;
+      })
+      .finally(() => {
+        pushHistory({
+          kind: 'http',
+          label: body.url || '(vide)',
+          payload: body,
+        });
+        refreshEnabled();
       });
   });
 
   sendTcp?.addEventListener('click', () => {
     if (!agree?.checked) return;
+    if (sendHttp) sendHttp.disabled = true;
+    if (sendTcp) sendTcp.disabled = true;
     const host = document.getElementById('lab-tcp-host')?.value?.trim();
     const port = parseInt(document.getElementById('lab-tcp-port')?.value, 10);
     const payload = {
@@ -291,8 +311,51 @@ export function initLab() {
       })
       .catch((e) => {
         out.innerHTML = `<span style="color:var(--a2)">${escapeHtml(String(e))}</span>`;
+      })
+      .finally(() => {
+        pushHistory({
+          kind: 'tcp',
+          label: payload.host || '(host vide)',
+          payload,
+        });
+        refreshEnabled();
       });
   });
+
+  if (historyEl) {
+    historyEl.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-idx]');
+      if (!btn) return;
+      const idx = Number.parseInt(btn.dataset.idx, 10);
+      if (Number.isNaN(idx) || !history[idx]) return;
+      const h = history[idx];
+      if (h.kind === 'http') {
+        const p = h.payload || {};
+        const m = document.getElementById('lab-http-method');
+        const u = document.getElementById('lab-http-url');
+        const hh = document.getElementById('lab-http-headers');
+        const b = document.getElementById('lab-http-body');
+        if (m && p.method) m.value = p.method;
+        if (u && p.url) u.value = p.url;
+        if (hh && p.headers) hh.value = JSON.stringify(p.headers, null, 2);
+        if (b && Object.prototype.hasOwnProperty.call(p, 'body')) b.value = p.body;
+      } else if (h.kind === 'tcp') {
+        const p = h.payload || {};
+        const hostEl = document.getElementById('lab-tcp-host');
+        const portEl = document.getElementById('lab-tcp-port');
+        const encEl = document.getElementById('lab-tcp-encoding');
+        const payEl = document.getElementById('lab-tcp-payload');
+        const readEl = document.getElementById('lab-tcp-readmax');
+        const tEl = document.getElementById('lab-tcp-timeout');
+        if (hostEl && p.host) hostEl.value = p.host;
+        if (portEl && p.port) portEl.value = String(p.port);
+        if (encEl && p.payload_encoding) encEl.value = p.payload_encoding;
+        if (payEl && Object.prototype.hasOwnProperty.call(p, 'payload')) payEl.value = p.payload;
+        if (readEl && p.read_max) readEl.value = String(p.read_max);
+        if (tEl && p.timeout_sec) tEl.value = String(p.timeout_sec);
+      }
+    });
+  }
 
   loadPresets();
 }

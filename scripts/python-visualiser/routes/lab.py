@@ -186,7 +186,6 @@ def _normalize_lab_http_url(url: str) -> str:
     if not u:
         return u
     if "://" not in u:
-        # "https" seul → ne pas produire https://https (hostname invalide, DNS pour « https »)
         low = u.lower().rstrip("/")
         if low in ("http", "https"):
             return u
@@ -273,9 +272,13 @@ def serve_lab_http(handler) -> None:
         return
     try:
         if not _lab_rate_ok(handler):
+            retry_after = int(max(1, 60 - (time.time() % 60)))
             _send_json(
                 handler,
-                {"ok": False, "error": "Limite LAB atteinte (requêtes par minute). Réessayez plus tard."},
+                {
+                    "ok": False,
+                    "error": f"Limite LAB atteinte (requêtes par minute). Réessayez dans {retry_after} s.",
+                },
                 429,
             )
             return
@@ -478,9 +481,13 @@ def serve_lab_tcp(handler) -> None:
         return
     try:
         if not _lab_rate_ok(handler):
+            retry_after = int(max(1, 60 - (time.time() % 60)))
             _send_json(
                 handler,
-                {"ok": False, "error": "Limite LAB atteinte (requêtes par minute). Réessayez plus tard."},
+                {
+                    "ok": False,
+                    "error": f"Limite LAB atteinte (requêtes par minute). Réessayez dans {retry_after} s.",
+                },
                 429,
             )
             return
@@ -573,7 +580,9 @@ def serve_lab_tcp(handler) -> None:
         if err:
             _send_json(handler, {"ok": False, "error": err}, 400)
             return
-        assert raw is not None
+        if raw is None:
+            _send_json(handler, {"ok": False, "error": "payload décodé vide"}, 400)
+            return
 
         if len(raw) > MAX_BODY_IN:
             _send_json(handler, {"ok": False, "error": "payload trop volumineux"}, 400)

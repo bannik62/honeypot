@@ -48,6 +48,18 @@ document.getElementById('panel-ips').addEventListener('click', (e) => {
   const ip = badge.dataset.ip;
   const type = badge.dataset.type;
   if (!ip || !type) return;
+  if (type === 'lab') {
+    const labTab = document.querySelector('.tab[data-tab="lab"]');
+    if (labTab) labTab.click();
+    const urlInput = document.getElementById('lab-http-url');
+    if (urlInput) urlInput.value = `http://${ip}`;
+    const agree = document.getElementById('lab-agree');
+    if (agree && !agree.checked) {
+      agree.checked = true;
+      agree.dispatchEvent(new Event('change'));
+    }
+    return;
+  }
   const modal = document.getElementById('ip-detail-modal');
   const titleEl = document.getElementById('ip-modal-title');
   const bodyEl = document.getElementById('ip-modal-body');

@@ -512,7 +512,7 @@ tr:hover td{background:rgba(0,212,255,.03)}
     <strong>Usage réservé à l’étude et à des environnements autorisés.</strong>
     Ne ciblez pas des systèmes sans permission explicite. Ce module envoie des requêtes réelles depuis le serveur.
     Les <strong>IPv4 autorisées</strong> sont : <code>127.0.0.1</code>, les noms de dossiers <code>data/screenshotAndLog/&lt;ip&gt;/</code> (attaquants),
-    et celles listées dans <code>LAB_ALLOW_IPS</code> (config). Sans <strong>mode GOD</strong> (Konami), les URLs HTTP doivent utiliser une <strong>IPv4 littérale</strong> (pas de DNS).
+    et celles listées dans <code>LAB_ALLOW_IPS</code> (config).
   </div>
   <label class="lab-row" style="align-items:center;cursor:pointer">
     <input type="checkbox" id="lab-agree" />
@@ -582,6 +582,8 @@ tr:hover td{background:rgba(0,212,255,.03)}
 
   <div class="lab-sub">Résultat</div>
   <div id="lab-result">—</div>
+  <div class="lab-sub" style="margin-top:8px">Historique (10 dernières requêtes)</div>
+  <div id="lab-history" style="font-size:.65rem;color:var(--mu)">—</div>
 </div>
 
 <div id="panel-sonde" class="panel">
