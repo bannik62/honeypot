@@ -22,6 +22,7 @@ import time
 import urllib.parse
 import urllib.error
 import urllib.request
+import http.client
 from html.parser import HTMLParser
 from http.cookiejar import CookieJar
 from pathlib import Path
@@ -244,6 +245,23 @@ def _parse_headers_dict(raw: Any) -> tuple[dict[str, str] | None, str | None]:
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None
+
+
+class _HttpsHandlerWithSni(urllib.request.HTTPSHandler):
+    """HTTPS handler that forces SNI hostname (for vhosts over IP)."""
+
+    def __init__(self, context: ssl.SSLContext, sni_hostname: str | None):
+        super().__init__(context=context)
+        self._sni = sni_hostname
+
+    def https_open(self, req):
+        sni = self._sni
+
+        def _conn(host, **kwargs):
+            # urllib passes host as 'host:port' sometimes; HTTPSConnection accepts host + port in kwargs.
+            return http.client.HTTPSConnection(host, server_hostname=sni, **kwargs)
+
+        return self.do_open(_conn, req)
 
 
 class _LabHtmlExtract(HTMLParser):
@@ -523,7 +541,22 @@ def serve_lab_http(handler) -> None:
         session_id = str(payload.get("session_id") or "").strip()
         extract_prefill = bool(payload.get("extract_prefill"))
 
-        handlers: list[Any] = [urllib.request.HTTPSHandler(context=ctx)]
+        # SNI: si on se connecte en IP pour un vhost HTTPS, il faut garder le hostname en SNI,
+        # sinon Apache/Nginx peut renvoyer 421 (misdirected request).
+        sni_host: str | None = None
+        if parsed.scheme == "https":
+            # Priorité : override Host (si hostname) puis hostname DNS original (host_for_header).
+            cand = override or host_for_header
+            if cand:
+                try:
+                    ipaddress.ip_address(cand)
+                    cand_is_ip = True
+                except ValueError:
+                    cand_is_ip = False
+                if not cand_is_ip:
+                    sni_host = cand
+
+        handlers: list[Any] = [_HttpsHandlerWithSni(context=ctx, sni_hostname=sni_host)]
         if not follow_redirects:
             handlers.insert(0, _NoRedirect)
         jar: CookieJar | None = None
@@ -611,6 +644,8 @@ def serve_lab_http(handler) -> None:
             "god_mode": god,
             "follow_redirects": follow_redirects,
         }
+        if sni_host is not None:
+            http_obj["sni_hostname"] = sni_host
         if jar is not None:
             http_obj["session"] = {"session_id": session_id, "cookies": _cookies_as_kv(jar)}
         if extracted is not None:
