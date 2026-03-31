@@ -495,7 +495,7 @@ tr:hover td{background:rgba(0,212,255,.03)}
 
 <div id="panel-lab" class="panel">
   <div id="lab-god-banner" class="lab-god-banner" aria-live="polite">
-    <strong>MODE GOD activé.</strong> Un nom DNS dans l’URL est résolu (première IPv4) sans contrôle par la whitelist ; les <strong>IPv4 littérales</strong> restent soumises à la liste (<code>data/screenshotAndLog/&lt;ip&gt;/</code>, <code>LAB_ALLOW_IPS</code>).
+    <strong>MODE GOD activé.</strong> Un nom DNS dans l’URL est résolu (première IPv4) sans contrôle par la whitelist ; les <strong>IPv4 littérales</strong> restent soumises à la liste (<code>data/screenshotAndLog/&lt;ip&gt;/</code> ou <code>LAB_ALLOW_IPS</code>).
     Le serveur envoie toujours les requêtes réelles depuis le VPS : usage réservé à l’audit autorisé.
     <button type="button" class="btn" id="lab-god-off" style="margin-left:8px">Désactiver GOD</button>
   </div>
@@ -536,7 +536,7 @@ tr:hover td{background:rgba(0,212,255,.03)}
         </select>
       </label>
     </div>
-    <label class="lab-inline" style="width:100%;max-width:720px">URL complète (<code>https://…</code> ou <code>http://…</code>) — si tu ne mets que le domaine, <code>https://</code> est ajouté automatiquement. IPv4 littérale whitelistée ; avec GOD + DNS : première IPv4 sans filtre whitelist.
+    <label class="lab-inline" style="width:100%;max-width:720px">URL (IPv4 littérale ; avec GOD : hostname)
       <input type="text" id="lab-http-url" placeholder="https://codeurbase.fr/" style="width:100%" />
     </label>
     <label class="lab-inline" style="width:100%;max-width:720px">En-tête <code>Host</code> (optionnel) — seulement si tu te connectes en <strong>IP</strong> dans l’URL mais que le serveur attend un autre nom (vhost / reverse proxy). Sinon laisser vide : l’hôte vient de l’URL.
@@ -557,7 +557,7 @@ tr:hover td{background:rgba(0,212,255,.03)}
       <label class="lab-inline">Preset
         <select id="lab-preset-tcp" style="min-width:220px"></select>
       </label>
-      <label class="lab-inline">Hôte (IPv4 whitelistée ; avec GOD : hostname → première IPv4)
+      <label class="lab-inline">Hôte (IPv4 ; avec GOD : hostname)
         <input type="text" id="lab-tcp-host" placeholder="127.0.0.1" style="width:140px" />
       </label>
       <label class="lab-inline">Port

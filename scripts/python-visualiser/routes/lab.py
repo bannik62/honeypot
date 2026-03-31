@@ -42,13 +42,6 @@ _RATE_LOCK = threading.Lock()
 
 _LAB_SEM: threading.BoundedSemaphore | None = None
 
-_RFC1918_NETS = (
-    ipaddress.ip_network("10.0.0.0/8"),
-    ipaddress.ip_network("172.16.0.0/12"),
-    ipaddress.ip_network("192.168.0.0/16"),
-)
-_LINK_LOCAL_NET = ipaddress.ip_network("169.254.0.0/16")
-
 
 def _lab_max_concurrency() -> int:
     raw = (CONFIG.get("LAB_MAX_CONCURRENCY") or CONFIG.get("LAB_CONCURRENCY") or "10").strip()
@@ -64,21 +57,6 @@ def _lab_sem() -> threading.BoundedSemaphore:
     if _LAB_SEM is None:
         _LAB_SEM = threading.BoundedSemaphore(_lab_max_concurrency())
     return _LAB_SEM
-
-
-def _lab_allow_private_ipv4() -> bool:
-    raw = str(CONFIG.get("LAB_ALLOW_PRIVATE") or CONFIG.get("LAB_ALLOW_PRIVATE_IPV4") or "").strip().lower()
-    return raw in ("1", "true", "yes", "on")
-
-
-def _is_private_or_link_local_ipv4(ip_str: str) -> bool:
-    try:
-        ip = ipaddress.ip_address(ip_str)
-    except ValueError:
-        return False
-    if ip.version != 4:
-        return False
-    return any(ip in n for n in _RFC1918_NETS) or (ip in _LINK_LOCAL_NET)
 
 
 def _lab_max_per_minute() -> int:
@@ -392,17 +370,6 @@ def serve_lab_http(handler) -> None:
             )
             return
 
-        if not _lab_allow_private_ipv4() and _is_private_or_link_local_ipv4(ip_str):
-            _send_json(
-                handler,
-                {
-                    "ok": False,
-                    "error": f"IPv4 privée / link-local refusée par sécurité : {ip_str}. (Activez LAB_ALLOW_PRIVATE=1 pour autoriser.)",
-                },
-                403,
-            )
-            return
-
         hdrs, herr = _parse_headers_dict(payload.get("headers"))
         if herr:
             _send_json(handler, {"ok": False, "error": herr}, 400)
@@ -571,17 +538,6 @@ def serve_lab_tcp(handler) -> None:
             _send_json(
                 handler,
                 {"ok": False, "error": f"IP non autorisée : {ip_str}"},
-                403,
-            )
-            return
-
-        if not _lab_allow_private_ipv4() and _is_private_or_link_local_ipv4(ip_str):
-            _send_json(
-                handler,
-                {
-                    "ok": False,
-                    "error": f"IPv4 privée / link-local refusée par sécurité : {ip_str}. (Activez LAB_ALLOW_PRIVATE=1 pour autoriser.)",
-                },
                 403,
             )
             return
