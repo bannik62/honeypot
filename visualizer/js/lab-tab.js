@@ -20,7 +20,11 @@ function formatJsonPretty(s) {
 function normalizeLabHttpUrl(raw) {
   const u = (raw || '').trim();
   if (!u) return u;
-  if (!u.includes('://')) return `https://${u}`;
+  if (!u.includes('://')) {
+    const low = u.replace(/\/+$/, '').toLowerCase();
+    if (low === 'http' || low === 'https') return u;
+    return `https://${u}`;
+  }
   return u;
 }
 
