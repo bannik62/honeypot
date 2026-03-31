@@ -250,6 +250,7 @@ class _LabHtmlExtract(HTMLParser):
     def __init__(self):
         super().__init__()
         self.hidden_fields: dict[str, str] = {}
+        self.form_fields: list[dict[str, str]] = []
         self.csrf_meta_token: str | None = None
         self.csrf_meta_param: str | None = None
         self.authenticity_token: str | None = None
@@ -290,6 +291,16 @@ class _LabHtmlExtract(HTMLParser):
                 self.authenticity_token = str(val)
             if typ == "hidden" and val is not None:
                 self.hidden_fields[name] = str(val)
+                return
+            # Capture des champs de formulaire usuels (login/pwd/etc.) pour préremplir les clés.
+            if typ in ("text", "email", "password", "tel", "number", "search", "url"):
+                self.form_fields.append(
+                    {
+                        "name": name,
+                        "type": typ,
+                        "value": "" if val is None else str(val),
+                    }
+                )
 
 
 def _extract_html_fields(base_url: str, body_text: str) -> dict[str, Any]:
@@ -305,6 +316,7 @@ def _extract_html_fields(base_url: str, body_text: str) -> dict[str, Any]:
         "form_action": form_action,
         "form_method": p._first_form_method or None,
         "hidden_fields": p.hidden_fields,
+        "form_fields": p.form_fields,
         "csrf": {
             "authenticity_token": p.authenticity_token,
             "csrf_token_meta": p.csrf_meta_token,
@@ -560,6 +572,17 @@ def serve_lab_http(handler) -> None:
                     hidden = extracted.get("hidden_fields") or {}
                     # Rails: include authenticity_token and utf8 if present
                     body_fields = dict(hidden) if isinstance(hidden, dict) else {}
+                    # Ajoute aussi les champs de formulaire "visibles" (login/pwd/etc.) avec valeurs vides,
+                    # pour que l'utilisateur n'ait pas à deviner les clés.
+                    ff = extracted.get("form_fields") or []
+                    if isinstance(ff, list):
+                        for f in ff:
+                            if not isinstance(f, dict):
+                                continue
+                            nm = f.get("name")
+                            if not nm or nm in body_fields:
+                                continue
+                            body_fields[str(nm)] = ""
                     csrf = extracted.get("csrf") or {}
                     atok = csrf.get("authenticity_token") if isinstance(csrf, dict) else None
                     if atok and "authenticity_token" not in body_fields:

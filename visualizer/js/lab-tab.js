@@ -310,6 +310,9 @@ export function initLab() {
             const hidden = ex.hidden_fields || {};
             const hk = Object.keys(hidden);
             if (hk.length) parts.push(`<div><strong>Hidden</strong>: ${escapeHtml(hk.join(', '))}</div>`);
+            const ff = Array.isArray(ex.form_fields) ? ex.form_fields : [];
+            const names = ff.map((f) => f && f.name ? String(f.name) : '').filter(Boolean);
+            if (names.length) parts.push(`<div><strong>Champs</strong>: ${escapeHtml(names.join(', '))}</div>`);
           }
           extractedEl.innerHTML = parts.length ? parts.join('') : '—';
         }
