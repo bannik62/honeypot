@@ -39,6 +39,15 @@ function konamiMatchesStep(idx, e) {
   return false;
 }
 
+function toFormUrlEncoded(fields) {
+  const params = new URLSearchParams();
+  Object.entries(fields || {}).forEach(([k, v]) => {
+    if (v == null) return;
+    params.append(String(k), String(v));
+  });
+  return params.toString();
+}
+
 export function initLab() {
   const agree = document.getElementById('lab-agree');
   const sendHttp = document.getElementById('lab-send-http');
@@ -48,6 +57,10 @@ export function initLab() {
   const modTcp = document.getElementById('lab-mod-tcp');
   const presetWeb = document.getElementById('lab-preset-web');
   const presetTcp = document.getElementById('lab-preset-tcp');
+  const extractedEl = document.getElementById('lab-extracted');
+  const followRedirectsEl = document.getElementById('lab-http-follow-redirects');
+  const sessionEl = document.getElementById('lab-http-session');
+  const extractPrefillEl = document.getElementById('lab-http-extract-prefill');
   const historyEl = document.getElementById('lab-history');
 
   const godBanner = document.getElementById('lab-god-banner');
@@ -72,7 +85,10 @@ export function initLab() {
     historyEl.innerHTML = history
       .map(
         (h, idx) =>
-          `<button type="button" class="btn tiny" data-idx="${idx}" data-kind="${h.kind}">${idx + 1}. ${h.kind.toUpperCase()} ${escapeHtml(h.label)}</button>`,
+          `<span style="display:inline-flex;gap:6px;align-items:center;margin:2px 6px 2px 0">
+            <button type="button" class="btn tiny" data-idx="${idx}" data-kind="${h.kind}">${idx + 1}. ${h.kind.toUpperCase()} ${escapeHtml(h.label)}</button>
+            <button type="button" class="btn tiny" data-del-idx="${idx}" title="Supprimer">×</button>
+          </span>`,
       )
       .join(' ');
   }
@@ -228,6 +244,21 @@ export function initLab() {
       }
     }
     const hostHeader = document.getElementById('lab-http-host-header')?.value?.trim();
+    const followRedirects = !!followRedirectsEl?.checked;
+    const useSession = !!sessionEl?.checked;
+    const extractPrefill = !!extractPrefillEl?.checked;
+    let labSessionId = '';
+    if (useSession) {
+      try {
+        labSessionId = window.localStorage.getItem('labSessionId') || '';
+        if (!labSessionId) {
+          labSessionId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+          window.localStorage.setItem('labSessionId', labSessionId);
+        }
+      } catch {
+        labSessionId = '';
+      }
+    }
     const body = {
       method: document.getElementById('lab-http-method')?.value || 'GET',
       url: document.getElementById('lab-http-url')?.value?.trim() || '',
@@ -235,7 +266,11 @@ export function initLab() {
       body: document.getElementById('lab-http-body')?.value ?? '',
     };
     if (hostHeader) body.host_header = hostHeader;
+    if (followRedirects) body.follow_redirects = true;
+    if (useSession && labSessionId) body.session_id = labSessionId;
+    if (extractPrefill) body.extract_prefill = true;
     out.textContent = 'Requête en cours…';
+    if (extractedEl) extractedEl.textContent = '—';
     fetch('/api/lab/http', {
       method: 'POST',
       headers: labGodFetchHeaders(),
@@ -260,6 +295,36 @@ export function initLab() {
           + `<pre style="white-space:pre-wrap;word-break:break-all;margin-bottom:12px">${escapeHtml(head)}</pre>`
           + `<div style="color:var(--mu);font-size:.65rem;margin-bottom:4px">Corps</div>`
           + `<pre style="white-space:pre-wrap;word-break:break-all">${escapeHtml(pretty)}</pre>`;
+
+        if (extractedEl) {
+          const ex = h.extracted || null;
+          const sess = h.session || null;
+          const parts = [];
+          if (sess && Array.isArray(sess.cookies) && sess.cookies.length) {
+            parts.push(`<div><strong>Cookies</strong>: <code>${escapeHtml(sess.cookies.join('; '))}</code></div>`);
+          }
+          if (ex) {
+            if (ex.form_action) parts.push(`<div><strong>Form action</strong>: <code>${escapeHtml(ex.form_action)}</code></div>`);
+            if (ex.csrf && ex.csrf.authenticity_token) parts.push(`<div><strong>authenticity_token</strong>: <code>${escapeHtml(ex.csrf.authenticity_token)}</code></div>`);
+            if (ex.csrf && ex.csrf.csrf_token_meta) parts.push(`<div><strong>meta csrf-token</strong>: <code>${escapeHtml(ex.csrf.csrf_token_meta)}</code></div>`);
+            const hidden = ex.hidden_fields || {};
+            const hk = Object.keys(hidden);
+            if (hk.length) parts.push(`<div><strong>Hidden</strong>: ${escapeHtml(hk.join(', '))}</div>`);
+          }
+          extractedEl.innerHTML = parts.length ? parts.join('') : '—';
+        }
+
+        if (extractPrefillEl?.checked && h.prefill) {
+          const pf = h.prefill;
+          const m = document.getElementById('lab-http-method');
+          const u = document.getElementById('lab-http-url');
+          const hh = document.getElementById('lab-http-headers');
+          const b = document.getElementById('lab-http-body');
+          if (m) m.value = 'POST';
+          if (u && pf.post_url) u.value = pf.post_url;
+          if (hh && pf.headers) hh.value = JSON.stringify(pf.headers, null, 2);
+          if (b && pf.body_fields) b.value = toFormUrlEncoded(pf.body_fields);
+        }
       })
       .catch((e) => {
         out.innerHTML = `<span style="color:var(--a2)">${escapeHtml(String(e))}</span>`;
@@ -324,6 +389,27 @@ export function initLab() {
 
   if (historyEl) {
     historyEl.addEventListener('click', (e) => {
+      const del = e.target.closest('button[data-del-idx]');
+      if (del) {
+        const idx = Number.parseInt(del.dataset.delIdx, 10);
+        if (!Number.isNaN(idx) && history[idx]) {
+          history.splice(idx, 1);
+          // re-render
+          if (!history.length) historyEl.textContent = '—';
+          else {
+            historyEl.innerHTML = history
+              .map(
+                (h, i) =>
+                  `<span style="display:inline-flex;gap:6px;align-items:center;margin:2px 6px 2px 0">
+                    <button type="button" class="btn tiny" data-idx="${i}" data-kind="${h.kind}">${i + 1}. ${h.kind.toUpperCase()} ${escapeHtml(h.label)}</button>
+                    <button type="button" class="btn tiny" data-del-idx="${i}" title="Supprimer">×</button>
+                  </span>`,
+              )
+              .join(' ');
+          }
+        }
+        return;
+      }
       const btn = e.target.closest('button[data-idx]');
       if (!btn) return;
       const idx = Number.parseInt(btn.dataset.idx, 10);

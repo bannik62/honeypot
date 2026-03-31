@@ -19,11 +19,14 @@ import socket
 import ssl
 import threading
 import time
+import urllib.parse
 import urllib.error
 import urllib.request
+from html.parser import HTMLParser
+from http.cookiejar import CookieJar
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import urlparse, urlunparse, urljoin
 
 from config import CONFIG, IP_RE, ROOT, SCAN_DIR, VISUALIZER_DIR
 
@@ -41,6 +44,34 @@ _RATE_BUCKET: dict[tuple[str, int], int] = {}
 _RATE_LOCK = threading.Lock()
 
 _LAB_SEM: threading.BoundedSemaphore | None = None
+
+_LAB_SESSIONS: dict[str, tuple[CookieJar, float]] = {}
+_LAB_SESSIONS_LOCK = threading.Lock()
+
+
+def _lab_sessions_ttl_sec() -> int:
+    raw = (CONFIG.get("LAB_SESSION_TTL_SEC") or "1800").strip()
+    try:
+        n = int(raw)
+    except ValueError:
+        n = 1800
+    return max(60, min(n, 24 * 3600))
+
+
+def _lab_sessions_wipe_old(now: float) -> None:
+    ttl = _lab_sessions_ttl_sec()
+    dead = [k for k, (_jar, ts) in _LAB_SESSIONS.items() if (now - ts) > ttl]
+    for k in dead:
+        _LAB_SESSIONS.pop(k, None)
+
+
+def _lab_get_cookiejar(session_id: str) -> CookieJar:
+    now = time.time()
+    with _LAB_SESSIONS_LOCK:
+        _lab_sessions_wipe_old(now)
+        jar, _ts = _LAB_SESSIONS.get(session_id, (CookieJar(), now))
+        _LAB_SESSIONS[session_id] = (jar, now)
+        return jar
 
 
 def _lab_max_concurrency() -> int:
@@ -213,6 +244,83 @@ def _parse_headers_dict(raw: Any) -> tuple[dict[str, str] | None, str | None]:
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None
+
+
+class _LabHtmlExtract(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.hidden_fields: dict[str, str] = {}
+        self.csrf_meta_token: str | None = None
+        self.csrf_meta_param: str | None = None
+        self.authenticity_token: str | None = None
+        self._first_form_action: str | None = None
+        self._first_form_method: str | None = None
+
+    def handle_starttag(self, tag, attrs):
+        a = dict(attrs)
+        if tag == "meta":
+            name = (a.get("name") or "").strip().lower()
+            if name == "csrf-token":
+                v = a.get("content")
+                if v:
+                    self.csrf_meta_token = str(v)
+            elif name == "csrf-param":
+                v = a.get("content")
+                if v:
+                    self.csrf_meta_param = str(v)
+            return
+
+        if tag == "form" and self._first_form_action is None:
+            act = a.get("action")
+            if act:
+                self._first_form_action = str(act)
+            m = a.get("method")
+            if m:
+                self._first_form_method = str(m).strip().upper()
+            return
+
+        if tag == "input":
+            name = a.get("name")
+            if not name:
+                return
+            name = str(name)
+            typ = str(a.get("type") or "").strip().lower()
+            val = a.get("value")
+            if name == "authenticity_token" and val is not None:
+                self.authenticity_token = str(val)
+            if typ == "hidden" and val is not None:
+                self.hidden_fields[name] = str(val)
+
+
+def _extract_html_fields(base_url: str, body_text: str) -> dict[str, Any]:
+    p = _LabHtmlExtract()
+    try:
+        p.feed(body_text)
+    except Exception:
+        return {}
+    form_action = None
+    if p._first_form_action:
+        form_action = urljoin(base_url, p._first_form_action)
+    return {
+        "form_action": form_action,
+        "form_method": p._first_form_method or None,
+        "hidden_fields": p.hidden_fields,
+        "csrf": {
+            "authenticity_token": p.authenticity_token,
+            "csrf_token_meta": p.csrf_meta_token,
+            "csrf_param_meta": p.csrf_meta_param,
+        },
+    }
+
+
+def _cookies_as_kv(jar: CookieJar) -> list[str]:
+    out: list[str] = []
+    for c in jar:
+        try:
+            out.append(f"{c.name}={c.value}")
+        except Exception:
+            continue
+    return out
 
 
 def serve_lab_presets_web(handler) -> None:
@@ -399,10 +507,18 @@ def serve_lab_http(handler) -> None:
         ctx = ssl.create_default_context()
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
-        opener = urllib.request.build_opener(
-            _NoRedirect,
-            urllib.request.HTTPSHandler(context=ctx),
-        )
+        follow_redirects = bool(payload.get("follow_redirects"))
+        session_id = str(payload.get("session_id") or "").strip()
+        extract_prefill = bool(payload.get("extract_prefill"))
+
+        handlers: list[Any] = [urllib.request.HTTPSHandler(context=ctx)]
+        if not follow_redirects:
+            handlers.insert(0, _NoRedirect)
+        jar: CookieJar | None = None
+        if session_id:
+            jar = _lab_get_cookiejar(session_id)
+            handlers.append(urllib.request.HTTPCookieProcessor(jar))
+        opener = urllib.request.build_opener(*handlers)
 
         req = urllib.request.Request(url, data=data, method=method, headers=hdrs)
 
@@ -434,23 +550,52 @@ def serve_lab_http(handler) -> None:
         except UnicodeDecodeError:
             body_text = chunk.decode("utf-8", errors="replace")
 
-        _send_json(
-            handler,
-            {
-                "ok": True,
-                "http": {
-                    "status": status,
-                    "headers": resp_headers,
-                    "body_text": body_text,
-                    "body_length": len(chunk),
-                    "truncated": truncated,
-                    "request_url": url,
-                    "resolved_ipv4": ip_str,
-                    "dns_used": bool(host_for_header),
-                    "god_mode": god,
-                },
-            },
-        )
+        extracted: dict[str, Any] | None = None
+        prefill: dict[str, Any] | None = None
+        if extract_prefill:
+            ctype = (resp_headers.get("Content-Type") or resp_headers.get("content-type") or "").lower()
+            if ("text/html" in ctype) or ("<html" in body_text.lower()) or ("<form" in body_text.lower()):
+                extracted = _extract_html_fields(url, body_text)
+                if extracted:
+                    hidden = extracted.get("hidden_fields") or {}
+                    # Rails: include authenticity_token and utf8 if present
+                    body_fields = dict(hidden) if isinstance(hidden, dict) else {}
+                    csrf = extracted.get("csrf") or {}
+                    atok = csrf.get("authenticity_token") if isinstance(csrf, dict) else None
+                    if atok and "authenticity_token" not in body_fields:
+                        body_fields["authenticity_token"] = atok
+                    post_url = extracted.get("form_action") or url
+                    headers_out = {
+                        "Content-Type": "application/x-www-form-urlencoded",
+                        "Origin": f"{parsed.scheme}://{host}",
+                        "Referer": url,
+                    }
+                    # If meta csrf token exists, also suggest X-CSRF-Token (some apps use it)
+                    mtok = csrf.get("csrf_token_meta") if isinstance(csrf, dict) else None
+                    if mtok:
+                        headers_out["X-CSRF-Token"] = str(mtok)
+                    prefill = {"post_url": post_url, "headers": headers_out, "body_fields": body_fields}
+
+        http_obj: dict[str, Any] = {
+            "status": status,
+            "headers": resp_headers,
+            "body_text": body_text,
+            "body_length": len(chunk),
+            "truncated": truncated,
+            "request_url": url,
+            "resolved_ipv4": ip_str,
+            "dns_used": bool(host_for_header),
+            "god_mode": god,
+            "follow_redirects": follow_redirects,
+        }
+        if jar is not None:
+            http_obj["session"] = {"session_id": session_id, "cookies": _cookies_as_kv(jar)}
+        if extracted is not None:
+            http_obj["extracted"] = extracted
+        if prefill is not None:
+            http_obj["prefill"] = prefill
+
+        _send_json(handler, {"ok": True, "http": http_obj})
     finally:
         sem.release()
 

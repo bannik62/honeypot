@@ -536,6 +536,11 @@ tr:hover td{background:rgba(0,212,255,.03)}
         </select>
       </label>
     </div>
+    <div class="lab-row" style="margin-top:6px;gap:14px;flex-wrap:wrap">
+      <label style="font-size:.68rem;color:var(--mu)"><input type="checkbox" id="lab-http-follow-redirects" /> Suivre les redirections (30x)</label>
+      <label style="font-size:.68rem;color:var(--mu)"><input type="checkbox" id="lab-http-session" /> Session (cookies)</label>
+      <label style="font-size:.68rem;color:var(--mu)"><input type="checkbox" id="lab-http-extract-prefill" /> Extraire + préremplir (CSRF/hidden)</label>
+    </div>
     <label class="lab-inline" style="width:100%;max-width:720px">URL (IPv4 littérale ; avec GOD : hostname)
       <input type="text" id="lab-http-url" placeholder="https://codeurbase.fr/" style="width:100%" />
     </label>
@@ -582,6 +587,8 @@ tr:hover td{background:rgba(0,212,255,.03)}
 
   <div class="lab-sub">Résultat</div>
   <div id="lab-result">—</div>
+  <div class="lab-sub" style="margin-top:10px">Extraits (CSRF / cookies / formulaire)</div>
+  <div id="lab-extracted" style="font-size:.65rem;color:var(--mu)">—</div>
   <div class="lab-sub" style="margin-top:8px">Historique (10 dernières requêtes)</div>
   <div id="lab-history" style="font-size:.65rem;color:var(--mu)">—</div>
 </div>
