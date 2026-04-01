@@ -150,6 +150,38 @@ def _send_json(handler, payload: dict[str, Any], status: int = 200) -> None:
     handler.wfile.write(body)
 
 
+def _send_err(
+    handler,
+    *,
+    status: int,
+    kind: str,
+    error: str,
+    details: dict[str, Any] | None = None,
+    retry_after_sec: int | None = None,
+) -> None:
+    payload: dict[str, Any] = {"ok": False, "kind": kind, "error": error}
+    if details:
+        payload["details"] = details
+    if retry_after_sec is not None:
+        payload["retry_after_sec"] = int(max(1, retry_after_sec))
+    _send_json(handler, payload, status)
+
+
+def _retry_after_to_next_minute_sec() -> int:
+    return int(max(1, 60 - (time.time() % 60)))
+
+
+def _classify_urlerror_reason(reason: Any) -> tuple[str, str]:
+    # urllib.error.URLError.reason can be a string, OSError, or ssl.SSLError.
+    if isinstance(reason, ssl.SSLError):
+        return "tls", f"Erreur TLS : {reason!s}"
+    s = str(reason or "")
+    low = s.lower()
+    if "certificate verify failed" in low or "certificat" in low:
+        return "tls", f"Erreur TLS : {s}"
+    return "network", f"Erreur réseau : {s}"
+
+
 def get_allowed_ipv4s() -> set[str]:
     """IPs autorisées : 127.0.0.1, dossiers data/screenshotAndLog/<ip>/ (attaquants), LAB_ALLOW_IPS.
 
@@ -451,22 +483,23 @@ def _serve_presets_file(handler, path: Path) -> None:
 def serve_lab_http(handler) -> None:
     sem = _lab_sem()
     if not sem.acquire(blocking=False):
-        _send_json(
+        _send_err(
             handler,
-            {"ok": False, "error": "Trop de requêtes LAB en parallèle. Réessayez dans quelques secondes."},
-            429,
+            status=429,
+            kind="concurrency",
+            error="Trop de requêtes LAB en parallèle. Réessayez dans quelques secondes.",
+            retry_after_sec=3,
         )
         return
     try:
         if not _lab_rate_ok(handler):
-            retry_after = int(max(1, 60 - (time.time() % 60)))
-            _send_json(
+            retry_after = _retry_after_to_next_minute_sec()
+            _send_err(
                 handler,
-                {
-                    "ok": False,
-                    "error": f"Limite LAB atteinte (requêtes par minute). Réessayez dans {retry_after} s.",
-                },
-                429,
+                status=429,
+                kind="rate",
+                error=f"Limite LAB atteinte (requêtes par minute). Réessayez dans {retry_after} s.",
+                retry_after_sec=retry_after,
             )
             return
 
@@ -474,36 +507,40 @@ def serve_lab_http(handler) -> None:
         allowed = get_allowed_ipv4s()
         payload = _read_json_body(handler)
         if not payload:
-            _send_json(handler, {"ok": False, "error": "JSON invalide ou trop volumineux"}, 400)
+            _send_err(handler, status=400, kind="input", error="JSON invalide ou trop volumineux")
             return
 
         method = str(payload.get("method", "GET")).strip().upper()
         if method not in ("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"):
-            _send_json(handler, {"ok": False, "error": "Méthode HTTP non supportée"}, 400)
+            _send_err(
+                handler,
+                status=400,
+                kind="input",
+                error="Méthode HTTP non supportée",
+                details={"allowed_methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]},
+            )
             return
 
         url = _normalize_lab_http_url(str(payload.get("url", "")))
         if not url or len(url) > 4096:
-            _send_json(handler, {"ok": False, "error": "URL manquante ou trop longue"}, 400)
+            _send_err(handler, status=400, kind="input", error="URL manquante ou trop longue")
             return
 
         parsed = urlparse(url)
         if parsed.scheme not in ("http", "https"):
-            _send_json(handler, {"ok": False, "error": "Schéma autorisé : http ou https"}, 400)
+            _send_err(handler, status=400, kind="input", error="Schéma autorisé : http ou https")
             return
 
         host = parsed.hostname
         if not host:
-            _send_json(handler, {"ok": False, "error": "Hôte manquant dans l’URL"}, 400)
+            _send_err(handler, status=400, kind="input", error="Hôte manquant dans l’URL")
             return
         if host in ("http", "https"):
-            _send_json(
+            _send_err(
                 handler,
-                {
-                    "ok": False,
-                    "error": "URL invalide : indiquez un domaine ou une IP (ex. https://codeurbase.fr). « http » ou « https » seul n’est pas une adresse.",
-                },
-                400,
+                status=400,
+                kind="input",
+                error="URL invalide : indiquez un domaine ou une IP (ex. https://codeurbase.fr). « http » ou « https » seul n’est pas une adresse.",
             )
             return
 
@@ -519,18 +556,17 @@ def serve_lab_http(handler) -> None:
 
         if ip_obj is not None:
             if ip_obj.version != 4:
-                _send_json(handler, {"ok": False, "error": "IPv6 non supporté (IPv4 uniquement)."}, 400)
+                _send_err(handler, status=400, kind="input", error="IPv6 non supporté (IPv4 uniquement).")
                 return
             ip_str = str(ip_obj)
         else:
             if not god:
-                _send_json(
+                _send_err(
                     handler,
-                    {
-                        "ok": False,
-                        "error": "Nom DNS dans l’URL non autorisé. Utilisez une IPv4 littérale.",
-                    },
-                    400,
+                    status=400,
+                    kind="forbidden",
+                    error="Nom DNS dans l’URL non autorisé. Utilisez une IPv4 littérale.",
+                    details={"host": host},
                 )
                 return
 
@@ -539,33 +575,44 @@ def serve_lab_http(handler) -> None:
             try:
                 infos = socket.getaddrinfo(host, None, socket.AF_INET, socket.SOCK_STREAM)
                 if not infos:
-                    _send_json(handler, {"ok": False, "error": f"Impossible de résoudre le nom d'hôte : {host}"}, 403)
+                    _send_err(
+                        handler,
+                        status=403,
+                        kind="dns",
+                        error=f"Impossible de résoudre le nom d'hôte : {host}",
+                        details={"host": host},
+                    )
                     return
                 # On prend la première IPv4 retournée
                 ip_str = infos[0][4][0]
                 host_for_header = host
                 url = _url_with_ip_netloc(parsed, ip_str)
             except OSError:
-                _send_json(handler, {"ok": False, "error": f"Erreur de résolution DNS pour {host}"}, 403)
+                _send_err(
+                    handler,
+                    status=403,
+                    kind="dns",
+                    error=f"Erreur de résolution DNS pour {host}",
+                    details={"host": host},
+                )
                 return
 
         assert ip_str is not None
 
         # IPv4 littérale : whitelist. DNS + GOD : pas de filtre sur l’IP résolue (ip_str déjà défini ci-dessus).
         if ip_obj is not None and not _ipv4_allowed(ip_str, allowed):
-            _send_json(
+            _send_err(
                 handler,
-                {
-                    "ok": False,
-                    "error": f"IP non autorisée : {ip_str}. Vérifiez data/screenshotAndLog/<ip>/ ou LAB_ALLOW_IPS.",
-                },
-                403,
+                status=403,
+                kind="forbidden",
+                error=f"IP non autorisée : {ip_str}. Vérifiez data/screenshotAndLog/<ip>/ ou LAB_ALLOW_IPS.",
+                details={"ip": ip_str},
             )
             return
 
         hdrs, herr = _parse_headers_dict(payload.get("headers"))
         if herr:
-            _send_json(handler, {"ok": False, "error": herr}, 400)
+            _send_err(handler, status=400, kind="input", error=herr)
             return
         assert hdrs is not None
 
@@ -579,11 +626,11 @@ def serve_lab_http(handler) -> None:
         data: bytes | None = None
         if body_raw is not None and method not in ("GET", "HEAD"):
             if not isinstance(body_raw, str):
-                _send_json(handler, {"ok": False, "error": "body doit être une chaîne"}, 400)
+                _send_err(handler, status=400, kind="input", error="body doit être une chaîne")
                 return
             data = body_raw.encode("utf-8")
             if len(data) > MAX_BODY_IN:
-                _send_json(handler, {"ok": False, "error": "Corps de requête trop volumineux"}, 400)
+                _send_err(handler, status=400, kind="input", error="Corps de requête trop volumineux")
                 return
 
         ctx = ssl.create_default_context()
@@ -632,10 +679,21 @@ def serve_lab_http(handler) -> None:
             except Exception:
                 chunk = b""
         except urllib.error.URLError as e:
-            _send_json(handler, {"ok": False, "error": f"Erreur réseau : {e.reason!s}"})
+            kind, msg = _classify_urlerror_reason(getattr(e, "reason", None))
+            _send_err(
+                handler,
+                status=502,
+                kind=kind,
+                error=msg,
+                details={
+                    "logical_url": logical_url,
+                    "request_url": url,
+                    "resolved_ipv4": ip_str,
+                },
+            )
             return
         except Exception as e:
-            _send_json(handler, {"ok": False, "error": str(e)})
+            _send_err(handler, status=500, kind="internal", error=str(e))
             return
 
         truncated = len(chunk) > MAX_HTTP_RESPONSE
@@ -733,22 +791,23 @@ def _decode_tcp_payload(payload: str, encoding: str) -> tuple[bytes | None, str 
 def serve_lab_tcp(handler) -> None:
     sem = _lab_sem()
     if not sem.acquire(blocking=False):
-        _send_json(
+        _send_err(
             handler,
-            {"ok": False, "error": "Trop de requêtes LAB en parallèle. Réessayez dans quelques secondes."},
-            429,
+            status=429,
+            kind="concurrency",
+            error="Trop de requêtes LAB en parallèle. Réessayez dans quelques secondes.",
+            retry_after_sec=3,
         )
         return
     try:
         if not _lab_rate_ok(handler):
-            retry_after = int(max(1, 60 - (time.time() % 60)))
-            _send_json(
+            retry_after = _retry_after_to_next_minute_sec()
+            _send_err(
                 handler,
-                {
-                    "ok": False,
-                    "error": f"Limite LAB atteinte (requêtes par minute). Réessayez dans {retry_after} s.",
-                },
-                429,
+                status=429,
+                kind="rate",
+                error=f"Limite LAB atteinte (requêtes par minute). Réessayez dans {retry_after} s.",
+                retry_after_sec=retry_after,
             )
             return
 
@@ -756,12 +815,12 @@ def serve_lab_tcp(handler) -> None:
         allowed = get_allowed_ipv4s()
         payload = _read_json_body(handler)
         if not payload:
-            _send_json(handler, {"ok": False, "error": "JSON invalide ou trop volumineux"}, 400)
+            _send_err(handler, status=400, kind="input", error="JSON invalide ou trop volumineux")
             return
 
         host = str(payload.get("host", "")).strip()
         if not host:
-            _send_json(handler, {"ok": False, "error": "host manquant"}, 400)
+            _send_err(handler, status=400, kind="input", error="host manquant")
             return
 
         ip_str: str | None = None
@@ -772,18 +831,17 @@ def serve_lab_tcp(handler) -> None:
 
         if ip_obj is not None:
             if ip_obj.version != 4:
-                _send_json(handler, {"ok": False, "error": "IPv6 non supporté (IPv4 uniquement)."}, 400)
+                _send_err(handler, status=400, kind="input", error="IPv6 non supporté (IPv4 uniquement).")
                 return
             ip_str = str(ip_obj)
         else:
             if not god:
-                _send_json(
+                _send_err(
                     handler,
-                    {
-                        "ok": False,
-                    "error": "Host non-IPv4 non autorisé. Utilisez une IPv4 littérale.",
-                    },
-                    400,
+                    status=400,
+                    kind="forbidden",
+                    error="Host non-IPv4 non autorisé. Utilisez une IPv4 littérale.",
+                    details={"host": host},
                 )
                 return
 
@@ -792,20 +850,34 @@ def serve_lab_tcp(handler) -> None:
             try:
                 infos = socket.getaddrinfo(host, None, socket.AF_INET, socket.SOCK_STREAM)
                 if not infos:
-                    _send_json(handler, {"ok": False, "error": f"Impossible de résoudre le nom d'hôte : {host}"}, 403)
+                    _send_err(
+                        handler,
+                        status=403,
+                        kind="dns",
+                        error=f"Impossible de résoudre le nom d'hôte : {host}",
+                        details={"host": host},
+                    )
                     return
                 ip_str = infos[0][4][0]
             except OSError:
-                _send_json(handler, {"ok": False, "error": f"Erreur de résolution DNS pour {host}"}, 403)
+                _send_err(
+                    handler,
+                    status=403,
+                    kind="dns",
+                    error=f"Erreur de résolution DNS pour {host}",
+                    details={"host": host},
+                )
                 return
 
         assert ip_str is not None
 
         if ip_obj is not None and not _ipv4_allowed(ip_str, allowed):
-            _send_json(
+            _send_err(
                 handler,
-                {"ok": False, "error": f"IP non autorisée : {ip_str}"},
-                403,
+                status=403,
+                kind="forbidden",
+                error=f"IP non autorisée : {ip_str}",
+                details={"ip": ip_str},
             )
             return
 
@@ -814,7 +886,7 @@ def serve_lab_tcp(handler) -> None:
         except (TypeError, ValueError):
             port = 0
         if port < 1 or port > 65535:
-            _send_json(handler, {"ok": False, "error": "port invalide (1-65535)"}, 400)
+            _send_err(handler, status=400, kind="input", error="port invalide (1-65535)")
             return
 
         try:
@@ -833,19 +905,19 @@ def serve_lab_tcp(handler) -> None:
         if body_str is None:
             body_str = ""
         if not isinstance(body_str, str):
-            _send_json(handler, {"ok": False, "error": "payload doit être une chaîne"}, 400)
+            _send_err(handler, status=400, kind="input", error="payload doit être une chaîne")
             return
 
         raw, err = _decode_tcp_payload(body_str, str(payload.get("payload_encoding", "text")))
         if err:
-            _send_json(handler, {"ok": False, "error": err}, 400)
+            _send_err(handler, status=400, kind="input", error=err)
             return
         if raw is None:
-            _send_json(handler, {"ok": False, "error": "payload décodé vide"}, 400)
+            _send_err(handler, status=400, kind="input", error="payload décodé vide")
             return
 
         if len(raw) > MAX_BODY_IN:
-            _send_json(handler, {"ok": False, "error": "payload trop volumineux"}, 400)
+            _send_err(handler, status=400, kind="input", error="payload trop volumineux")
             return
 
         sock: socket.socket | None = None
@@ -867,7 +939,13 @@ def serve_lab_tcp(handler) -> None:
                     if len(received) >= read_max:
                         break
         except OSError as e:
-            _send_json(handler, {"ok": False, "error": f"TCP : {e!s}"})
+            _send_err(
+                handler,
+                status=502,
+                kind="network",
+                error=f"TCP : {e!s}",
+                details={"host": host, "resolved_ipv4": ip_str, "port": port, "timeout_sec": timeout_sec},
+            )
             return
         finally:
             if sock:

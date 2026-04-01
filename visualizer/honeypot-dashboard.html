@@ -589,7 +589,10 @@ tr:hover td{background:rgba(0,212,255,.03)}
   <div id="lab-result">—</div>
   <div class="lab-sub" style="margin-top:10px">Extraits (CSRF / cookies / formulaire)</div>
   <div id="lab-extracted" style="font-size:.65rem;color:var(--mu)">—</div>
-  <div class="lab-sub" style="margin-top:8px">Historique (10 dernières requêtes)</div>
+  <div class="lab-sub" style="margin-top:8px;display:flex;align-items:center;gap:10px">
+    <span>Historique (10 dernières requêtes)</span>
+    <button type="button" class="btn tiny" id="lab-history-clear" title="Vider l’historique">Clear</button>
+  </div>
   <div id="lab-history" style="font-size:.65rem;color:var(--mu)">—</div>
 </div>
 

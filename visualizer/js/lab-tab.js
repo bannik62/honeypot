@@ -8,6 +8,27 @@ function escapeHtml(s) {
   return div.innerHTML;
 }
 
+function kindLabel(kind) {
+  const k = String(kind || '').toLowerCase();
+  if (k === 'input') return 'Entrée invalide';
+  if (k === 'dns') return 'DNS';
+  if (k === 'tls') return 'TLS';
+  if (k === 'network') return 'Réseau';
+  if (k === 'rate') return 'Limite';
+  if (k === 'concurrency') return 'Concurrence';
+  if (k === 'forbidden') return 'Interdit';
+  if (k === 'internal') return 'Serveur';
+  return 'Erreur';
+}
+
+function renderLabError(res) {
+  const msg = escapeHtml(res?.error || 'Erreur');
+  const lbl = escapeHtml(kindLabel(res?.kind));
+  const ra = Number(res?.retry_after_sec || 0);
+  const hint = ra > 0 ? `<div style="margin-top:6px;color:var(--mu);font-size:.62rem">Réessayez dans ${escapeHtml(String(ra))} s.</div>` : '';
+  return `<div style="color:var(--a2)"><strong>${lbl}</strong> — ${msg}${hint}</div>`;
+}
+
 function formatJsonPretty(s) {
   try {
     const o = JSON.parse(s);
@@ -85,6 +106,7 @@ export function initLab() {
   const sessionEl = document.getElementById('lab-http-session');
   const extractPrefillEl = document.getElementById('lab-http-extract-prefill');
   const historyEl = document.getElementById('lab-history');
+  const historyClearEl = document.getElementById('lab-history-clear');
 
   const godBanner = document.getElementById('lab-god-banner');
   const godModal = document.getElementById('lab-god-modal');
@@ -115,6 +137,11 @@ export function initLab() {
       )
       .join(' ');
   }
+
+  historyClearEl?.addEventListener('click', () => {
+    history.splice(0, history.length);
+    if (historyEl) historyEl.textContent = '—';
+  });
 
   function labGodFetchHeaders() {
     return {
@@ -263,6 +290,7 @@ export function initLab() {
         if (typeof headers !== 'object' || headers === null) throw new Error('not object');
       } catch {
         out.innerHTML = `<span style="color:var(--a2)">En-têtes : JSON invalide.</span>`;
+        refreshEnabled();
         return;
       }
     }
@@ -302,15 +330,26 @@ export function initLab() {
       .then((r) => r.json())
       .then((res) => {
         if (!res.ok) {
-          out.innerHTML = `<span style="color:var(--a2)">${escapeHtml(res.error || 'Erreur')}</span>`;
+          out.innerHTML = renderLabError(res);
           return;
         }
         const h = res.http;
         const head = JSON.stringify(h.headers || {}, null, 2);
         const txt = h.body_text || '';
         const pretty = formatJsonPretty(txt);
-        const metaLine = h.request_url
-          ? `<div style="color:var(--mu);font-size:.62rem;margin-bottom:6px">${h.dns_used ? `DNS → ${escapeHtml(String(h.resolved_ipv4 || ''))} — ` : ''}<span style="word-break:break-all">${escapeHtml(String(h.request_url))}</span></div>`
+        const metaParts = [];
+        if (h.dns_used) metaParts.push(`DNS → ${escapeHtml(String(h.resolved_ipv4 || ''))}`);
+        if (h.logical_url && h.logical_url !== h.request_url) {
+          metaParts.push(`<span style="word-break:break-all">URL logique: <code>${escapeHtml(String(h.logical_url))}</code></span>`);
+        }
+        if (h.request_url) {
+          metaParts.push(`<span style="word-break:break-all">URL appelée: <code>${escapeHtml(String(h.request_url))}</code></span>`);
+        }
+        if (h.sni_hostname) {
+          metaParts.push(`<span>SNI: <code>${escapeHtml(String(h.sni_hostname))}</code></span>`);
+        }
+        const metaLine = metaParts.length
+          ? `<div style="color:var(--mu);font-size:.62rem;margin-bottom:6px">${metaParts.join(' — ')}</div>`
           : '';
         out.innerHTML = `<div style="color:var(--a3);margin-bottom:8px">HTTP ${escapeHtml(String(h.status))} — ${h.truncated ? 'tronqué' : 'complet'}</div>`
           + metaLine
@@ -388,7 +427,7 @@ export function initLab() {
       .then((r) => r.json())
       .then((res) => {
         if (!res.ok) {
-          out.innerHTML = `<span style="color:var(--a2)">${escapeHtml(res.error || 'Erreur')}</span>`;
+          out.innerHTML = renderLabError(res);
           return;
         }
         const t = res.tcp;
