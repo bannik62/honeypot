@@ -340,6 +340,8 @@ export function initLab() {
       document.getElementById('lab-tcp-payload').value = p.payload != null ? String(p.payload) : '';
       document.getElementById('lab-tcp-readmax').value = p.read_max != null ? String(p.read_max) : '4096';
       document.getElementById('lab-tcp-timeout').value = p.timeout_sec != null ? String(p.timeout_sec) : '8';
+      const bindEl = document.getElementById('lab-tcp-bind');
+      if (bindEl) bindEl.value = p.bind_ipv4 != null ? String(p.bind_ipv4) : '';
     } catch {
       /* ignore */
     }
@@ -528,6 +530,7 @@ export function initLab() {
     }
     const host = document.getElementById('lab-tcp-host')?.value?.trim();
     const port = parseInt(document.getElementById('lab-tcp-port')?.value, 10);
+    const bindRaw = document.getElementById('lab-tcp-bind')?.value?.trim();
     const payload = {
       host,
       port,
@@ -536,6 +539,7 @@ export function initLab() {
       read_max: parseInt(document.getElementById('lab-tcp-readmax')?.value, 10) || 4096,
       timeout_sec: parseFloat(document.getElementById('lab-tcp-timeout')?.value) || 8,
     };
+    if (bindRaw) payload.bind_ipv4 = bindRaw;
     if (labGodMode && limitsMode && limitsMode !== 'strict') payload.limits_mode = limitsMode;
     out.textContent = 'TCP en cours…';
     fetch('/api/lab/tcp', {
@@ -552,7 +556,12 @@ export function initLab() {
         const t = res.tcp;
         const hex = t.hex || '';
         const hexDisp = hex.length > 4000 ? `${hex.slice(0, 4000)}…` : hex;
+        const srcLine =
+          t.source_ipv4 ?
+            `<div style="color:var(--mu);font-size:.65rem;margin-bottom:6px">Source TCP : <code>${escapeHtml(String(t.source_ipv4))}</code>${t.bind_ipv4 ? ` (bind <code>${escapeHtml(String(t.bind_ipv4))}</code>)` : ''}</div>`
+            : '';
         out.innerHTML = `<div style="color:var(--a3);margin-bottom:8px">Reçu ${t.bytes_received} octet(s)${t.read_truncated ? ' (limite atteinte)' : ''}</div>`
+          + srcLine
           + `<div style="color:var(--mu);font-size:.65rem;margin-bottom:4px">Hex</div>`
           + `<pre style="white-space:pre-wrap;word-break:break-all;margin-bottom:12px">${escapeHtml(hexDisp)}</pre>`
           + `<div style="color:var(--mu);font-size:.65rem;margin-bottom:4px">Aperçu texte (UTF-8, replacement)</div>`
@@ -591,10 +600,6 @@ export function initLab() {
               )
               .join(' ');
           }
-
-  // Force l’état initial: hors GOD, le bloc "Limites (GOD)" doit être caché.
-  setGodUi(false);
-  refreshLimitsUi();
         }
         return;
       }
@@ -621,15 +626,21 @@ export function initLab() {
         const payEl = document.getElementById('lab-tcp-payload');
         const readEl = document.getElementById('lab-tcp-readmax');
         const tEl = document.getElementById('lab-tcp-timeout');
+        const bindEl = document.getElementById('lab-tcp-bind');
         if (hostEl && p.host) hostEl.value = p.host;
         if (portEl && p.port) portEl.value = String(p.port);
         if (encEl && p.payload_encoding) encEl.value = p.payload_encoding;
         if (payEl && Object.prototype.hasOwnProperty.call(p, 'payload')) payEl.value = p.payload;
         if (readEl && p.read_max) readEl.value = String(p.read_max);
         if (tEl && p.timeout_sec) tEl.value = String(p.timeout_sec);
+        if (bindEl) bindEl.value = p.bind_ipv4 != null ? String(p.bind_ipv4) : '';
       }
     });
   }
+
+  // Force l’état initial: hors GOD, le bloc "Limites (GOD)" doit être caché.
+  setGodUi(false);
+  refreshLimitsUi();
 
   loadPresets();
 }

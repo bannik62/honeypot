@@ -2,12 +2,12 @@
 """
 routes/lab.py — LAB (étude) : requêtes HTTP et envoi TCP depuis le serveur.
 
-IPv4 littérales : autorisées seulement si présentes dans la liste (dossiers
-data/screenshotAndLog/<ip>/ + LAB_ALLOW_IPS + 127.0.0.1).
+Hors mode « GOD » : IPv4 littérales en cible autorisées seulement si présentes dans
+la liste (dossiers data/screenshotAndLog/<ip>/ + LAB_ALLOW_IPS + 127.0.0.1).
 
-Mode « GOD » (header X-Lab-God) : un nom DNS dans l’URL ou l’hôte est résolu vers
-la première IPv4 ; cette IP n’est pas filtrée par la whitelist (responsabilité de
-l’opérateur). Pas d’usage contre des tiers sans autorisation.
+Mode « GOD » (header X-Lab-God) : pas de filtre whitelist sur l’IPv4 de **cible**
+(que ce soit une IPv4 littérale dans l’URL ou une IP obtenue par résolution DNS).
+Responsabilité de l’opérateur. Pas d’usage contre des tiers sans autorisation.
 """
 
 from __future__ import annotations
@@ -805,8 +805,8 @@ def serve_lab_http(handler) -> None:
 
         assert ip_str is not None
 
-        # IPv4 littérale : whitelist. DNS + GOD : pas de filtre sur l’IP résolue (ip_str déjà défini ci-dessus).
-        if ip_obj is not None and not _ipv4_allowed(ip_str, allowed):
+        # IPv4 littérale : whitelist hors GOD. En GOD : pas de filtre (même logique qu’une cible DNS résolue).
+        if ip_obj is not None and not god and not _ipv4_allowed(ip_str, allowed):
             _send_err(
                 handler,
                 status=403,
@@ -1140,7 +1140,7 @@ def serve_lab_tcp(handler) -> None:
 
         assert ip_str is not None
 
-        if ip_obj is not None and not _ipv4_allowed(ip_str, allowed):
+        if ip_obj is not None and not god and not _ipv4_allowed(ip_str, allowed):
             _send_err(
                 handler,
                 status=403,
@@ -1170,6 +1170,38 @@ def serve_lab_tcp(handler) -> None:
             read_max = 4096
         read_max = max(0, min(MAX_TCP_READ, read_max))
 
+        bind_raw = str(payload.get("bind_ipv4") or "").strip()
+        bind_str: str | None = None
+        if bind_raw:
+            try:
+                bind_obj = ipaddress.ip_address(bind_raw)
+            except ValueError:
+                _send_err(handler, status=400, kind="input", error="Adresse source (bind) invalide (IPv4 attendu)")
+                return
+            if bind_obj.version != 4:
+                _send_err(handler, status=400, kind="input", error="IPv6 non supporté pour le bind (IPv4 uniquement)")
+                return
+            bind_str = str(bind_obj)
+            if bind_str == "0.0.0.0":
+                _send_err(
+                    handler,
+                    status=400,
+                    kind="input",
+                    error="Adresse source 0.0.0.0 non autorisée pour le bind",
+                )
+                return
+            # Hors GOD : même whitelist que les cibles. En GOD : pas de filtre liste (comme pour la résolution DNS
+            # vers la cible) — le noyau refuse un bind sur une IP non assignée à la machine.
+            if not god and not _ipv4_allowed(bind_str, allowed):
+                _send_err(
+                    handler,
+                    status=403,
+                    kind="forbidden",
+                    error="Adresse source non autorisée pour le bind (ajoutez-la à LAB_ALLOW_IPS ou utilisez une IP listée).",
+                    details={"bind_ipv4": bind_str},
+                )
+                return
+
         body_str = payload.get("payload")
         if body_str is None:
             body_str = ""
@@ -1190,9 +1222,32 @@ def serve_lab_tcp(handler) -> None:
             return
 
         sock: socket.socket | None = None
+        source_ipv4: str | None = None
         try:
-            sock = socket.create_connection((ip_str, port), timeout=timeout_sec)
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.settimeout(timeout_sec)
+            if bind_str:
+                try:
+                    sock.bind((bind_str, 0))
+                except OSError as e:
+                    try:
+                        sock.close()
+                    except OSError:
+                        pass
+                    sock = None
+                    _send_err(
+                        handler,
+                        status=400,
+                        kind="input",
+                        error=f"Bind sur l’adresse source impossible : {e!s}",
+                        details={"bind_ipv4": bind_str},
+                    )
+                    return
+            sock.connect((ip_str, port))
+            try:
+                source_ipv4 = sock.getsockname()[0]
+            except OSError:
+                source_ipv4 = bind_str
             if raw:
                 sock.sendall(raw)
             received = b""
@@ -1213,7 +1268,13 @@ def serve_lab_tcp(handler) -> None:
                 status=502,
                 kind="network",
                 error=f"TCP : {e!s}",
-                details={"host": host, "resolved_ipv4": ip_str, "port": port, "timeout_sec": timeout_sec},
+                details={
+                    "host": host,
+                    "resolved_ipv4": ip_str,
+                    "port": port,
+                    "timeout_sec": timeout_sec,
+                    **({"bind_ipv4": bind_str} if bind_str else {}),
+                },
             )
             return
         finally:
@@ -1229,18 +1290,16 @@ def serve_lab_tcp(handler) -> None:
         except Exception:
             ascii_preview = ""
 
-        _send_json(
-            handler,
-            {
-                "ok": True,
-                "tcp": {
-                    "bytes_received": len(received),
-                    "hex": hex_out,
-                    "text_preview": ascii_preview,
-                    "read_truncated": len(received) >= read_max and read_max > 0,
-                },
-            },
-        )
+        tcp_out: dict[str, Any] = {
+            "bytes_received": len(received),
+            "hex": hex_out,
+            "text_preview": ascii_preview,
+            "read_truncated": len(received) >= read_max and read_max > 0,
+            "source_ipv4": source_ipv4 or "",
+        }
+        if bind_str:
+            tcp_out["bind_ipv4"] = bind_str
+        _send_json(handler, {"ok": True, "tcp": tcp_out})
     finally:
         if "sem" in locals() and sem is not None and locals().get("sem_acquired"):
             sem.release()
