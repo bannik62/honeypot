@@ -45,6 +45,7 @@ _RATE_BUCKET: dict[tuple[str, int], int] = {}
 _RATE_LOCK = threading.Lock()
 
 _LAB_SEM: threading.BoundedSemaphore | None = None
+_LAB_SEM_GOD: threading.BoundedSemaphore | None = None
 
 _LAB_SESSIONS: dict[str, tuple[CookieJar, float]] = {}
 _LAB_SESSIONS_LOCK = threading.Lock()
@@ -84,11 +85,40 @@ def _lab_max_concurrency() -> int:
     return max(1, min(n, 200))
 
 
+def _lab_god_max_concurrency() -> int:
+    raw = (CONFIG.get("LAB_GOD_MAX_CONCURRENCY") or "").strip()
+    if not raw:
+        return _lab_max_concurrency()
+    try:
+        n = int(raw)
+    except ValueError:
+        n = _lab_max_concurrency()
+    return max(1, min(n, 500))
+
+
+def _lab_god_max_per_minute() -> int:
+    raw = (CONFIG.get("LAB_GOD_RATE_PER_MINUTE") or CONFIG.get("LAB_GOD_RATE_PER_MIN") or "").strip()
+    if not raw:
+        return _lab_max_per_minute()
+    try:
+        n = int(raw)
+    except ValueError:
+        n = _lab_max_per_minute()
+    return max(5, min(n, 5000))
+
+
 def _lab_sem() -> threading.BoundedSemaphore:
     global _LAB_SEM
     if _LAB_SEM is None:
         _LAB_SEM = threading.BoundedSemaphore(_lab_max_concurrency())
     return _LAB_SEM
+
+
+def _lab_sem_god() -> threading.BoundedSemaphore:
+    global _LAB_SEM_GOD
+    if _LAB_SEM_GOD is None:
+        _LAB_SEM_GOD = threading.BoundedSemaphore(_lab_god_max_concurrency())
+    return _LAB_SEM_GOD
 
 
 def _lab_max_per_minute() -> int:
@@ -106,7 +136,7 @@ def _lab_rate_wipe_old(minute_epoch: int) -> None:
         del _RATE_BUCKET[k]
 
 
-def _lab_rate_ok(handler) -> bool:
+def _lab_rate_ok(handler, cap: int | None = None) -> bool:
     try:
         client = handler.client_address[0] if getattr(handler, "client_address", None) else "unknown"
     except Exception:
@@ -115,12 +145,23 @@ def _lab_rate_ok(handler) -> bool:
     with _RATE_LOCK:
         _lab_rate_wipe_old(minute_epoch)
         key = (str(client), minute_epoch)
-        cap = _lab_max_per_minute()
+        cap = int(cap if cap is not None else _lab_max_per_minute())
         cur = _RATE_BUCKET.get(key, 0) + 1
         if cur > cap:
             return False
         _RATE_BUCKET[key] = cur
         return True
+
+
+def _lab_limits_mode(god: bool, payload: dict[str, Any] | None) -> str:
+    if not god:
+        return "strict"
+    raw = ""
+    if payload:
+        raw = str(payload.get("limits_mode") or "").strip().lower()
+    if raw in ("strict", "boost", "off"):
+        return raw
+    return "strict"
 
 
 def _read_json_body(handler, max_bytes: int = MAX_BODY_IN) -> dict[str, Any] | None:
@@ -481,34 +522,43 @@ def _serve_presets_file(handler, path: Path) -> None:
 
 
 def serve_lab_http(handler) -> None:
-    sem = _lab_sem()
-    if not sem.acquire(blocking=False):
-        _send_err(
-            handler,
-            status=429,
-            kind="concurrency",
-            error="Trop de requêtes LAB en parallèle. Réessayez dans quelques secondes.",
-            retry_after_sec=3,
-        )
-        return
     try:
-        if not _lab_rate_ok(handler):
-            retry_after = _retry_after_to_next_minute_sec()
-            _send_err(
-                handler,
-                status=429,
-                kind="rate",
-                error=f"Limite LAB atteinte (requêtes par minute). Réessayez dans {retry_after} s.",
-                retry_after_sec=retry_after,
-            )
-            return
-
         god = _is_god_mode(handler)
         allowed = get_allowed_ipv4s()
         payload = _read_json_body(handler)
         if not payload:
             _send_err(handler, status=400, kind="input", error="JSON invalide ou trop volumineux")
             return
+
+        limits_mode = _lab_limits_mode(god, payload)
+        if limits_mode != "off":
+            sem = _lab_sem_god() if limits_mode == "boost" else _lab_sem()
+            if not sem.acquire(blocking=False):
+                _send_err(
+                    handler,
+                    status=429,
+                    kind="concurrency",
+                    error="Trop de requêtes LAB en parallèle. Réessayez dans quelques secondes.",
+                    retry_after_sec=3,
+                )
+                return
+            sem_acquired = True
+        else:
+            sem = None
+            sem_acquired = False
+
+        if limits_mode != "off":
+            cap = _lab_god_max_per_minute() if limits_mode == "boost" else None
+            if not _lab_rate_ok(handler, cap=cap):
+                retry_after = _retry_after_to_next_minute_sec()
+                _send_err(
+                    handler,
+                    status=429,
+                    kind="rate",
+                    error=f"Limite LAB atteinte (requêtes par minute). Réessayez dans {retry_after} s.",
+                    retry_after_sec=retry_after,
+                )
+                return
 
         method = str(payload.get("method", "GET")).strip().upper()
         if method not in ("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"):
@@ -768,9 +818,11 @@ def serve_lab_http(handler) -> None:
         if prefill is not None:
             http_obj["prefill"] = prefill
 
+        http_obj["limits_mode"] = limits_mode
         _send_json(handler, {"ok": True, "http": http_obj})
     finally:
-        sem.release()
+        if "sem" in locals() and sem is not None and locals().get("sem_acquired"):
+            sem.release()
 
 
 def _decode_tcp_payload(payload: str, encoding: str) -> tuple[bytes | None, str | None]:
@@ -789,34 +841,43 @@ def _decode_tcp_payload(payload: str, encoding: str) -> tuple[bytes | None, str 
 
 
 def serve_lab_tcp(handler) -> None:
-    sem = _lab_sem()
-    if not sem.acquire(blocking=False):
-        _send_err(
-            handler,
-            status=429,
-            kind="concurrency",
-            error="Trop de requêtes LAB en parallèle. Réessayez dans quelques secondes.",
-            retry_after_sec=3,
-        )
-        return
     try:
-        if not _lab_rate_ok(handler):
-            retry_after = _retry_after_to_next_minute_sec()
-            _send_err(
-                handler,
-                status=429,
-                kind="rate",
-                error=f"Limite LAB atteinte (requêtes par minute). Réessayez dans {retry_after} s.",
-                retry_after_sec=retry_after,
-            )
-            return
-
         god = _is_god_mode(handler)
         allowed = get_allowed_ipv4s()
         payload = _read_json_body(handler)
         if not payload:
             _send_err(handler, status=400, kind="input", error="JSON invalide ou trop volumineux")
             return
+
+        limits_mode = _lab_limits_mode(god, payload)
+        if limits_mode != "off":
+            sem = _lab_sem_god() if limits_mode == "boost" else _lab_sem()
+            if not sem.acquire(blocking=False):
+                _send_err(
+                    handler,
+                    status=429,
+                    kind="concurrency",
+                    error="Trop de requêtes LAB en parallèle. Réessayez dans quelques secondes.",
+                    retry_after_sec=3,
+                )
+                return
+            sem_acquired = True
+        else:
+            sem = None
+            sem_acquired = False
+
+        if limits_mode != "off":
+            cap = _lab_god_max_per_minute() if limits_mode == "boost" else None
+            if not _lab_rate_ok(handler, cap=cap):
+                retry_after = _retry_after_to_next_minute_sec()
+                _send_err(
+                    handler,
+                    status=429,
+                    kind="rate",
+                    error=f"Limite LAB atteinte (requêtes par minute). Réessayez dans {retry_after} s.",
+                    retry_after_sec=retry_after,
+                )
+                return
 
         host = str(payload.get("host", "")).strip()
         if not host:
@@ -973,4 +1034,5 @@ def serve_lab_tcp(handler) -> None:
             },
         )
     finally:
-        sem.release()
+        if "sem" in locals() and sem is not None and locals().get("sem_acquired"):
+            sem.release()

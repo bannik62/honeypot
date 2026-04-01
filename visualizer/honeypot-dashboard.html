@@ -541,6 +541,19 @@ tr:hover td{background:rgba(0,212,255,.03)}
       <label style="font-size:.68rem;color:var(--mu)"><input type="checkbox" id="lab-http-session" /> Session (cookies)</label>
       <label style="font-size:.68rem;color:var(--mu)"><input type="checkbox" id="lab-http-extract-prefill" /> Extraire + préremplir (CSRF/hidden)</label>
     </div>
+    <div class="lab-row" id="lab-god-limits-row" style="margin-top:6px;gap:14px;flex-wrap:wrap" hidden>
+      <label class="lab-inline" style="font-size:.68rem;color:var(--mu)">Limites (GOD)
+        <select id="lab-limits-mode">
+          <option value="strict">Strict</option>
+          <option value="boost">Boost</option>
+          <option value="off">Off</option>
+        </select>
+      </label>
+      <label id="lab-limits-off-ack-row" style="font-size:.68rem;color:var(--a2)" hidden>
+        <input type="checkbox" id="lab-limits-off-ack" />
+        Je comprends le risque (spam/DDOS involontaire)
+      </label>
+    </div>
     <label class="lab-inline" style="width:100%;max-width:720px">URL (IPv4 littérale ; avec GOD : hostname)
       <input type="text" id="lab-http-url" placeholder="https://codeurbase.fr/" style="width:100%" />
     </label>

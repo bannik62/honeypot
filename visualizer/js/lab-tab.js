@@ -105,6 +105,10 @@ export function initLab() {
   const followRedirectsEl = document.getElementById('lab-http-follow-redirects');
   const sessionEl = document.getElementById('lab-http-session');
   const extractPrefillEl = document.getElementById('lab-http-extract-prefill');
+  const limitsRowEl = document.getElementById('lab-god-limits-row');
+  const limitsModeEl = document.getElementById('lab-limits-mode');
+  const limitsOffAckRowEl = document.getElementById('lab-limits-off-ack-row');
+  const limitsOffAckEl = document.getElementById('lab-limits-off-ack');
   const historyEl = document.getElementById('lab-history');
   const historyClearEl = document.getElementById('lab-history-clear');
 
@@ -153,7 +157,22 @@ export function initLab() {
   function setGodUi(on) {
     labGodMode = on;
     if (godBanner) godBanner.classList.toggle('lab-god-on', on);
+    if (limitsRowEl) limitsRowEl.hidden = !on;
+    if (!on) {
+      if (limitsModeEl) limitsModeEl.value = 'strict';
+      if (limitsOffAckEl) limitsOffAckEl.checked = false;
+      if (limitsOffAckRowEl) limitsOffAckRowEl.hidden = true;
+    }
   }
+
+  function refreshLimitsUi() {
+    const mode = String(limitsModeEl?.value || 'strict');
+    const showAck = labGodMode && mode === 'off';
+    if (limitsOffAckRowEl) limitsOffAckRowEl.hidden = !showAck;
+    if (!showAck && limitsOffAckEl) limitsOffAckEl.checked = false;
+  }
+
+  limitsModeEl?.addEventListener('change', refreshLimitsUi);
 
   function closeGodModal() {
     if (godModal) {
@@ -298,6 +317,12 @@ export function initLab() {
     const followRedirects = !!followRedirectsEl?.checked;
     const useSession = !!sessionEl?.checked;
     const extractPrefill = !!extractPrefillEl?.checked;
+    const limitsMode = labGodMode ? String(limitsModeEl?.value || 'strict') : 'strict';
+    if (labGodMode && limitsMode === 'off' && !limitsOffAckEl?.checked) {
+      out.innerHTML = `<span style="color:var(--a2)"><strong>Concurrence/Limites</strong> — coche “Je comprends le risque” pour désactiver les limites.</span>`;
+      refreshEnabled();
+      return;
+    }
     let labSessionId = '';
     if (useSession) {
       try {
@@ -320,6 +345,7 @@ export function initLab() {
     if (followRedirects) body.follow_redirects = true;
     if (useSession && labSessionId) body.session_id = labSessionId;
     if (extractPrefill) body.extract_prefill = true;
+    if (labGodMode && limitsMode && limitsMode !== 'strict') body.limits_mode = limitsMode;
     out.textContent = 'Requête en cours…';
     if (extractedEl) extractedEl.textContent = '—';
     fetch('/api/lab/http', {
@@ -408,6 +434,12 @@ export function initLab() {
     if (!agree?.checked) return;
     if (sendHttp) sendHttp.disabled = true;
     if (sendTcp) sendTcp.disabled = true;
+    const limitsMode = labGodMode ? String(limitsModeEl?.value || 'strict') : 'strict';
+    if (labGodMode && limitsMode === 'off' && !limitsOffAckEl?.checked) {
+      out.innerHTML = `<span style="color:var(--a2)"><strong>Concurrence/Limites</strong> — coche “Je comprends le risque” pour désactiver les limites.</span>`;
+      refreshEnabled();
+      return;
+    }
     const host = document.getElementById('lab-tcp-host')?.value?.trim();
     const port = parseInt(document.getElementById('lab-tcp-port')?.value, 10);
     const payload = {
@@ -418,6 +450,7 @@ export function initLab() {
       read_max: parseInt(document.getElementById('lab-tcp-readmax')?.value, 10) || 4096,
       timeout_sec: parseFloat(document.getElementById('lab-tcp-timeout')?.value) || 8,
     };
+    if (labGodMode && limitsMode && limitsMode !== 'strict') payload.limits_mode = limitsMode;
     out.textContent = 'TCP en cours…';
     fetch('/api/lab/tcp', {
       method: 'POST',
@@ -472,6 +505,8 @@ export function initLab() {
               )
               .join(' ');
           }
+
+  refreshLimitsUi();
         }
         return;
       }
