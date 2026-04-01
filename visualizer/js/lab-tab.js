@@ -38,6 +38,19 @@ function formatJsonPretty(s) {
   }
 }
 
+function mergeHeadersPreserveExisting(existing, incoming) {
+  const out = {};
+  if (existing && typeof existing === 'object') {
+    Object.entries(existing).forEach(([k, v]) => { out[k] = v; });
+  }
+  if (incoming && typeof incoming === 'object') {
+    Object.entries(incoming).forEach(([k, v]) => {
+      if (out[k] == null || out[k] === '') out[k] = v;
+    });
+  }
+  return out;
+}
+
 const KONAMI = [
   'ArrowUp',
   'ArrowUp',
@@ -413,7 +426,20 @@ export function initLab() {
           const b = document.getElementById('lab-http-body');
           if (m) m.value = 'POST';
           if (u && pf.post_url) applyLabPrefillUrl(u, pf.post_url);
-          if (hh && pf.headers) hh.value = JSON.stringify(pf.headers, null, 2);
+          if (hh && pf.headers) {
+            let cur = {};
+            const raw = (hh.value || '').trim();
+            if (raw) {
+              try {
+                const parsed = JSON.parse(raw);
+                if (parsed && typeof parsed === 'object') cur = parsed;
+              } catch {
+                cur = {};
+              }
+            }
+            const merged = mergeHeadersPreserveExisting(cur, pf.headers);
+            hh.value = JSON.stringify(merged, null, 2);
+          }
           if (b && pf.body_fields) b.value = toFormUrlEncoded(pf.body_fields);
         }
       })
@@ -506,6 +532,8 @@ export function initLab() {
               .join(' ');
           }
 
+  // Force l’état initial: hors GOD, le bloc "Limites (GOD)" doit être caché.
+  setGodUi(false);
   refreshLimitsUi();
         }
         return;
