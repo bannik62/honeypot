@@ -394,8 +394,20 @@ class _LabHtmlExtract(HTMLParser):
         self.csrf_meta_token: str | None = None
         self.csrf_meta_param: str | None = None
         self.authenticity_token: str | None = None
+        self.csrf_hidden_token: str | None = None
+        self.csrf_hidden_name: str | None = None
+        self.textareas: list[dict[str, str]] = []
+        self.selects: list[dict[str, str]] = []
+        self.submit_fields: list[dict[str, str]] = []
         self._first_form_action: str | None = None
         self._first_form_method: str | None = None
+        self._cur_textarea_name: str | None = None
+        self._cur_textarea_buf: list[str] | None = None
+        self._cur_select_name: str | None = None
+        self._cur_select_value: str | None = None
+        self._cur_select_has_selected: bool = False
+        self._cur_option_value: str | None = None
+        self._cur_option_selected: bool = False
 
     def handle_starttag(self, tag, attrs):
         a = dict(attrs)
@@ -429,6 +441,11 @@ class _LabHtmlExtract(HTMLParser):
             val = a.get("value")
             if name == "authenticity_token" and val is not None:
                 self.authenticity_token = str(val)
+            # CSRF hidden field names seen in common frameworks
+            # Django: csrfmiddlewaretoken, Laravel/Symfony: _token, ASP.NET: __RequestVerificationToken, Spring: _csrf
+            if val is not None and name in ("csrfmiddlewaretoken", "_token", "__RequestVerificationToken", "_csrf"):
+                self.csrf_hidden_name = name
+                self.csrf_hidden_token = str(val)
             if typ == "hidden" and val is not None:
                 self.hidden_fields[name] = str(val)
                 return
@@ -441,6 +458,88 @@ class _LabHtmlExtract(HTMLParser):
                         "value": "" if val is None else str(val),
                     }
                 )
+                return
+            # Boutons submit utiles (ex: commit=Sign in)
+            if typ in ("submit", "button", "image"):
+                if val is None:
+                    return
+                self.submit_fields.append({"name": name, "type": typ, "value": str(val)})
+                return
+            return
+
+        if tag == "textarea":
+            nm = a.get("name")
+            if not nm:
+                return
+            self._cur_textarea_name = str(nm)
+            self._cur_textarea_buf = []
+            return
+
+        if tag == "select":
+            nm = a.get("name")
+            if not nm:
+                return
+            self._cur_select_name = str(nm)
+            self._cur_select_value = None
+            self._cur_select_has_selected = False
+            return
+
+        if tag == "option" and self._cur_select_name:
+            self._cur_option_selected = "selected" in a
+            v = a.get("value")
+            self._cur_option_value = None if v is None else str(v)
+            # If selected and value already known, we can set immediately (text may come later though).
+            if self._cur_option_selected and self._cur_option_value is not None:
+                self._cur_select_value = self._cur_option_value
+                self._cur_select_has_selected = True
+            return
+
+        if tag == "button":
+            typ = str(a.get("type") or "").strip().lower()
+            if typ and typ != "submit":
+                return
+            nm = a.get("name")
+            val = a.get("value")
+            if nm and val is not None:
+                self.submit_fields.append({"name": str(nm), "type": "button", "value": str(val)})
+            return
+
+    def handle_data(self, data: str) -> None:
+        if self._cur_textarea_buf is not None:
+            self._cur_textarea_buf.append(data)
+            return
+        if self._cur_select_name and self._cur_option_selected and self._cur_option_value is None:
+            # option selected but no explicit value -> fallback to its text content
+            t = (data or "").strip()
+            if t:
+                self._cur_select_value = t
+                self._cur_select_has_selected = True
+            return
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "textarea" and self._cur_textarea_name and self._cur_textarea_buf is not None:
+            txt = "".join(self._cur_textarea_buf)
+            self.textareas.append({"name": self._cur_textarea_name, "value": txt})
+            self._cur_textarea_name = None
+            self._cur_textarea_buf = None
+            return
+        if tag == "select" and self._cur_select_name:
+            self.selects.append(
+                {
+                    "name": self._cur_select_name,
+                    "value": "" if self._cur_select_value is None else str(self._cur_select_value),
+                }
+            )
+            self._cur_select_name = None
+            self._cur_select_value = None
+            self._cur_select_has_selected = False
+            return
+        if tag == "option":
+            # For non-selected options without value, we don't store anything. For selected without explicit value,
+            # handle_data sets it from the text.
+            self._cur_option_value = None
+            self._cur_option_selected = False
+            return
 
 
 def _extract_html_fields(base_url: str, body_text: str) -> dict[str, Any]:
@@ -457,10 +556,15 @@ def _extract_html_fields(base_url: str, body_text: str) -> dict[str, Any]:
         "form_method": p._first_form_method or None,
         "hidden_fields": p.hidden_fields,
         "form_fields": p.form_fields,
+        "textareas": p.textareas,
+        "selects": p.selects,
+        "submit_fields": p.submit_fields,
         "csrf": {
             "authenticity_token": p.authenticity_token,
             "csrf_token_meta": p.csrf_meta_token,
             "csrf_param_meta": p.csrf_meta_param,
+            "hidden_name": p.csrf_hidden_name,
+            "hidden_token": p.csrf_hidden_token,
         },
     }
 
@@ -780,6 +884,43 @@ def serve_lab_http(handler) -> None:
                     atok = csrf.get("authenticity_token") if isinstance(csrf, dict) else None
                     if atok and "authenticity_token" not in body_fields:
                         body_fields["authenticity_token"] = atok
+                    # Other frameworks: csrfmiddlewaretoken / _token / __RequestVerificationToken / _csrf
+                    if isinstance(csrf, dict):
+                        hname = csrf.get("hidden_name")
+                        htok = csrf.get("hidden_token")
+                        if hname and htok and str(hname) not in body_fields:
+                            body_fields[str(hname)] = str(htok)
+
+                    tas = extracted.get("textareas") or []
+                    if isinstance(tas, list):
+                        for t in tas:
+                            if not isinstance(t, dict):
+                                continue
+                            nm = t.get("name")
+                            if not nm or nm in body_fields:
+                                continue
+                            body_fields[str(nm)] = str(t.get("value") or "")
+
+                    sels = extracted.get("selects") or []
+                    if isinstance(sels, list):
+                        for s in sels:
+                            if not isinstance(s, dict):
+                                continue
+                            nm = s.get("name")
+                            if not nm or nm in body_fields:
+                                continue
+                            body_fields[str(nm)] = str(s.get("value") or "")
+
+                    subs = extracted.get("submit_fields") or []
+                    if isinstance(subs, list):
+                        for sf in subs:
+                            if not isinstance(sf, dict):
+                                continue
+                            nm = sf.get("name")
+                            val = sf.get("value")
+                            if not nm or val is None or nm in body_fields:
+                                continue
+                            body_fields[str(nm)] = str(val)
                     post_url = extracted.get("form_action") or logical_url
                     post_url = _replace_resolved_ip_netloc_with_hostname(post_url, logical_url, ip_str)
                     pl = urlparse(logical_url)
