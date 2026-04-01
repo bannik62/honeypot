@@ -170,7 +170,10 @@ export function initLab() {
   function setGodUi(on) {
     labGodMode = on;
     if (godBanner) godBanner.classList.toggle('lab-god-on', on);
-    if (limitsRowEl) limitsRowEl.hidden = !on;
+    if (limitsRowEl) {
+      limitsRowEl.hidden = !on;
+      limitsRowEl.style.display = on ? 'flex' : 'none';
+    }
     if (!on) {
       if (limitsModeEl) limitsModeEl.value = 'strict';
       if (limitsOffAckEl) limitsOffAckEl.checked = false;
