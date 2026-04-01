@@ -348,6 +348,33 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
+class _RecordRedirects(urllib.request.HTTPRedirectHandler):
+    """Redirect handler that records chain for display."""
+
+    def __init__(self, chain: list[dict[str, Any]]):
+        super().__init__()
+        self._chain = chain
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        try:
+            loc = None
+            try:
+                loc = headers.get("Location") if headers else None
+            except Exception:
+                loc = None
+            self._chain.append(
+                {
+                    "code": int(code),
+                    "from": getattr(req, "full_url", None) or getattr(req, "get_full_url", lambda: None)(),
+                    "to": str(newurl),
+                    "location": None if loc is None else str(loc),
+                }
+            )
+        except Exception:
+            pass
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
 class _HttpsConnectionWithSni(http.client.HTTPSConnection):
     """HTTPSConnection that forces SNI hostname (vhosts over IP)."""
 
@@ -574,6 +601,31 @@ def _cookies_as_kv(jar: CookieJar) -> list[str]:
     for c in jar:
         try:
             out.append(f"{c.name}={c.value}")
+        except Exception:
+            continue
+    return out
+
+
+def _cookies_as_detail(jar: CookieJar) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for c in jar:
+        try:
+            rest = getattr(c, "_rest", None) or getattr(c, "rest", None) or {}
+            http_only = False
+            if isinstance(rest, dict):
+                http_only = bool(rest.get("HttpOnly") or rest.get("httponly") or rest.get("HTTPOnly"))
+            out.append(
+                {
+                    "name": getattr(c, "name", ""),
+                    "value": getattr(c, "value", ""),
+                    "domain": getattr(c, "domain", ""),
+                    "path": getattr(c, "path", ""),
+                    "secure": bool(getattr(c, "secure", False)),
+                    "http_only": http_only,
+                    "expires": getattr(c, "expires", None),
+                    "discard": bool(getattr(c, "discard", False)),
+                }
+            )
         except Exception:
             continue
     return out
@@ -810,8 +862,11 @@ def serve_lab_http(handler) -> None:
                     sni_host = cand
 
         handlers: list[Any] = [_HttpsHandlerWithSni(context=ctx, sni_hostname=sni_host)]
+        redirect_chain: list[dict[str, Any]] = []
         if not follow_redirects:
             handlers.insert(0, _NoRedirect)
+        else:
+            handlers.insert(0, _RecordRedirects(redirect_chain))
         jar: CookieJar | None = None
         if session_id:
             jar = _lab_get_cookiejar(session_id)
@@ -823,10 +878,15 @@ def serve_lab_http(handler) -> None:
         try:
             with opener.open(req, timeout=HTTP_TIMEOUT) as resp:
                 status = resp.status
+                final_url = getattr(resp, "geturl", lambda: None)()
                 resp_headers = {k: v for k, v in resp.getheaders()}
                 chunk = resp.read(MAX_HTTP_RESPONSE + 1)
         except urllib.error.HTTPError as e:
             status = e.code
+            try:
+                final_url = getattr(e, "geturl", lambda: None)()
+            except Exception:
+                final_url = None
             resp_headers = dict(e.headers.items()) if e.headers else {}
             try:
                 chunk = e.read(MAX_HTTP_RESPONSE + 1)
@@ -945,15 +1005,22 @@ def serve_lab_http(handler) -> None:
             "truncated": truncated,
             "request_url": url,
             "logical_url": logical_url,
+            "final_url": final_url or url,
             "resolved_ipv4": ip_str,
             "dns_used": bool(host_for_header),
             "god_mode": god,
             "follow_redirects": follow_redirects,
         }
+        if redirect_chain:
+            http_obj["redirect_chain"] = redirect_chain
         if sni_host is not None:
             http_obj["sni_hostname"] = sni_host
         if jar is not None:
-            http_obj["session"] = {"session_id": session_id, "cookies": _cookies_as_kv(jar)}
+            http_obj["session"] = {
+                "session_id": session_id,
+                "cookies": _cookies_as_kv(jar),
+                "cookies_detail": _cookies_as_detail(jar),
+            }
         if extracted is not None:
             http_obj["extracted"] = extracted
         if prefill is not None:

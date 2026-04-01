@@ -29,6 +29,7 @@ Case **“Suivre les redirections (30x)”** :
 
 - décoché: la première réponse 30x est renvoyée (mode analyse)
 - coché: `urllib` suit les redirections jusqu’à la réponse finale
+  - l’UI affiche aussi **l’URL finale** (`final_url`) et la **chaîne de redirections** (`redirect_chain`)
 
 ### Session (cookies)
 

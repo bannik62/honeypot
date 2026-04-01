@@ -8,6 +8,13 @@ function escapeHtml(s) {
   return div.innerHTML;
 }
 
+function maskSecret(s) {
+  const v = String(s || '');
+  if (!v) return v;
+  if (v.length <= 10) return '***';
+  return `${v.slice(0, 4)}…${v.slice(-4)}`;
+}
+
 function kindLabel(kind) {
   const k = String(kind || '').toLowerCase();
   if (k === 'input') return 'Entrée invalide';
@@ -117,7 +124,9 @@ export function initLab() {
   const extractedEl = document.getElementById('lab-extracted');
   const followRedirectsEl = document.getElementById('lab-http-follow-redirects');
   const sessionEl = document.getElementById('lab-http-session');
+  const sessionResetEl = document.getElementById('lab-http-session-reset');
   const extractPrefillEl = document.getElementById('lab-http-extract-prefill');
+  const maskSecretsEl = document.getElementById('lab-mask-secrets');
   const limitsRowEl = document.getElementById('lab-god-limits-row');
   const limitsModeEl = document.getElementById('lab-limits-mode');
   const limitsOffAckRowEl = document.getElementById('lab-limits-off-ack-row');
@@ -135,6 +144,29 @@ export function initLab() {
   let labGodMode = false;
   let konamiIdx = 0;
   const history = [];
+
+  function newLabSessionId() {
+    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+
+  function getLabSessionId(forceNew = false) {
+    try {
+      let sid = window.localStorage.getItem('labSessionId') || '';
+      if (forceNew || !sid) {
+        sid = newLabSessionId();
+        window.localStorage.setItem('labSessionId', sid);
+      }
+      return sid;
+    } catch {
+      return '';
+    }
+  }
+
+  sessionResetEl?.addEventListener('click', () => {
+    const sid = getLabSessionId(true);
+    if (out) out.innerHTML = `<span style="color:var(--mu);font-size:.62rem">Session réinitialisée: <code>${escapeHtml(sid)}</code></span>`;
+    if (extractedEl) extractedEl.textContent = '—';
+  });
 
   function pushHistory(entry) {
     history.unshift(entry);
@@ -341,15 +373,7 @@ export function initLab() {
     }
     let labSessionId = '';
     if (useSession) {
-      try {
-        labSessionId = window.localStorage.getItem('labSessionId') || '';
-        if (!labSessionId) {
-          labSessionId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-          window.localStorage.setItem('labSessionId', labSessionId);
-        }
-      } catch {
-        labSessionId = '';
-      }
+      labSessionId = getLabSessionId(false);
     }
     const body = {
       method: document.getElementById('lab-http-method')?.value || 'GET',
@@ -387,8 +411,19 @@ export function initLab() {
         if (h.request_url) {
           metaParts.push(`<span style="word-break:break-all">URL appelée: <code>${escapeHtml(String(h.request_url))}</code></span>`);
         }
+        if (h.follow_redirects && h.final_url && h.final_url !== h.request_url) {
+          metaParts.push(`<span style="word-break:break-all">URL finale: <code>${escapeHtml(String(h.final_url))}</code></span>`);
+        }
         if (h.sni_hostname) {
           metaParts.push(`<span>SNI: <code>${escapeHtml(String(h.sni_hostname))}</code></span>`);
+        }
+        if (h.follow_redirects && Array.isArray(h.redirect_chain) && h.redirect_chain.length) {
+          const steps = h.redirect_chain.slice(0, 10).map((r) => {
+            const code = escapeHtml(String(r.code || ''));
+            const to = escapeHtml(String(r.to || r.location || ''));
+            return `<div style="color:var(--mu);font-size:.62rem">↪ ${code} → <code style="word-break:break-all">${to}</code></div>`;
+          }).join('');
+          metaParts.push(`<details><summary style="cursor:pointer">Redirections (${h.redirect_chain.length})</summary>${steps}</details>`);
         }
         const metaLine = metaParts.length
           ? `<div style="color:var(--mu);font-size:.62rem;margin-bottom:6px">${metaParts.join(' — ')}</div>`
@@ -404,19 +439,41 @@ export function initLab() {
           const ex = h.extracted || null;
           const sess = h.session || null;
           const parts = [];
-          if (sess && Array.isArray(sess.cookies) && sess.cookies.length) {
-            parts.push(`<div><strong>Cookies</strong>: <code>${escapeHtml(sess.cookies.join('; '))}</code></div>`);
+          const mask = !!maskSecretsEl?.checked;
+          if (sess && Array.isArray(sess.cookies_detail) && sess.cookies_detail.length) {
+            const items = sess.cookies_detail.slice(0, 12).map((c) => {
+              const nv = `${c.name}=${mask ? maskSecret(c.value) : String(c.value || '')}`;
+              const attrs = [
+                c.domain ? `domain=${c.domain}` : '',
+                c.path ? `path=${c.path}` : '',
+                c.secure ? 'Secure' : '',
+                c.http_only ? 'HttpOnly' : '',
+                c.expires ? `exp=${c.expires}` : '',
+              ].filter(Boolean).join('; ');
+              return `<div><code>${escapeHtml(nv)}</code>${attrs ? ` <span style="color:var(--mu)">(${escapeHtml(attrs)})</span>` : ''}</div>`;
+            }).join('');
+            parts.push(`<div><strong>Cookies</strong>:</div>${items}`);
+          } else if (sess && Array.isArray(sess.cookies) && sess.cookies.length) {
+            const v = mask ? sess.cookies.map((x) => String(x).replace(/=.*/, (m) => `=${maskSecret(m.slice(1))}`)) : sess.cookies;
+            parts.push(`<div><strong>Cookies</strong>: <code>${escapeHtml(v.join('; '))}</code></div>`);
           }
           if (ex) {
             if (ex.form_action) parts.push(`<div><strong>Form action</strong>: <code>${escapeHtml(ex.form_action)}</code></div>`);
-            if (ex.csrf && ex.csrf.authenticity_token) parts.push(`<div><strong>authenticity_token</strong>: <code>${escapeHtml(ex.csrf.authenticity_token)}</code></div>`);
-            if (ex.csrf && ex.csrf.csrf_token_meta) parts.push(`<div><strong>meta csrf-token</strong>: <code>${escapeHtml(ex.csrf.csrf_token_meta)}</code></div>`);
+            if (ex.csrf && ex.csrf.authenticity_token) parts.push(`<div><strong>authenticity_token</strong>: <code>${escapeHtml(mask ? maskSecret(ex.csrf.authenticity_token) : ex.csrf.authenticity_token)}</code></div>`);
+            if (ex.csrf && ex.csrf.csrf_token_meta) parts.push(`<div><strong>meta csrf-token</strong>: <code>${escapeHtml(mask ? maskSecret(ex.csrf.csrf_token_meta) : ex.csrf.csrf_token_meta)}</code></div>`);
+            if (ex.csrf && ex.csrf.hidden_name && ex.csrf.hidden_token) parts.push(`<div><strong>${escapeHtml(String(ex.csrf.hidden_name))}</strong>: <code>${escapeHtml(mask ? maskSecret(ex.csrf.hidden_token) : ex.csrf.hidden_token)}</code></div>`);
             const hidden = ex.hidden_fields || {};
             const hk = Object.keys(hidden);
             if (hk.length) parts.push(`<div><strong>Hidden</strong>: ${escapeHtml(hk.join(', '))}</div>`);
             const ff = Array.isArray(ex.form_fields) ? ex.form_fields : [];
             const names = ff.map((f) => f && f.name ? String(f.name) : '').filter(Boolean);
             if (names.length) parts.push(`<div><strong>Champs</strong>: ${escapeHtml(names.join(', '))}</div>`);
+            const ta = Array.isArray(ex.textareas) ? ex.textareas : [];
+            const tan = ta.map((t) => t && t.name ? String(t.name) : '').filter(Boolean);
+            if (tan.length) parts.push(`<div><strong>Textarea</strong>: ${escapeHtml(tan.join(', '))}</div>`);
+            const sel = Array.isArray(ex.selects) ? ex.selects : [];
+            const seln = sel.map((s) => s && s.name ? String(s.name) : '').filter(Boolean);
+            if (seln.length) parts.push(`<div><strong>Select</strong>: ${escapeHtml(seln.join(', '))}</div>`);
           }
           extractedEl.innerHTML = parts.length ? parts.join('') : '—';
         }

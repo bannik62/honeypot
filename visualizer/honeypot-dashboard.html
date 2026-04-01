@@ -539,7 +539,9 @@ tr:hover td{background:rgba(0,212,255,.03)}
     <div class="lab-row" style="margin-top:6px;gap:14px;flex-wrap:wrap">
       <label style="font-size:.68rem;color:var(--mu)"><input type="checkbox" id="lab-http-follow-redirects" /> Suivre les redirections (30x)</label>
       <label style="font-size:.68rem;color:var(--mu)"><input type="checkbox" id="lab-http-session" /> Session (cookies)</label>
+      <button type="button" class="btn tiny" id="lab-http-session-reset" title="Réinitialiser la session (nouvel ID)">Reset session</button>
       <label style="font-size:.68rem;color:var(--mu)"><input type="checkbox" id="lab-http-extract-prefill" /> Extraire + préremplir (CSRF/hidden)</label>
+      <label style="font-size:.68rem;color:var(--mu)"><input type="checkbox" id="lab-mask-secrets" checked /> Masquer tokens/cookies</label>
     </div>
     <div class="lab-row" id="lab-god-limits-row" style="margin-top:6px;gap:14px;flex-wrap:wrap;display:none" hidden>
       <label class="lab-inline" style="font-size:.68rem;color:var(--mu)">Limites (GOD)
