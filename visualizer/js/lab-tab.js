@@ -2,6 +2,8 @@
  * Onglet LAB — HTTP / TCP + presets (premier jet).
  */
 
+import { applyTcpPreset, applyWebPreset, mergeHeadersPreserveExisting } from './lab-presets.js';
+
 function escapeHtml(s) {
   const div = document.createElement('div');
   div.textContent = s;
@@ -43,19 +45,6 @@ function formatJsonPretty(s) {
   } catch {
     return s;
   }
-}
-
-function mergeHeadersPreserveExisting(existing, incoming) {
-  const out = {};
-  if (existing && typeof existing === 'object') {
-    Object.entries(existing).forEach(([k, v]) => { out[k] = v; });
-  }
-  if (incoming && typeof incoming === 'object') {
-    Object.entries(incoming).forEach(([k, v]) => {
-      if (out[k] == null || out[k] === '') out[k] = v;
-    });
-  }
-  return out;
 }
 
 const KONAMI = [
@@ -121,6 +110,7 @@ export function initLab() {
   const modTcp = document.getElementById('lab-mod-tcp');
   const presetWeb = document.getElementById('lab-preset-web');
   const presetTcp = document.getElementById('lab-preset-tcp');
+  const presetApplyModeEl = document.getElementById('lab-preset-apply-mode');
   const extractedEl = document.getElementById('lab-extracted');
   const followRedirectsEl = document.getElementById('lab-http-follow-redirects');
   const sessionEl = document.getElementById('lab-http-session');
@@ -311,19 +301,31 @@ export function initLab() {
       .catch(() => {});
   }
 
+  try {
+    const savedMode = window.localStorage.getItem('labPresetApplyMode');
+    if (presetApplyModeEl && savedMode && ['override', 'headers_merge', 'fill_empty'].includes(savedMode)) {
+      presetApplyModeEl.value = savedMode;
+    }
+  } catch {
+    /* ignore */
+  }
+  presetApplyModeEl?.addEventListener('change', () => {
+    try {
+      window.localStorage.setItem('labPresetApplyMode', String(presetApplyModeEl.value || 'override'));
+    } catch {
+      /* ignore */
+    }
+  });
+
   presetWeb?.addEventListener('change', () => {
     const opt = presetWeb.selectedOptions[0];
     if (!opt || !opt.dataset.preset) return;
     try {
       const p = JSON.parse(opt.dataset.preset);
-      const m = document.getElementById('lab-http-method');
-      const u = document.getElementById('lab-http-url');
-      const h = document.getElementById('lab-http-headers');
-      const b = document.getElementById('lab-http-body');
-      if (m) m.value = p.method || 'GET';
-      if (u) u.value = p.url || '';
-      if (h) h.value = p.headers ? JSON.stringify(p.headers, null, 2) : '';
-      if (b) b.value = p.body != null ? String(p.body) : '';
+      const mode = /** @type {'override'|'headers_merge'|'fill_empty'} */ (
+        presetApplyModeEl?.value || 'override'
+      );
+      applyWebPreset(p, mode);
     } catch {
       /* ignore */
     }
@@ -334,14 +336,7 @@ export function initLab() {
     if (!opt || !opt.dataset.preset) return;
     try {
       const p = JSON.parse(opt.dataset.preset);
-      document.getElementById('lab-tcp-host').value = p.host || '';
-      document.getElementById('lab-tcp-port').value = p.port != null ? String(p.port) : '';
-      document.getElementById('lab-tcp-encoding').value = p.payload_encoding || 'text';
-      document.getElementById('lab-tcp-payload').value = p.payload != null ? String(p.payload) : '';
-      document.getElementById('lab-tcp-readmax').value = p.read_max != null ? String(p.read_max) : '4096';
-      document.getElementById('lab-tcp-timeout').value = p.timeout_sec != null ? String(p.timeout_sec) : '8';
-      const bindEl = document.getElementById('lab-tcp-bind');
-      if (bindEl) bindEl.value = p.bind_ipv4 != null ? String(p.bind_ipv4) : '';
+      applyTcpPreset(p);
     } catch {
       /* ignore */
     }

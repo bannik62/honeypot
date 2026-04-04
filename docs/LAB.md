@@ -60,6 +60,62 @@ Case **“Extraire + préremplir (CSRF/hidden)”** (après une réponse HTML) :
 
 ---
 
+## Presets (bibliothèque Web / TCP)
+
+Les listes sont servies depuis `visualizer/lab/presets-web.json` et `presets-tcp.json` (`GET /api/lab/presets/web|tcp`).
+
+### Application (mode global)
+
+À côté du sélecteur **Preset Web**, le menu **Application** contrôle comment le preset est fusionné avec le formulaire :
+
+| Mode | Comportement |
+|------|----------------|
+| **Remplacer tout** | Méthode, URL, Host optionnel, en-têtes JSON, corps : valeurs du preset. |
+| **Fusion en-têtes** | Comme remplacer tout, sauf **en-têtes** : les clés déjà présentes et non vides sont conservées ; le preset ne remplit que les clés vides et ajoute les nouvelles. |
+| **Uniquement champs vides** | URL, Host, corps : appliqués seulement si le champ est vide. **En-têtes** : même logique que « fusion ». La **méthode** n’est pas modifiée (le sélecteur a toujours une valeur). |
+
+Le choix est mémorisé dans `localStorage` (`labPresetApplyMode`).
+
+### Surcharge par preset (`merge` dans le JSON)
+
+Chaque entrée peut définir un objet optionnel `merge` pour préciser le comportement **par champ** : `method`, `url`, `host_header`, `headers`, `body`.
+
+Valeurs possibles :
+
+- `override` — remplacer.
+- `fill_empty` — (hors `headers`) n’appliquer que si le champ est vide ; pour `headers`, équivalent à la fusion « ne pas écraser les clés déjà remplies ».
+- `merge` — **uniquement pour `headers`** : fusion comme ci-dessus.
+- `json_shallow` — **uniquement pour `body`** : si le corps actuel et le corps du preset sont tous deux des objets JSON, fusion superficielle `{ …existant, …preset }` (les clés du preset écrasent les clés communes).
+
+Exemple :
+
+```json
+"merge": {
+  "headers": "merge",
+  "body": "json_shallow"
+}
+```
+
+### Variables `{{…}}` (HTTP et TCP)
+
+Dans `method`, `url`, `host_header`, `headers`, `body` (HTTP) et `host`, `payload`, `bind_ipv4` (TCP), les motifs `{{NOM}}` sont remplacés avant application.
+
+**HTTP** — contexte dérivé du champ **URL** et de **Host** optionnel :
+
+| Variable | Exemple |
+|----------|---------|
+| `URL` | Texte brut du champ URL |
+| `ORIGIN` | `https://exemple.com` (si l’URL est absolue valide) |
+| `HOST` | `exemple.com:443` |
+| `PATHNAME` | `/chemin` |
+| `SEARCH` | `?x=1` |
+| `PROTOCOL` | `https` |
+| `HOST_HEADER` | Valeur du champ « En-tête Host » |
+
+**TCP** — contexte depuis les champs **Hôte** et **Port** : `HOST`, `PORT`.
+
+---
+
 ## TCP brut
 
 Permet une connexion TCP sortante vers `host:port`.

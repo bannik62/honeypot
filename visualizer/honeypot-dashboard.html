@@ -530,6 +530,14 @@ tr:hover td{background:rgba(0,212,255,.03)}
       <label class="lab-inline">Preset
         <select id="lab-preset-web" style="min-width:220px"></select>
       </label>
+      <label class="lab-inline" title="Override = tout remplacer. Fusion en-têtes = garder les en-têtes existants et ne remplir que les clés vides + ajouter les nouvelles. Champs vides = ne remplir que si le champ est vide (méthode inchangée).">
+        Application
+        <select id="lab-preset-apply-mode" style="min-width:200px">
+          <option value="override">Remplacer tout</option>
+          <option value="headers_merge">Fusion en-têtes</option>
+          <option value="fill_empty">Uniquement champs vides</option>
+        </select>
+      </label>
       <label class="lab-inline">Méthode
         <select id="lab-http-method">
           <option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>HEAD</option><option>OPTIONS</option>

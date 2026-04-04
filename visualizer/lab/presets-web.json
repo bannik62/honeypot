@@ -27,6 +27,15 @@
       "url": "http://127.0.0.1:8765/api/vulners/status",
       "headers": { "Accept": "application/json" },
       "body": ""
+    },
+    {
+      "id": "meta-from-origin",
+      "name": "GET /api/lab/meta ({{ORIGIN}})",
+      "description": "Même requête que meta-lab mais URL construite depuis le champ URL (schéma+hôte). Saisir d’abord une URL de base valide si besoin.",
+      "method": "GET",
+      "url": "{{ORIGIN}}/api/lab/meta",
+      "headers": { "Accept": "application/json" },
+      "body": ""
     }
   ]
 }
