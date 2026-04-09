@@ -308,7 +308,32 @@ export function initLab() {
     if (!bEl) return;
     const cur = String(bEl.value ?? '');
     const body = String(t.body ?? '');
-    if (mode === 'fill_empty') {
+    if (mode === 'inject_urlencoded') {
+      // Injecte le payload dans les valeurs vides d'un body urlencoded existant, sans toucher aux clés.
+      // Exemple: "email=&password=" + "X" -> "email=X&password=X"
+      try {
+        const p = new URLSearchParams(cur);
+        let changed = false;
+        /** @type {[string,string][]} */
+        const outEntries = [];
+        p.forEach((v, k) => {
+          if (v === '') {
+            outEntries.push([k, body]);
+            changed = true;
+          } else {
+            outEntries.push([k, v]);
+          }
+        });
+        if (changed) {
+          const outP = new URLSearchParams();
+          outEntries.forEach(([k, v]) => outP.append(k, v));
+          bEl.value = outP.toString();
+        }
+      } catch {
+        // Si ce n'est pas un urlencoded valide, fallback sur remplacer.
+        bEl.value = body;
+      }
+    } else if (mode === 'fill_empty') {
       if (!cur.trim()) bEl.value = body;
     } else {
       bEl.value = body;

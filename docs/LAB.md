@@ -79,6 +79,70 @@ L’extraction renvoie aussi `extracted.csrf.detected_as` (framework probable), 
 
 Les listes sont servies depuis `visualizer/lab/presets-web.json` et `presets-tcp.json` (`GET /api/lab/presets/web|tcp`).
 
+## Templates utilisateur (Headers / Body) + pack.json
+
+En plus des presets embarqués, l’onglet LAB permet de gérer des **templates utilisateur** stockés dans le navigateur (localStorage) :
+
+- **Headers templates (HTTP)** : bouton **`+ Headers`** à droite de “En‑têtes (JSON)”, puis **💾 Enregistrer**.
+- **Body templates (HTTP)** : bouton **`+ Body`** à droite de “Corps (optionnel)”, puis **💾 Enregistrer**.
+
+### Import / Export (pack.json)
+
+Le format recommandé est un **`pack.json`** unique qui regroupe headers + body (les `pairs` sont réservés pour une étape ultérieure) :
+
+```json
+{
+  "version": 1,
+  "headers": {
+    "templates": [
+      {
+        "id": "h-1",
+        "name": "Nom",
+        "category": "string",
+        "tags": ["string"],
+        "headers": { "Accept": "application/json" },
+        "notes": "string"
+      }
+    ]
+  },
+  "body": {
+    "templates": [
+      {
+        "id": "b-1",
+        "name": "Nom",
+        "category": "string",
+        "tags": ["string"],
+        "body_type": "raw",
+        "content_type_hint": "text/plain",
+        "body": "string",
+        "notes": "string"
+      }
+    ]
+  },
+  "pairs": { "pairs": [] }
+}
+```
+
+#### Tolérance d’import (formats acceptés)
+
+L’import est volontairement **tolérant** pour éviter de te forcer à renommer tes clés :
+
+- **Headers** : `headers.templates` **ou** `headers.headers` **ou** un tableau directement ; et `headers` **ou** `data` comme objet de headers.
+- **Body** : `body.templates` **ou** `body.payloads` **ou** `payloads` au top-level ; chaque entrée utilise `body` comme contenu.
+
+#### Merge (par id)
+
+À l’import, les templates sont fusionnés **par `id`** :
+
+- si un `id` existe déjà → l’entrée importée **remplace** l’ancienne (update),
+- sinon → ajout.
+
+#### Où sont les boutons ?
+
+- **Import / Export pack.json** : dans la popin **`+ Headers`** (footer), et aussi dans la popin **`+ Body`** (Import + Export body).
+- **Export JSON headers seul** : bouton export dans la popin `+ Headers`.
+- **Export JSON body seul** : bouton export dans la popin `+ Body`.
+
 ### Application (mode global)
 
 À côté du sélecteur **Preset Web**, le menu **Application** contrôle comment le preset est fusionné avec le formulaire :
@@ -190,7 +254,6 @@ Clés lues dans `CONFIG` (fichier `config/config` via `scripts/python-visualiser
 ## Reste à faire / améliorations
 
 - **Extraction HTML plus large**:
-  - Django (`csrfmiddlewaretoken`), Laravel/Symfony (`_token`), Spring (`_csrf`), ASP.NET (`__RequestVerificationToken`)
   - `textarea`, `select`, boutons submit (`commit`)
   - support `multipart/form-data` (upload) si besoin
 - **Affichage “Extraits”**:
