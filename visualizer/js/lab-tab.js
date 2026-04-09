@@ -3,6 +3,17 @@
  */
 
 import { applyTcpPreset, applyWebPreset, mergeHeadersPreserveExisting } from './lab-presets.js';
+import {
+  CATEGORIES,
+  builtinTemplates,
+  exportUserTemplatesJson,
+  filterTemplates,
+  loadUserTemplates,
+  newId,
+  parseHeadersTextarea,
+  saveUserTemplates,
+  scoreTemplate,
+} from './lab-header-templates.js';
 
 function escapeHtml(s) {
   const div = document.createElement('div');
@@ -111,6 +122,17 @@ export function initLab() {
   const presetWeb = document.getElementById('lab-preset-web');
   const presetTcp = document.getElementById('lab-preset-tcp');
   const presetApplyModeEl = document.getElementById('lab-preset-apply-mode');
+  const headersOpenEl = document.getElementById('lab-headers-open');
+  const headersSaveEl = document.getElementById('lab-headers-save');
+  const headersModalEl = document.getElementById('lab-headers-modal');
+  const headersBackdropEl = document.getElementById('lab-headers-backdrop');
+  const headersCloseEl = document.getElementById('lab-headers-close');
+  const headersQEl = document.getElementById('lab-headers-q');
+  const headersApplyEl = document.getElementById('lab-headers-apply');
+  const headersChipsEl = document.getElementById('lab-headers-chips');
+  const headersRecEl = document.getElementById('lab-headers-rec');
+  const headersAllEl = document.getElementById('lab-headers-all');
+  const headersExportEl = document.getElementById('lab-headers-export');
   const extractedEl = document.getElementById('lab-extracted');
   const followRedirectsEl = document.getElementById('lab-http-follow-redirects');
   const sessionEl = document.getElementById('lab-http-session');
@@ -134,6 +156,231 @@ export function initLab() {
   let labGodMode = false;
   let konamiIdx = 0;
   const history = [];
+
+  // --- Header templates (HTTP) ---
+  let headerCat = '';
+
+  function openHeadersModal() {
+    if (!headersModalEl) return;
+    headersModalEl.classList.add('open');
+    headersModalEl.setAttribute('aria-hidden', 'false');
+    try {
+      const savedCat = window.localStorage.getItem('labHeadersCategory') || '';
+      headerCat = savedCat;
+      const savedApply = window.localStorage.getItem('labHeadersApply') || '';
+      if (headersApplyEl && (savedApply === 'merge' || savedApply === 'replace')) headersApplyEl.value = savedApply;
+    } catch {
+      /* ignore */
+    }
+    renderHeadersLibrary();
+    setTimeout(() => headersQEl?.focus(), 0);
+  }
+
+  function closeHeadersModal() {
+    if (!headersModalEl) return;
+    headersModalEl.classList.remove('open');
+    headersModalEl.setAttribute('aria-hidden', 'true');
+  }
+
+  function getAllHeaderTemplates() {
+    const builtins = builtinTemplates();
+    const users = loadUserTemplates();
+    // Évite collisions id en préfixant côté builtins déjà "b-".
+    return [...users, ...builtins];
+  }
+
+  function renderChips() {
+    if (!headersChipsEl) return;
+    headersChipsEl.innerHTML = '';
+    const mk = (id, label) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = `lab-chip${headerCat === id ? ' on' : ''}`;
+      b.textContent = label;
+      b.addEventListener('click', () => {
+        headerCat = headerCat === id ? '' : id;
+        try {
+          window.localStorage.setItem('labHeadersCategory', headerCat);
+        } catch {
+          /* ignore */
+        }
+        renderHeadersLibrary();
+      });
+      return b;
+    };
+    headersChipsEl.appendChild(mk('', 'Tous'));
+    CATEGORIES.forEach((c) => headersChipsEl.appendChild(mk(c.id, c.label)));
+  }
+
+  function dl(name, jsonText) {
+    const blob = new Blob([jsonText], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function applyHeaderTemplate(t, mode) {
+    const hEl = document.getElementById('lab-http-headers');
+    if (!hEl) return;
+    const curObj = (() => {
+      const parsed = parseHeadersTextarea(hEl.value);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    })();
+    const next =
+      mode === 'replace' ? { ...(t.headers || {}) } : mergeHeadersPreserveExisting(curObj, t.headers || {});
+    hEl.value = JSON.stringify(next, null, 2);
+  }
+
+  function renderTemplateItem(t, isUser) {
+    const wrap = document.createElement('div');
+    wrap.className = 'lab-hitem';
+    const name = document.createElement('div');
+    name.className = 'nm';
+    name.textContent = t.name || 'template';
+
+    const desc = document.createElement('div');
+    desc.className = 'ds';
+    const meta = [];
+    if (t.category) meta.push(t.category);
+    if (Array.isArray(t.tags) && t.tags.length) meta.push(t.tags.join(', '));
+    desc.textContent = t.notes || meta.join(' — ') || '';
+
+    const acts = document.createElement('div');
+    acts.className = 'acts';
+    const applyBtn = document.createElement('button');
+    applyBtn.type = 'button';
+    applyBtn.className = 'btn tiny pri';
+    applyBtn.textContent = 'Appliquer';
+    applyBtn.addEventListener('click', () => {
+      const m = String(headersApplyEl?.value || 'merge');
+      try {
+        window.localStorage.setItem('labHeadersApply', m);
+      } catch {
+        /* ignore */
+      }
+      applyHeaderTemplate(t, m === 'replace' ? 'replace' : 'merge');
+      closeHeadersModal();
+    });
+    const repBtn = document.createElement('button');
+    repBtn.type = 'button';
+    repBtn.className = 'btn tiny';
+    repBtn.textContent = 'Remplacer';
+    repBtn.addEventListener('click', () => {
+      applyHeaderTemplate(t, 'replace');
+      closeHeadersModal();
+    });
+    acts.appendChild(applyBtn);
+    acts.appendChild(repBtn);
+
+    if (isUser) {
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'btn tiny';
+      delBtn.textContent = 'Supprimer';
+      delBtn.addEventListener('click', () => {
+        const cur = loadUserTemplates().filter((x) => x.id !== t.id);
+        saveUserTemplates(cur);
+        renderHeadersLibrary();
+      });
+      acts.appendChild(delBtn);
+    }
+
+    const r1 = document.createElement('div');
+    r1.className = 'r1';
+    const left = document.createElement('div');
+    left.appendChild(name);
+    if (desc.textContent) left.appendChild(desc);
+    r1.appendChild(left);
+    r1.appendChild(acts);
+
+    const pre = document.createElement('pre');
+    pre.textContent = JSON.stringify(t.headers || {}, null, 2);
+
+    wrap.appendChild(r1);
+    wrap.appendChild(pre);
+    return wrap;
+  }
+
+  function renderHeadersLibrary() {
+    renderChips();
+    const q = String(headersQEl?.value || '');
+    const body = String(document.getElementById('lab-http-body')?.value || '');
+    const all = getAllHeaderTemplates();
+    const filtered = filterTemplates(all, q, headerCat);
+    const users = new Set(loadUserTemplates().map((t) => t.id));
+
+    const scored = filtered
+      .map((t) => ({ t, s: scoreTemplate(t, q, headerCat, body) }))
+      .sort((a, b) => b.s - a.s);
+    const rec = scored.slice(0, 5).map((x) => x.t);
+
+    if (headersRecEl) {
+      headersRecEl.innerHTML = '';
+      if (!rec.length) headersRecEl.textContent = '—';
+      else rec.forEach((t) => headersRecEl.appendChild(renderTemplateItem(t, users.has(t.id))));
+    }
+    if (headersAllEl) {
+      headersAllEl.innerHTML = '';
+      if (!filtered.length) headersAllEl.textContent = '—';
+      else filtered.forEach((t) => headersAllEl.appendChild(renderTemplateItem(t, users.has(t.id))));
+    }
+  }
+
+  headersOpenEl?.addEventListener('click', openHeadersModal);
+  headersBackdropEl?.addEventListener('click', closeHeadersModal);
+  headersCloseEl?.addEventListener('click', closeHeadersModal);
+  document.addEventListener('keydown', (e) => {
+    const onLab = document.getElementById('panel-lab')?.classList.contains('active');
+    if (e.key === 'Escape' && onLab && headersModalEl?.classList.contains('open')) closeHeadersModal();
+  });
+
+  headersQEl?.addEventListener('input', () => renderHeadersLibrary());
+  headersApplyEl?.addEventListener('change', () => {
+    try {
+      window.localStorage.setItem('labHeadersApply', String(headersApplyEl.value || 'merge'));
+    } catch {
+      /* ignore */
+    }
+  });
+
+  headersExportEl?.addEventListener('click', () => {
+    dl('lab-http-headers-templates.json', exportUserTemplatesJson());
+  });
+
+  headersSaveEl?.addEventListener('click', () => {
+    const hEl = document.getElementById('lab-http-headers');
+    if (!hEl) return;
+    const parsed = parseHeadersTextarea(hEl.value);
+    if (!parsed) {
+      if (out) out.innerHTML = '<span style="color:var(--a2)">En-têtes : JSON invalide — impossible d’enregistrer.</span>';
+      return;
+    }
+    const name = window.prompt('Nom du modèle d’en-têtes ?', 'Mon template');
+    if (!name) return;
+    const tagsRaw = window.prompt('Tags (séparés par des virgules) ?', '');
+    const tags = tagsRaw ? tagsRaw.split(',').map((x) => x.trim()).filter(Boolean) : [];
+    const cat = headerCat || 'custom';
+    const now = Date.now();
+    const t = {
+      id: newId(),
+      name: String(name).trim() || 'template',
+      category: cat,
+      tags,
+      headers: parsed,
+      notes: '',
+      createdAt: now,
+      updatedAt: now,
+    };
+    const cur = loadUserTemplates();
+    cur.unshift(t);
+    saveUserTemplates(cur);
+    if (out) out.innerHTML = `<span style="color:var(--a3);font-size:.65rem">✅ Modèle enregistré: <code>${escapeHtml(t.name)}</code></span>`;
+  });
 
   function newLabSessionId() {
     return `${Date.now()}-${Math.random().toString(16).slice(2)}`;

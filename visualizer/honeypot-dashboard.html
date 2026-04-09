@@ -284,6 +284,45 @@ tr:hover td{background:rgba(0,212,255,.03)}
 #panel-lab #lab-http-body,#panel-lab #lab-tcp-payload{min-height:100px}
 #panel-lab #lab-result{min-height:120px;max-height:min(50vh,480px);overflow:auto;background:rgba(0,0,0,.4);border:1px solid var(--b);border-radius:8px;padding:10px 12px;font-size:.65rem;line-height:1.35;color:var(--a3);white-space:pre-wrap;word-break:break-word}
 #panel-lab .lab-sub{font-family:'Orbitron',monospace;font-size:.74rem;color:var(--a);letter-spacing:1px;margin:14px 0 8px}
+#panel-lab .lab-sub.row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+#panel-lab .lab-sub .lab-sub-actions{display:flex;gap:8px;align-items:center}
+#panel-lab .lab-sub .lab-sub-actions .btn{font-size:.62rem}
+#panel-lab .lab-headers-modal{position:fixed;inset:0;z-index:220;display:none;align-items:center;justify-content:center;padding:16px}
+#panel-lab .lab-headers-modal.open{display:flex}
+#panel-lab .lab-headers-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.65)}
+#panel-lab .lab-headers-box{
+  position:relative;max-width:min(820px,96vw);width:100%;max-height:86vh;
+  border-radius:12px;border:1px solid var(--b);background:var(--s2);
+  box-shadow:0 16px 52px rgba(0,0,0,.62),0 0 30px rgba(0,212,255,.08);
+  display:flex;flex-direction:column;overflow:hidden
+}
+#panel-lab .lab-headers-title{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-bottom:1px solid rgba(26,58,92,.55)}
+#panel-lab .lab-headers-title .t{font-family:'Orbitron',monospace;color:var(--a);font-size:.82rem;letter-spacing:2px}
+#panel-lab .lab-headers-title .x{background:none;border:none;color:var(--mu);cursor:pointer;font-size:1.2rem;line-height:1;padding:4px}
+#panel-lab .lab-headers-title .x:hover{color:var(--a)}
+#panel-lab .lab-headers-body{padding:12px 14px;overflow:auto;min-height:0}
+#panel-lab .lab-headers-top{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px}
+#panel-lab .lab-headers-top input[type="text"]{min-width:min(320px,100%);flex:1}
+#panel-lab .lab-chips{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 12px}
+#panel-lab .lab-chip{display:inline-flex;gap:6px;align-items:center;border:1px solid rgba(26,58,92,.65);border-radius:999px;padding:4px 10px;background:rgba(0,212,255,.05);cursor:pointer;color:var(--tx);font-size:.66rem;font-family:'Share Tech Mono',monospace}
+#panel-lab .lab-chip:hover{border-color:var(--a);color:var(--a)}
+#panel-lab .lab-chip.on{border-color:var(--a3);color:var(--a3);background:rgba(0,212,255,.08)}
+#panel-lab .lab-hlist{display:flex;flex-direction:column;gap:8px}
+#panel-lab .lab-hitem{border:1px solid rgba(26,58,92,.55);border-radius:10px;padding:10px 12px;background:rgba(0,0,0,.18)}
+#panel-lab .lab-hitem .r1{display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
+#panel-lab .lab-hitem .nm{font-family:'Orbitron',monospace;color:var(--w);font-size:.72rem;letter-spacing:1px}
+#panel-lab .lab-hitem .ds{color:var(--mu);font-size:.64rem;line-height:1.35;margin-top:4px}
+#panel-lab .lab-hitem .acts{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+#panel-lab .lab-hitem pre{margin:8px 0 0;padding:10px 12px;background:rgba(0,0,0,.35);border:1px solid rgba(26,58,92,.6);border-radius:8px;color:var(--tx);font-size:.63rem;white-space:pre-wrap;word-break:break-all}
+#panel-lab .lab-hitem .meta{margin-top:6px;color:var(--mu);font-size:.62rem}
+#panel-lab .lab-headers-footer{padding:10px 14px;border-top:1px solid rgba(26,58,92,.55);display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+#panel-lab .lab-headers-footer .hint{color:var(--mu);font-size:.62rem}
+@media(max-width:520px){
+  #panel-lab .lab-headers-box{max-height:92vh}
+  #panel-lab .lab-headers-body{padding:12px}
+  #panel-lab .lab-hitem .r1{flex-direction:column;align-items:stretch}
+  #panel-lab .lab-hitem .acts{justify-content:flex-start}
+}
 #panel-lab fieldset.lab-mod{border:1px solid rgba(26,58,92,.6);border-radius:8px;padding:12px;margin-bottom:12px}
 #panel-lab fieldset.lab-mod legend{font-size:.68rem;color:var(--mu);padding:0 6px}
 </style>
@@ -570,7 +609,13 @@ tr:hover td{background:rgba(0,212,255,.03)}
     <label class="lab-inline" style="width:100%;max-width:720px">En-tête <code>Host</code> (optionnel) — seulement si tu te connectes en <strong>IP</strong> dans l’URL mais que le serveur attend un autre nom (vhost / reverse proxy). Sinon laisser vide : l’hôte vient de l’URL.
       <input type="text" id="lab-http-host-header" placeholder="vide en usage normal" style="width:100%" />
     </label>
-    <div class="lab-sub">En-têtes (JSON)</div>
+    <div class="lab-sub row">
+      <span>En-têtes (JSON)</span>
+      <span class="lab-sub-actions">
+        <button type="button" class="btn tiny" id="lab-headers-open" title="Choisir un modèle d’en-têtes">+ Headers</button>
+        <button type="button" class="btn tiny" id="lab-headers-save" title="Enregistrer les en-têtes actuels (localStorage)">💾 Enregistrer</button>
+      </span>
+    </div>
     <textarea id="lab-http-headers" placeholder='{ "Accept": "application/json" }' rows="4"></textarea>
     <div class="lab-sub">Corps (optionnel)</div>
     <textarea id="lab-http-body" placeholder="{}"></textarea>
@@ -578,6 +623,37 @@ tr:hover td{background:rgba(0,212,255,.03)}
       <button type="button" class="btn pri" id="lab-send-http" disabled>Envoyer HTTP</button>
     </div>
   </fieldset>
+
+  <!-- Popin Templates d'en-têtes (HTTP) -->
+  <div class="lab-headers-modal" id="lab-headers-modal" aria-hidden="true">
+    <div class="lab-headers-backdrop" id="lab-headers-backdrop"></div>
+    <div class="lab-headers-box" role="dialog" aria-labelledby="lab-headers-title">
+      <div class="lab-headers-title">
+        <div class="t" id="lab-headers-title">HEADERS — TEMPLATES</div>
+        <button type="button" class="x" id="lab-headers-close" aria-label="Fermer">×</button>
+      </div>
+      <div class="lab-headers-body">
+        <div class="lab-headers-top">
+          <input type="text" id="lab-headers-q" placeholder="Rechercher (json, csrf, oauth, rails, browser…)" />
+          <select id="lab-headers-apply" title="Comment appliquer le modèle d’en-têtes">
+            <option value="merge">Fusion (recommandé)</option>
+            <option value="replace">Remplacer</option>
+          </select>
+        </div>
+        <div class="lab-chips" id="lab-headers-chips"></div>
+        <div class="stitle" style="margin-top:10px">RECOMMANDÉS</div>
+        <div class="lab-hlist" id="lab-headers-rec"></div>
+        <details style="margin-top:12px">
+          <summary style="cursor:pointer;color:var(--mu);font-size:.68rem">Tous les modèles</summary>
+          <div style="margin-top:10px" class="lab-hlist" id="lab-headers-all"></div>
+        </details>
+      </div>
+      <div class="lab-headers-footer">
+        <div class="hint">Stockage local (navigateur). Astuce: garde “Fusion” pour ne pas écraser tes headers existants.</div>
+        <button type="button" class="btn" id="lab-headers-export" title="Exporter tes modèles (JSON)">⬇ Export</button>
+      </div>
+    </div>
+  </div>
 
   <fieldset class="lab-mod" id="lab-mod-tcp" hidden>
     <legend>TCP + bibliothèque TCP</legend>
