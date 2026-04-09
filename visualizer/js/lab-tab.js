@@ -98,6 +98,40 @@ function toFormUrlEncoded(fields) {
   return params.toString();
 }
 
+/**
+ * Parse x-www-form-urlencoded de manière tolérante (accepte séparateurs '&' OU retours à la ligne).
+ * Retourne une liste de paires [key, value] (non-dédupliquée).
+ * @param {string} raw
+ * @returns {[string,string][]}
+ */
+function parseUrlEncodedLoose(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return [];
+  // Supporte bodies multi-lignes: email=\npassword= (pas de &)
+  const parts = s.split(/[&;\n\r]+/g).filter(Boolean);
+  /** @type {[string,string][]} */
+  const out = [];
+  for (const part of parts) {
+    const idx = part.indexOf('=');
+    const k = idx >= 0 ? part.slice(0, idx) : part;
+    const v = idx >= 0 ? part.slice(idx + 1) : '';
+    // decodeURIComponent tolérant (+ -> space)
+    const dk = safeDecodeURIComponent(k.replace(/\+/g, ' '));
+    const dv = safeDecodeURIComponent(v.replace(/\+/g, ' '));
+    if (!dk) continue;
+    out.push([dk, dv]);
+  }
+  return out;
+}
+
+function safeDecodeURIComponent(x) {
+  try {
+    return decodeURIComponent(x);
+  } catch {
+    return x;
+  }
+}
+
 /** Évite de remplacer le champ URL par une IPv4 (TLS/SNI attend le hostname). */
 function isIPv4LiteralHost(hostname) {
   if (!hostname) return false;
@@ -284,20 +318,16 @@ export function initLab() {
     const bEl = document.getElementById('lab-http-body');
     const cur = String(bEl?.value ?? '');
     bodyInjectKeyEl.innerHTML = '<option value="__ALL_EMPTY__">Toutes les clés vides</option>';
-    try {
-      const p = new URLSearchParams(cur);
-      const seen = new Set();
-      p.forEach((_, k) => {
-        if (seen.has(k)) return;
-        seen.add(k);
-        const opt = document.createElement('option');
-        opt.value = k;
-        opt.textContent = k;
-        bodyInjectKeyEl.appendChild(opt);
-      });
-    } catch {
-      /* ignore */
-    }
+    const pairs = parseUrlEncodedLoose(cur);
+    const seen = new Set();
+    pairs.forEach(([k]) => {
+      if (!k || seen.has(k)) return;
+      seen.add(k);
+      const opt = document.createElement('option');
+      opt.value = k;
+      opt.textContent = k;
+      bodyInjectKeyEl.appendChild(opt);
+    });
   }
 
   function refreshBodyInjectUi() {
@@ -341,29 +371,23 @@ export function initLab() {
     if (mode === 'inject_urlencoded') {
       // Injecte le payload dans les valeurs vides d'un body urlencoded existant, sans toucher aux clés.
       // Exemple: "email=&password=" + "X" -> "email=X&password=X"
-      try {
-        const p = new URLSearchParams(cur);
+      const pairs = parseUrlEncodedLoose(cur);
+      if (!pairs.length) {
+        bEl.value = body;
+      } else {
         let changed = false;
         const target = String(bodyInjectKeyEl?.value || '__ALL_EMPTY__');
-        /** @type {[string,string][]} */
-        const outEntries = [];
-        p.forEach((v, k) => {
+        const outP = new URLSearchParams();
+        pairs.forEach(([k, v]) => {
           const isTarget = target === '__ALL_EMPTY__' ? true : k === target;
-          if (isTarget && v === '') {
-            outEntries.push([k, body]);
+          if (isTarget && (v == null || v === '')) {
+            outP.append(k, body);
             changed = true;
           } else {
-            outEntries.push([k, v]);
+            outP.append(k, v == null ? '' : v);
           }
         });
-        if (changed) {
-          const outP = new URLSearchParams();
-          outEntries.forEach(([k, v]) => outP.append(k, v));
-          bEl.value = outP.toString();
-        }
-      } catch {
-        // Si ce n'est pas un urlencoded valide, fallback sur remplacer.
-        bEl.value = body;
+        if (changed) bEl.value = outP.toString();
       }
     } else if (mode === 'fill_empty') {
       if (!cur.trim()) bEl.value = body;
