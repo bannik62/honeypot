@@ -369,25 +369,31 @@ export function initLab() {
     const cur = String(bEl.value ?? '');
     const body = String(t.body ?? '');
     if (mode === 'inject_urlencoded') {
-      // Injecte le payload dans les valeurs vides d'un body urlencoded existant, sans toucher aux clés.
-      // Exemple: "email=&password=" + "X" -> "email=X&password=X"
       const pairs = parseUrlEncodedLoose(cur);
       if (!pairs.length) {
-        bEl.value = body;
+        if (out) out.innerHTML = '<span style="color:var(--w);font-size:.65rem">⚠️ Body non urlencoded — injection ignorée. Utilise "Remplacer" si besoin.</span>';
+        closeBodyModal();
+        return;
+      }
+      const target = String(bodyInjectKeyEl?.value || '__ALL_EMPTY__');
+      const outP = new URLSearchParams();
+      let changed = false;
+      pairs.forEach(([k, v]) => {
+        const match = target === '__ALL_EMPTY__' ? (v === '') : (k === target && v === '');
+        if (match) {
+          outP.append(k, body);
+          changed = true;
+        } else {
+          outP.append(k, v);
+        }
+      });
+      if (changed) {
+        bEl.value = outP.toString();
       } else {
-        let changed = false;
-        const target = String(bodyInjectKeyEl?.value || '__ALL_EMPTY__');
-        const outP = new URLSearchParams();
-        pairs.forEach(([k, v]) => {
-          const isTarget = target === '__ALL_EMPTY__' ? true : k === target;
-          if (isTarget && (v == null || v === '')) {
-            outP.append(k, body);
-            changed = true;
-          } else {
-            outP.append(k, v == null ? '' : v);
-          }
-        });
-        if (changed) bEl.value = outP.toString();
+        const hint = target === '__ALL_EMPTY__' ? 'aucune valeur vide trouvée' : `clé "${target}" non vide ou absente`;
+        if (out) out.innerHTML = `<span style="color:var(--mu);font-size:.65rem">ℹ️ Injection ignorée : ${escapeHtml(hint)}.</span>`;
+        closeBodyModal();
+        return;
       }
     } else if (mode === 'fill_empty') {
       if (!cur.trim()) bEl.value = body;
