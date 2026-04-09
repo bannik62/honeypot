@@ -588,6 +588,17 @@ tr:hover td{background:rgba(0,212,255,.03)}
       <label style="font-size:.68rem;color:var(--mu)"><input type="checkbox" id="lab-http-session" /> Session (cookies)</label>
       <button type="button" class="btn tiny" id="lab-http-session-reset" title="Réinitialiser la session (nouvel ID)">Reset session</button>
       <label style="font-size:.68rem;color:var(--mu)"><input type="checkbox" id="lab-http-extract-prefill" /> Extraire + préremplir (CSRF/hidden)</label>
+      <label class="lab-inline" style="font-size:.62rem;color:var(--mu)">
+        Framework
+        <select id="lab-http-extract-fw" style="min-width:140px">
+          <option value="auto">Auto</option>
+          <option value="rails">Rails</option>
+          <option value="django">Django</option>
+          <option value="laravel">Laravel/Symfony</option>
+          <option value="spring">Spring</option>
+          <option value="aspnet">ASP.NET</option>
+        </select>
+      </label>
       <label style="font-size:.68rem;color:var(--mu)"><input type="checkbox" id="lab-mask-secrets" checked /> Masquer tokens/cookies</label>
     </div>
     <div class="lab-row" id="lab-god-limits-row" style="margin-top:6px;gap:14px;flex-wrap:wrap;display:none" hidden>

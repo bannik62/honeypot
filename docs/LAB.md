@@ -47,6 +47,11 @@ Case **“Extraire + préremplir (CSRF/hidden)”** (après une réponse HTML) :
   - `input[type=hidden][name][value]` (tous)
   - `input[name="authenticity_token"]` (Rails)
   - `meta[name="csrf-token"]` / `meta[name="csrf-param"]`
+  - tokens CSRF courants (si présents) :
+    - Django : `csrfmiddlewaretoken`
+    - Laravel/Symfony : `_token`
+    - Spring Security : meta `name="_csrf"` + `name="_csrf_header"` (et hidden `_csrf` si présent)
+    - ASP.NET : `__RequestVerificationToken`
   - champs “visibles” (`input[type=text|email|password|…]`) → **leurs `name`** sont ajoutés au body prérempli avec valeur vide
 - préremplissage automatique de l’appel suivant:
   - méthode `POST`
@@ -55,7 +60,17 @@ Case **“Extraire + préremplir (CSRF/hidden)”** (après une réponse HTML) :
     - `Content-Type: application/x-www-form-urlencoded`
     - `Origin` / `Referer`
     - `X-CSRF-Token` si `meta csrf-token` est présent
+    - Spring Security : si meta `_csrf_header` est présent, le header correspondant est aussi prérempli
   - body urlencoded (hidden + token + clés des champs visibles)
+
+#### Hint “Framework”
+
+À côté de la case “Extraire + préremplir”, le menu **Framework** permet de guider l’extraction :
+
+- **Auto** : essaie les patterns connus.
+- Rails / Django / Laravel / Spring / ASP.NET : priorise le framework choisi (fallback sur auto).
+
+L’extraction renvoie aussi `extracted.csrf.detected_as` (framework probable), à titre indicatif.
 - **URL logique (mode GOD / DNS)** : l’extraction (`urljoin`) et le préremplissage (`post_url`, `Origin`, `Referer`) partent de l’**URL que tu as saisie** (hostname), pas de l’IPv4 résolue en interne, pour éviter de remplacer le champ URL par une IP (erreur TLS / certificat). La réponse JSON inclut `logical_url` (URL affichable) et `request_url` (URL réellement utilisée pour la socket, peut être IP).
 
 ---

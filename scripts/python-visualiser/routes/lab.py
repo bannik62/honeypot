@@ -420,9 +420,12 @@ class _LabHtmlExtract(HTMLParser):
         self.form_fields: list[dict[str, str]] = []
         self.csrf_meta_token: str | None = None
         self.csrf_meta_param: str | None = None
+        # Spring Security meta (common pattern)
+        self.csrf_meta_spring_token: str | None = None
+        self.csrf_meta_spring_header: str | None = None
         self.authenticity_token: str | None = None
-        self.csrf_hidden_token: str | None = None
-        self.csrf_hidden_name: str | None = None
+        # Hidden CSRF candidates (frameworks): keep ALL matches
+        self.csrf_hidden_tokens: dict[str, str] = {}
         self.textareas: list[dict[str, str]] = []
         self.selects: list[dict[str, str]] = []
         self.submit_fields: list[dict[str, str]] = []
@@ -448,6 +451,14 @@ class _LabHtmlExtract(HTMLParser):
                 v = a.get("content")
                 if v:
                     self.csrf_meta_param = str(v)
+            elif name == "_csrf":
+                v = a.get("content")
+                if v:
+                    self.csrf_meta_spring_token = str(v)
+            elif name == "_csrf_header":
+                v = a.get("content")
+                if v:
+                    self.csrf_meta_spring_header = str(v)
             return
 
         if tag == "form" and self._first_form_action is None:
@@ -471,8 +482,7 @@ class _LabHtmlExtract(HTMLParser):
             # CSRF hidden field names seen in common frameworks
             # Django: csrfmiddlewaretoken, Laravel/Symfony: _token, ASP.NET: __RequestVerificationToken, Spring: _csrf
             if val is not None and name in ("csrfmiddlewaretoken", "_token", "__RequestVerificationToken", "_csrf"):
-                self.csrf_hidden_name = name
-                self.csrf_hidden_token = str(val)
+                self.csrf_hidden_tokens[name] = str(val)
             if typ == "hidden" and val is not None:
                 self.hidden_fields[name] = str(val)
                 return
@@ -578,6 +588,17 @@ def _extract_html_fields(base_url: str, body_text: str) -> dict[str, Any]:
     form_action = None
     if p._first_form_action:
         form_action = urljoin(base_url, p._first_form_action)
+    detected_as = "unknown"
+    if p.authenticity_token:
+        detected_as = "rails"
+    elif p.csrf_meta_spring_token or p.csrf_meta_spring_header:
+        detected_as = "spring"
+    elif "__RequestVerificationToken" in p.csrf_hidden_tokens:
+        detected_as = "aspnet"
+    elif "csrfmiddlewaretoken" in p.csrf_hidden_tokens:
+        detected_as = "django"
+    elif "_token" in p.csrf_hidden_tokens:
+        detected_as = "laravel"
     return {
         "form_action": form_action,
         "form_method": p._first_form_method or None,
@@ -587,11 +608,13 @@ def _extract_html_fields(base_url: str, body_text: str) -> dict[str, Any]:
         "selects": p.selects,
         "submit_fields": p.submit_fields,
         "csrf": {
+            "detected_as": detected_as,
             "authenticity_token": p.authenticity_token,
             "csrf_token_meta": p.csrf_meta_token,
             "csrf_param_meta": p.csrf_meta_param,
-            "hidden_name": p.csrf_hidden_name,
-            "hidden_token": p.csrf_hidden_token,
+            "spring_token_meta": p.csrf_meta_spring_token,
+            "spring_header_meta": p.csrf_meta_spring_header,
+            "hidden_tokens": p.csrf_hidden_tokens,
         },
     }
 
@@ -845,6 +868,9 @@ def serve_lab_http(handler) -> None:
         follow_redirects = bool(payload.get("follow_redirects"))
         session_id = str(payload.get("session_id") or "").strip()
         extract_prefill = bool(payload.get("extract_prefill"))
+        extract_framework_hint = str(payload.get("extract_framework_hint") or "").strip().lower()
+        if extract_framework_hint not in ("", "auto", "rails", "django", "laravel", "spring", "aspnet"):
+            extract_framework_hint = ""
 
         # SNI: si on se connecte en IP pour un vhost HTTPS, il faut garder le hostname en SNI,
         # sinon Apache/Nginx peut renvoyer 421 (misdirected request).
@@ -944,12 +970,13 @@ def serve_lab_http(handler) -> None:
                     atok = csrf.get("authenticity_token") if isinstance(csrf, dict) else None
                     if atok and "authenticity_token" not in body_fields:
                         body_fields["authenticity_token"] = atok
-                    # Other frameworks: csrfmiddlewaretoken / _token / __RequestVerificationToken / _csrf
+                    # Other frameworks: keep all known CSRF hidden tokens if present
                     if isinstance(csrf, dict):
-                        hname = csrf.get("hidden_name")
-                        htok = csrf.get("hidden_token")
-                        if hname and htok and str(hname) not in body_fields:
-                            body_fields[str(hname)] = str(htok)
+                        toks = csrf.get("hidden_tokens")
+                        if isinstance(toks, dict):
+                            for k, v in toks.items():
+                                if k and v is not None and str(k) not in body_fields:
+                                    body_fields[str(k)] = str(v)
 
                     tas = extracted.get("textareas") or []
                     if isinstance(tas, list):
@@ -995,6 +1022,12 @@ def serve_lab_http(handler) -> None:
                     mtok = csrf.get("csrf_token_meta") if isinstance(csrf, dict) else None
                     if mtok:
                         headers_out["X-CSRF-Token"] = str(mtok)
+                    # Spring Security meta: if header name is provided, set it
+                    if isinstance(csrf, dict):
+                        spring_header = csrf.get("spring_header_meta")
+                        spring_token = csrf.get("spring_token_meta")
+                        if spring_header and spring_token:
+                            headers_out[str(spring_header)] = str(spring_token)
                     prefill = {"post_url": post_url, "headers": headers_out, "body_fields": body_fields}
 
         http_obj: dict[str, Any] = {

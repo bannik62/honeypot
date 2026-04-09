@@ -138,6 +138,7 @@ export function initLab() {
   const sessionEl = document.getElementById('lab-http-session');
   const sessionResetEl = document.getElementById('lab-http-session-reset');
   const extractPrefillEl = document.getElementById('lab-http-extract-prefill');
+  const extractFwEl = document.getElementById('lab-http-extract-fw');
   const maskSecretsEl = document.getElementById('lab-mask-secrets');
   const limitsRowEl = document.getElementById('lab-god-limits-row');
   const limitsModeEl = document.getElementById('lab-limits-mode');
@@ -405,6 +406,22 @@ export function initLab() {
     if (extractedEl) extractedEl.textContent = '—';
   });
 
+  try {
+    const savedFw = window.localStorage.getItem('labExtractFrameworkHint');
+    if (extractFwEl && savedFw && ['auto', 'rails', 'django', 'laravel', 'spring', 'aspnet'].includes(savedFw)) {
+      extractFwEl.value = savedFw;
+    }
+  } catch {
+    /* ignore */
+  }
+  extractFwEl?.addEventListener('change', () => {
+    try {
+      window.localStorage.setItem('labExtractFrameworkHint', String(extractFwEl.value || 'auto'));
+    } catch {
+      /* ignore */
+    }
+  });
+
   function pushHistory(entry) {
     history.unshift(entry);
     if (history.length > 10) history.pop();
@@ -609,6 +626,7 @@ export function initLab() {
     const followRedirects = !!followRedirectsEl?.checked;
     const useSession = !!sessionEl?.checked;
     const extractPrefill = !!extractPrefillEl?.checked;
+    const extractFrameworkHint = String(extractFwEl?.value || 'auto');
     const limitsMode = labGodMode ? String(limitsModeEl?.value || 'strict') : 'strict';
     if (labGodMode && limitsMode === 'off' && !limitsOffAckEl?.checked) {
       out.innerHTML = `<span style="color:var(--a2)"><strong>Concurrence/Limites</strong> — coche “Je comprends le risque” pour désactiver les limites.</span>`;
@@ -629,6 +647,9 @@ export function initLab() {
     if (followRedirects) body.follow_redirects = true;
     if (useSession && labSessionId) body.session_id = labSessionId;
     if (extractPrefill) body.extract_prefill = true;
+    if (extractPrefill && extractFrameworkHint && extractFrameworkHint !== 'auto') {
+      body.extract_framework_hint = extractFrameworkHint;
+    }
     if (labGodMode && limitsMode && limitsMode !== 'strict') body.limits_mode = limitsMode;
     out.textContent = 'Requête en cours…';
     if (extractedEl) extractedEl.textContent = '—';
@@ -702,10 +723,26 @@ export function initLab() {
             parts.push(`<div><strong>Cookies</strong>: <code>${escapeHtml(v.join('; '))}</code></div>`);
           }
           if (ex) {
+            const csrfInfo = ex.csrf || null;
+            if (csrfInfo && typeof csrfInfo === 'object') {
+              const da = csrfInfo.detected_as ? String(csrfInfo.detected_as) : '';
+              if (da) parts.push(`<div><strong>CSRF</strong>: <span style="color:var(--mu)">${escapeHtml(da)}</span></div>`);
+            }
             if (ex.form_action) parts.push(`<div><strong>Form action</strong>: <code>${escapeHtml(ex.form_action)}</code></div>`);
             if (ex.csrf && ex.csrf.authenticity_token) parts.push(`<div><strong>authenticity_token</strong>: <code>${escapeHtml(mask ? maskSecret(ex.csrf.authenticity_token) : ex.csrf.authenticity_token)}</code></div>`);
             if (ex.csrf && ex.csrf.csrf_token_meta) parts.push(`<div><strong>meta csrf-token</strong>: <code>${escapeHtml(mask ? maskSecret(ex.csrf.csrf_token_meta) : ex.csrf.csrf_token_meta)}</code></div>`);
-            if (ex.csrf && ex.csrf.hidden_name && ex.csrf.hidden_token) parts.push(`<div><strong>${escapeHtml(String(ex.csrf.hidden_name))}</strong>: <code>${escapeHtml(mask ? maskSecret(ex.csrf.hidden_token) : ex.csrf.hidden_token)}</code></div>`);
+            if (ex.csrf && ex.csrf.spring_header_meta && ex.csrf.spring_token_meta) {
+              const hn = String(ex.csrf.spring_header_meta);
+              const tk = mask ? maskSecret(ex.csrf.spring_token_meta) : String(ex.csrf.spring_token_meta);
+              parts.push(`<div><strong>${escapeHtml(hn)}</strong>: <code>${escapeHtml(tk)}</code> <span style="color:var(--mu)">(spring meta)</span></div>`);
+            }
+            if (ex.csrf && ex.csrf.hidden_tokens && typeof ex.csrf.hidden_tokens === 'object') {
+              const entries = Object.entries(ex.csrf.hidden_tokens);
+              entries.slice(0, 6).forEach(([k, v]) => {
+                const tk = mask ? maskSecret(String(v || '')) : String(v || '');
+                parts.push(`<div><strong>${escapeHtml(String(k))}</strong>: <code>${escapeHtml(tk)}</code></div>`);
+              });
+            }
             const hidden = ex.hidden_fields || {};
             const hk = Object.keys(hidden);
             if (hk.length) parts.push(`<div><strong>Hidden</strong>: ${escapeHtml(hk.join(', '))}</div>`);
