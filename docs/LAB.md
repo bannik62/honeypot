@@ -86,6 +86,40 @@ En plus des presets embarqués, l’onglet LAB permet de gérer des **templates 
 - **Headers templates (HTTP)** : bouton **`+ Headers`** à droite de “En‑têtes (JSON)”, puis **💾 Enregistrer**.
 - **Body templates (HTTP)** : bouton **`+ Body`** à droite de “Corps (optionnel)”, puis **💾 Enregistrer**.
 
+
+> **ℹ Guide HTTP** : bouton ℹ dans le titre de la popin `+ Headers` → ouvre `/guides/http-requests.html` dans un nouvel onglet (anatomie, méthodes, headers, body, codes de statut, HTTPS, architecture).
+
+### Catégories disponibles
+
+#### Headers
+| id | Label |
+|----|-------|
+| `api_json` | API JSON |
+| `form` | Form |
+| `browser` | Browser |
+| `auth` | Auth |
+| `csrf` | CSRF |
+| `graphql` | GraphQL |
+| `ssrf` | SSRF |
+| `sqli` | SQLi |
+| `bypass-403` | 403 Bypass |
+| `minimal` | Minimal |
+| `custom` | Custom |
+
+#### Body
+| id | Label |
+|----|-------|
+| `generic` | Generic |
+| `json` | JSON |
+| `form` | Form |
+| `ssti` | SSTI |
+| `ssrf` | SSRF |
+| `sqli` | SQLi |
+| `bypass-403` | 403 Bypass |
+| `custom` | Custom |
+
+> Les catégories inconnues s'affichent dans le chip **"Tous"** mais n'ont pas de chip dédié.
+
 ### Import / Export (pack.json)
 
 Le format recommandé est un **`pack.json`** unique qui regroupe headers + body (les `pairs` sont réservés pour une étape ultérieure) :

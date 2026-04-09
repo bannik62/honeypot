@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Organiser ses requêtes HTTP(S)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --border: #1e1e2e;
+    --accent: #00ff88;
+    --accent2: #ff6b35;
+    --accent3: #7c6af7;
+    --text: #e2e2f0;
+    --muted: #6b6b8a;
+    --code-bg: #0d0d1a;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Syne', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.6;
+  }
+
+  header {
+    padding: 3rem 2rem 2rem;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+  }
+  header::before {
+    content: '';
+    position: absolute;
+    top: -80px; left: -80px;
+    width: 300px; height: 300px;
+    background: radial-gradient(circle, rgba(0,255,136,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  header::after {
+    content: '';
+    position: absolute;
+    bottom: -60px; right: 5%;
+    width: 200px; height: 200px;
+    background: radial-gradient(circle, rgba(124,106,247,0.1) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .tag {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 2px 10px;
+    border-radius: 2px;
+    letter-spacing: 2px;
+    margin-bottom: 1rem;
+    opacity: 0.8;
+  }
+  h1 {
+    font-size: clamp(1.8rem, 5vw, 3rem);
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -1px;
+  }
+  h1 span { color: var(--accent); }
+  .subtitle {
+    margin-top: 0.8rem;
+    color: var(--muted);
+    font-size: 0.95rem;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  nav {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  nav::-webkit-scrollbar { display: none; }
+  .nav-btn {
+    flex-shrink: 0;
+    padding: 1rem 1.4rem;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    letter-spacing: 0.5px;
+  }
+  .nav-btn:hover { color: var(--text); }
+  .nav-btn.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  main { max-width: 860px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+
+  .section { display: none; animation: fadeIn 0.3s ease; }
+  .section.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+  h2 {
+    font-size: 1.5rem;
+    font-weight: 800;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+  }
+  h2 .icon {
+    width: 32px; height: 32px;
+    background: var(--accent);
+    color: var(--bg);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1rem;
+    flex-shrink: 0;
+  }
+
+  h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--accent2);
+    margin: 2rem 0 0.8rem;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.5px;
+  }
+
+  p { color: #c0c0d8; margin-bottom: 1rem; font-size: 0.95rem; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.2rem 1.4rem;
+    margin-bottom: 1rem;
+  }
+  .card.accent-left { border-left: 3px solid var(--accent); }
+  .card.accent-orange { border-left: 3px solid var(--accent2); }
+  .card.accent-purple { border-left: 3px solid var(--accent3); }
+
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1.2rem;
+    overflow-x: auto;
+    margin: 1rem 0;
+    position: relative;
+  }
+  code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+    line-height: 1.7;
+  }
+  .c-green { color: #00ff88; }
+  .c-orange { color: #ff6b35; }
+  .c-purple { color: #bd93f9; }
+  .c-blue { color: #8be9fd; }
+  .c-yellow { color: #f1fa8c; }
+  .c-muted { color: #6272a4; }
+  .c-white { color: #f8f8f2; }
+
+  .ic {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    padding: 1px 6px;
+    border-radius: 3px;
+    color: var(--accent);
+  }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0; }
+  @media (max-width: 600px) { .grid2 { grid-template-columns: 1fr; } }
+
+  .flow { display: flex; flex-direction: column; gap: 0; margin: 1.5rem 0; }
+  .flow-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    position: relative;
+  }
+  .flow-step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    left: 15px; top: 36px;
+    width: 2px; height: calc(100% - 4px);
+    background: linear-gradient(to bottom, var(--accent), var(--border));
+  }
+  .flow-dot {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: var(--bg);
+    border: 2px solid var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--accent);
+    flex-shrink: 0;
+    z-index: 1;
+  }
+  .flow-content { padding-bottom: 1.5rem; flex: 1; }
+  .flow-title { font-weight: 700; font-size: 0.95rem; margin-bottom: 0.3rem; }
+  .flow-desc { font-size: 0.88rem; color: var(--muted); }
+
+  .badge {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    padding: 2px 8px;
+    border-radius: 3px;
+    margin-right: 4px;
+    font-weight: 700;
+  }
+  .badge-get { background: rgba(0,255,136,0.15); color: var(--accent); }
+  .badge-post { background: rgba(255,107,53,0.15); color: var(--accent2); }
+  .badge-put { background: rgba(241,250,140,0.15); color: #f1fa8c; }
+  .badge-delete { background: rgba(255,85,85,0.15); color: #ff5555; }
+  .badge-patch { background: rgba(124,106,247,0.15); color: var(--accent3); }
+
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.88rem; }
+  th {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 0.6rem 1rem;
+    text-align: left;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+  td { border: 1px solid var(--border); padding: 0.6rem 1rem; color: #c0c0d8; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  .alert {
+    display: flex;
+    gap: 0.8rem;
+    align-items: flex-start;
+    padding: 1rem 1.2rem;
+    border-radius: 6px;
+    margin: 1rem 0;
+    font-size: 0.9rem;
+  }
+  .alert-tip { background: rgba(0,255,136,0.07); border: 1px solid rgba(0,255,136,0.2); }
+  .alert-warn { background: rgba(255,107,53,0.07); border: 1px solid rgba(255,107,53,0.2); }
+  .alert-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
+  .alert-text { color: #c0c0d8; }
+
+  .status-list { display: flex; flex-direction: column; gap: 0.6rem; margin: 1rem 0; }
+  .status-item { display: flex; align-items: center; gap: 1rem; }
+  .status-code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    font-weight: 700;
+    width: 40px;
+    flex-shrink: 0;
+  }
+  .s2xx { color: var(--accent); }
+  .s3xx { color: #f1fa8c; }
+  .s4xx { color: var(--accent2); }
+  .s5xx { color: #ff5555; }
+  .status-label { font-size: 0.85rem; color: var(--muted); flex: 1; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="tag">COURS · HTTP(S)</div>
+  <h1>Organiser ses<br><span>requêtes HTTP(S)</span></h1>
+  <p class="subtitle">// de la structure à l'architecture</p>
+</header>
+
+<nav>
+  <button class="nav-btn active" onclick="show('anatomie', this)">01 · Anatomie</button>
+  <button class="nav-btn" onclick="show('methodes', this)">02 · Méthodes</button>
+  <button class="nav-btn" onclick="show('headers', this)">03 · Headers</button>
+  <button class="nav-btn" onclick="show('body', this)">04 · Body</button>
+  <button class="nav-btn" onclick="show('reponse', this)">05 · Réponse</button>
+  <button class="nav-btn" onclick="show('https', this)">06 · HTTPS</button>
+  <button class="nav-btn" onclick="show('archi', this)">07 · Architecture</button>
+</nav>
+
+<main>
+
+<!-- 01 ANATOMIE -->
+<div class="section active" id="anatomie">
+  <h2><span class="icon">①</span> Anatomie d'une requête HTTP</h2>
+  <p>Une requête HTTP c'est un message texte structuré en 3 parties envoyé du client vers le serveur.</p>
+
+  <div class="flow">
+    <div class="flow-step">
+      <div class="flow-dot">1</div>
+      <div class="flow-content">
+        <div class="flow-title">Request Line</div>
+        <div class="flow-desc">Méthode + URL + Version HTTP</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-dot">2</div>
+      <div class="flow-content">
+        <div class="flow-title">Headers</div>
+        <div class="flow-desc">Métadonnées clé:valeur (auth, type de contenu, cookies…)</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-dot">3</div>
+      <div class="flow-content">
+        <div class="flow-title">Body (optionnel)</div>
+        <div class="flow-desc">Données envoyées (JSON, form-data, binaire…)</div>
+      </div>
+    </div>
+  </div>
+
+  <pre><code><span class="c-muted">// Requête HTTP brute</span>
+<span class="c-orange">POST</span> <span class="c-blue">/api/users</span> <span class="c-muted">HTTP/1.1</span>
+<span class="c-purple">Host:</span> <span class="c-white">api.example.com</span>
+<span class="c-purple">Content-Type:</span> <span class="c-white">application/json</span>
+<span class="c-purple">Authorization:</span> <span class="c-yellow">Bearer eyJhbGci...</span>
+<span class="c-purple">Content-Length:</span> <span class="c-white">42</span>
+                                       <span class="c-muted">← ligne vide obligatoire</span>
+<span class="c-green">{"name": "Yohann", "role": "dev"}</span></code></pre>
+
+  <h3>// Décomposer une URL</h3>
+  <pre><code><span class="c-muted">https://api.example.com:443/users/42?sort=asc&limit=10#section</span>
+
+<span class="c-purple">https://</span>          <span class="c-muted">← protocole (scheme)</span>
+<span class="c-blue">api.example.com</span>   <span class="c-muted">← hostname</span>
+<span class="c-orange">:443</span>              <span class="c-muted">← port (optionnel si standard)</span>
+<span class="c-white">/users/42</span>         <span class="c-muted">← path (ressource)</span>
+<span class="c-yellow">?sort=asc&limit=10</span> <span class="c-muted">← query string (paramètres)</span>
+<span class="c-green">#section</span>          <span class="c-muted">← fragment (côté client uniquement)</span></code></pre>
+
+  <div class="alert alert-tip">
+    <span class="alert-icon">💡</span>
+    <span class="alert-text">Le fragment <span class="ic">#anchor</span> n'est <strong>jamais envoyé au serveur</strong> — il reste dans le browser.</span>
+  </div>
+</div>
+
+<!-- 02 METHODES -->
+<div class="section" id="methodes">
+  <h2><span class="icon">②</span> Méthodes HTTP</h2>
+  <p>La méthode définit l'<strong>intention</strong> de la requête. Chaque méthode a une sémantique précise.</p>
+
+  <div class="card accent-left">
+    <span class="badge badge-get">GET</span> Lire une ressource. <strong>Sans effet de bord.</strong> Idempotent.<br>
+    <span style="font-size:0.82rem;color:var(--muted)">Le body est ignoré — toujours passer les params en query string.</span>
+  </div>
+  <div class="card accent-orange">
+    <span class="badge badge-post">POST</span> Créer une ressource ou soumettre des données. <strong>Non-idempotent.</strong><br>
+    <span style="font-size:0.82rem;color:var(--muted)">Appel multiple = effets multiples (double soumission = double création).</span>
+  </div>
+  <div class="card">
+    <span class="badge badge-put">PUT</span> Remplacer <strong>entièrement</strong> une ressource existante. Idempotent.<br>
+    <span style="font-size:0.82rem;color:var(--muted)">Envoyer l'objet complet. Ce qui manque sera écrasé/supprimé.</span>
+  </div>
+  <div class="card accent-purple">
+    <span class="badge badge-patch">PATCH</span> Modifier <strong>partiellement</strong> une ressource. Idempotent si bien implémenté.<br>
+    <span style="font-size:0.82rem;color:var(--muted)">Envoyer uniquement les champs à modifier.</span>
+  </div>
+  <div class="card">
+    <span class="badge badge-delete">DELETE</span> Supprimer une ressource. Idempotent.<br>
+    <span style="font-size:0.82rem;color:var(--muted)">Un second DELETE sur une ressource déjà supprimée → 404 (pas d'erreur grave).</span>
+  </div>
+
+  <h3>// Idempotence — concept clé</h3>
+  <div class="grid2">
+    <div class="card accent-left">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:0.8rem;color:var(--accent);margin-bottom:0.5rem">IDEMPOTENT ✓</div>
+      Appeler N fois = même résultat que 1 fois.<br>
+      <span style="color:var(--muted);font-size:0.82rem">GET, PUT, DELETE, PATCH</span>
+    </div>
+    <div class="card accent-orange">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:0.8rem;color:var(--accent2);margin-bottom:0.5rem">NON-IDEMPOTENT ✗</div>
+      Chaque appel crée un effet nouveau.<br>
+      <span style="color:var(--muted);font-size:0.82rem">POST</span>
+    </div>
+  </div>
+
+  <h3>// Exemples REST</h3>
+  <pre><code><span class="c-green">GET</span>    <span class="c-blue">/api/users</span>        <span class="c-muted">→ liste tous les users</span>
+<span class="c-green">GET</span>    <span class="c-blue">/api/users/42</span>     <span class="c-muted">→ récupère user id=42</span>
+<span class="c-orange">POST</span>   <span class="c-blue">/api/users</span>        <span class="c-muted">→ crée un user</span>
+<span class="c-yellow">PUT</span>    <span class="c-blue">/api/users/42</span>     <span class="c-muted">→ remplace user id=42</span>
+<span class="c-purple">PATCH</span>  <span class="c-blue">/api/users/42</span>     <span class="c-muted">→ modifie partiellement user id=42</span>
+<span class="c-red" style="color:#ff5555">DELETE</span> <span class="c-blue">/api/users/42</span>     <span class="c-muted">→ supprime user id=42</span></code></pre>
+</div>
+
+<!-- 03 HEADERS -->
+<div class="section" id="headers">
+  <h2><span class="icon">③</span> Headers</h2>
+  <p>Les headers sont des <strong>métadonnées</strong> de la requête. Ils ne font pas partie du body mais conditionnent tout son traitement.</p>
+
+  <h3>// Headers de requête essentiels</h3>
+  <table>
+    <tr><th>HEADER</th><th>RÔLE</th><th>EXEMPLE</th></tr>
+    <tr>
+      <td><span class="ic">Content-Type</span></td>
+      <td>Format du body envoyé</td>
+      <td><code style="font-size:0.78rem;color:#8be9fd">application/json</code></td>
+    </tr>
+    <tr>
+      <td><span class="ic">Accept</span></td>
+      <td>Format attendu en réponse</td>
+      <td><code style="font-size:0.78rem;color:#8be9fd">application/json</code></td>
+    </tr>
+    <tr>
+      <td><span class="ic">Authorization</span></td>
+      <td>Auth token / credentials</td>
+      <td><code style="font-size:0.78rem;color:#8be9fd">Bearer &lt;token&gt;</code></td>
+    </tr>
+    <tr>
+      <td><span class="ic">Cookie</span></td>
+      <td>Cookies session</td>
+      <td><code style="font-size:0.78rem;color:#8be9fd">session=abc123</code></td>
+    </tr>
+    <tr>
+      <td><span class="ic">User-Agent</span></td>
+      <td>Identification du client</td>
+      <td><code style="font-size:0.78rem;color:#8be9fd">Mozilla/5.0...</code></td>
+    </tr>
+    <tr>
+      <td><span class="ic">Origin</span></td>
+      <td>Origine pour CORS</td>
+      <td><code style="font-size:0.78rem;color:#8be9fd">https://monapp.fr</code></td>
+    </tr>
+  </table>
+
+  <h3>// Headers de réponse essentiels</h3>
+  <table>
+    <tr><th>HEADER</th><th>RÔLE</th></tr>
+    <tr><td><span class="ic">Content-Type</span></td><td>Format du body retourné</td></tr>
+    <tr><td><span class="ic">Set-Cookie</span></td><td>Setter un cookie côté client</td></tr>
+    <tr><td><span class="ic">Cache-Control</span></td><td>Politique de cache</td></tr>
+    <tr><td><span class="ic">Access-Control-Allow-Origin</span></td><td>CORS — origines autorisées</td></tr>
+    <tr><td><span class="ic">Location</span></td><td>Redirect URL (3xx)</td></tr>
+    <tr><td><span class="ic">X-RateLimit-Remaining</span></td><td>Rate limit restant</td></tr>
+  </table>
+
+  <div class="alert alert-warn">
+    <span class="alert-icon">⚠️</span>
+    <span class="alert-text">Oublier <span class="ic">Content-Type: application/json</span> sur un POST → le serveur lira le body comme texte brut et le parsing JSON échouera silencieusement.</span>
+  </div>
+
+  <h3>// Custom headers</h3>
+  <pre><code><span class="c-muted">// Convention : préfixe X- (deprecated mais encore courant)</span>
+<span class="c-purple">X-Request-ID:</span> <span class="c-white">550e8400-e29b-41d4-a716</span>
+<span class="c-purple">X-Api-Key:</span> <span class="c-yellow">sk_live_xxxx</span>
+<span class="c-purple">X-Forwarded-For:</span> <span class="c-white">203.0.113.42</span>  <span class="c-muted">← IP réelle derrière proxy</span></code></pre>
+</div>
+
+<!-- 04 BODY -->
+<div class="section" id="body">
+  <h2><span class="icon">④</span> Body — formats</h2>
+  <p>Le body porte les données. Son format est dicté par le header <span class="ic">Content-Type</span>.</p>
+
+  <h3>// JSON (le plus courant)</h3>
+  <pre><code><span class="c-purple">Content-Type:</span> <span class="c-white">application/json</span>
+
+<span class="c-green">{
+  "user": "Yohann",
+  "role": "dev",
+  "tags": ["node", "svelte", "docker"]
+}</span></code></pre>
+
+  <h3>// Form URL-encoded (formulaires HTML)</h3>
+  <pre><code><span class="c-purple">Content-Type:</span> <span class="c-white">application/x-www-form-urlencoded</span>
+
+<span class="c-orange">user=Yohann&role=dev&tags=node</span>
+<span class="c-muted">// Les valeurs sont URL-encodées : espace → %20, & → %26</span></code></pre>
+
+  <h3>// Multipart / file upload</h3>
+  <pre><code><span class="c-purple">Content-Type:</span> <span class="c-white">multipart/form-data; boundary=----XYZ</span>
+
+<span class="c-muted">------XYZ</span>
+<span class="c-purple">Content-Disposition:</span> <span class="c-white">form-data; name="file"; filename="photo.jpg"</span>
+<span class="c-purple">Content-Type:</span> <span class="c-white">image/jpeg</span>
+
+<span class="c-yellow">[binary data]</span>
+<span class="c-muted">------XYZ--</span></code></pre>
+
+  <h3>// Raw / binaire / autres</h3>
+  <div class="grid2">
+    <div class="card accent-purple">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:var(--accent3)">text/plain</div>
+      Texte brut sans structure
+    </div>
+    <div class="card">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:var(--muted)">application/octet-stream</div>
+      Binaire brut (téléchargements)
+    </div>
+    <div class="card">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:var(--muted)">application/xml</div>
+      XML (SOAP, legacy APIs)
+    </div>
+    <div class="card">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:var(--muted)">application/graphql</div>
+      Requêtes GraphQL
+    </div>
+  </div>
+
+  <div class="alert alert-tip">
+    <span class="alert-icon">💡</span>
+    <span class="alert-text">GET et DELETE n'ont <strong>techniquement</strong> pas de body. Certains serveurs l'ignorent. Ne jamais en envoyer pour ces méthodes.</span>
+  </div>
+</div>
+
+<!-- 05 REPONSE -->
+<div class="section" id="reponse">
+  <h2><span class="icon">⑤</span> Structure de la réponse</h2>
+  <p>La réponse HTTP suit la même structure : status line + headers + body.</p>
+
+  <pre><code><span class="c-muted">HTTP/1.1</span> <span class="c-green">201 Created</span>
+<span class="c-purple">Content-Type:</span> <span class="c-white">application/json</span>
+<span class="c-purple">Location:</span> <span class="c-blue">/api/users/42</span>
+<span class="c-purple">X-Request-ID:</span> <span class="c-white">uuid-xxxx</span>
+
+<span class="c-green">{"id": 42, "name": "Yohann", "created": true}</span></code></pre>
+
+  <h3>// Codes de statut</h3>
+  <div class="status-list">
+    <div class="status-item"><span class="status-code s2xx">2xx</span><span class="status-label">Succès</span></div>
+    <div class="status-item"><span class="status-code" style="color:#aaa;font-size:0.78rem;font-family:'JetBrains Mono',monospace">200</span><span class="status-label">OK — requête réussie</span></div>
+    <div class="status-item"><span class="status-code" style="color:#aaa;font-size:0.78rem;font-family:'JetBrains Mono',monospace">201</span><span class="status-label">Created — ressource créée (POST)</span></div>
+    <div class="status-item"><span class="status-code" style="color:#aaa;font-size:0.78rem;font-family:'JetBrains Mono',monospace">204</span><span class="status-label">No Content — succès sans body (DELETE)</span></div>
+    <div class="status-item"><span class="status-code s3xx">3xx</span><span class="status-label">Redirection</span></div>
+    <div class="status-item"><span class="status-code" style="color:#aaa;font-size:0.78rem;font-family:'JetBrains Mono',monospace">301</span><span class="status-label">Moved Permanently — nouvelle URL définitive</span></div>
+    <div class="status-item"><span class="status-code" style="color:#aaa;font-size:0.78rem;font-family:'JetBrains Mono',monospace">302</span><span class="status-label">Found — redirect temporaire</span></div>
+    <div class="status-item"><span class="status-code" style="color:#aaa;font-size:0.78rem;font-family:'JetBrains Mono',monospace">304</span><span class="status-label">Not Modified — cache valide, pas de body</span></div>
+    <div class="status-item"><span class="status-code s4xx">4xx</span><span class="status-label">Erreur client</span></div>
+    <div class="status-item"><span class="status-code" style="color:#aaa;font-size:0.78rem;font-family:'JetBrains Mono',monospace">400</span><span class="status-label">Bad Request — body/params invalides</span></div>
+    <div class="status-item"><span class="status-code" style="color:#aaa;font-size:0.78rem;font-family:'JetBrains Mono',monospace">401</span><span class="status-label">Unauthorized — pas/mauvais token</span></div>
+    <div class="status-item"><span class="status-code" style="color:#aaa;font-size:0.78rem;font-family:'JetBrains Mono',monospace">403</span><span class="status-label">Forbidden — token valide, accès refusé</span></div>
+    <div class="status-item"><span class="status-code" style="color:#aaa;font-size:0.78rem;font-family:'JetBrains Mono',monospace">404</span><span class="status-label">Not Found — ressource inexistante</span></div>
+    <div class="status-item"><span class="status-code" style="color:#aaa;font-size:0.78rem;font-family:'JetBrains Mono',monospace">422</span><span class="status-label">Unprocessable — validation échouée</span></div>
+    <div class="status-item"><span class="status-code" style="color:#aaa;font-size:0.78rem;font-family:'JetBrains Mono',monospace">429</span><span class="status-label">Too Many Requests — rate limit atteint</span></div>
+    <div class="status-item"><span class="status-code s5xx">5xx</span><span class="status-label">Erreur serveur</span></div>
+    <div class="status-item"><span class="status-code" style="color:#aaa;font-size:0.78rem;font-family:'JetBrains Mono',monospace">500</span><span class="status-label">Internal Server Error — crash serveur</span></div>
+    <div class="status-item"><span class="status-code" style="color:#aaa;font-size:0.78rem;font-family:'JetBrains Mono',monospace">502</span><span class="status-label">Bad Gateway — proxy/reverse proxy cassé</span></div>
+    <div class="status-item"><span class="status-code" style="color:#aaa;font-size:0.78rem;font-family:'JetBrains Mono',monospace">503</span><span class="status-label">Service Unavailable — surcharge/maintenance</span></div>
+  </div>
+
+  <div class="alert alert-warn">
+    <span class="alert-icon">⚠️</span>
+    <span class="alert-text"><strong>401 vs 403</strong> : 401 = "qui es-tu ?" (pas/mauvais token). 403 = "je te connais mais non." (token valide, droits insuffisants).</span>
+  </div>
+</div>
+
+<!-- 06 HTTPS -->
+<div class="section" id="https">
+  <h2><span class="icon">⑥</span> HTTPS — TLS en pratique</h2>
+  <p>HTTPS = HTTP + TLS. La couche TLS chiffre tout le trafic entre client et serveur.</p>
+
+  <h3>// TLS Handshake simplifié</h3>
+  <div class="flow">
+    <div class="flow-step">
+      <div class="flow-dot">1</div>
+      <div class="flow-content">
+        <div class="flow-title">Client Hello</div>
+        <div class="flow-desc">Le client envoie les algos de chiffrement supportés + un nonce aléatoire</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-dot">2</div>
+      <div class="flow-content">
+        <div class="flow-title">Server Hello + Certificat</div>
+        <div class="flow-desc">Le serveur choisit l'algo + envoie son certificat TLS (signé par une CA)</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-dot">3</div>
+      <div class="flow-content">
+        <div class="flow-title">Vérification cert + clé de session</div>
+        <div class="flow-desc">Le client vérifie la chaîne de confiance et génère une clé de session symétrique</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-dot">4</div>
+      <div class="flow-content">
+        <div class="flow-title">Échange chiffré</div>
+        <div class="flow-desc">Tout le reste est chiffré avec AES (symétrique, rapide)</div>
+      </div>
+    </div>
+  </div>
+
+  <h3>// Ce que TLS protège / ne protège pas</h3>
+  <div class="grid2">
+    <div class="card accent-left">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:var(--accent);margin-bottom:0.6rem">PROTÉGÉ ✓</div>
+      Headers, body, query string, cookies, tous chiffrés en transit
+    </div>
+    <div class="card accent-orange">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:var(--accent2);margin-bottom:0.6rem">PAS PROTÉGÉ ✗</div>
+      Le hostname (SNI visible en clair). L'IP de destination. Les métadonnées réseau.
+    </div>
+  </div>
+
+  <h3>// Certificats en pratique (VPS)</h3>
+  <pre><code><span class="c-muted"># Let's Encrypt via Certbot (Apache)</span>
+<span class="c-green">certbot</span> <span class="c-white">--apache -d mondomaine.fr -d www.mondomaine.fr</span>
+
+<span class="c-muted"># Renouvellement auto (cron)</span>
+<span class="c-green">certbot renew</span> <span class="c-white">--quiet</span>
+
+<span class="c-muted"># Vérifier l'expiration</span>
+<span class="c-green">openssl s_client</span> <span class="c-white">-connect mondomaine.fr:443 -servername mondomaine.fr</span> \
+  <span class="c-white">2>/dev/null | openssl x509 -noout -dates</span></code></pre>
+
+  <h3>// SNI — Virtual Hosting HTTPS</h3>
+  <p>SNI (Server Name Indication) permet à un serveur d'héberger plusieurs domaines HTTPS sur la même IP. Le client envoie le hostname en clair pendant le handshake TLS pour que le serveur sache quel certificat présenter.</p>
+
+  <div class="alert alert-tip">
+    <span class="alert-icon">💡</span>
+    <span class="alert-text">Le LAB force le SNI en Python avec <span class="ic">server_hostname=target_host</span> — c'est exactement ça.</span>
+  </div>
+</div>
+
+<!-- 07 ARCHITECTURE -->
+<div class="section" id="archi">
+  <h2><span class="icon">⑦</span> Organiser ses requêtes</h2>
+  <p>Côté code, l'organisation des appels HTTP conditionne la maintenabilité. Voici les patterns.</p>
+
+  <h3>// Pattern 1 — Couche API centralisée</h3>
+  <pre><code><span class="c-muted">// lib/api.js — instance axios configurée une seule fois</span>
+<span class="c-purple">import</span> <span class="c-white">axios</span> <span class="c-purple">from</span> <span class="c-yellow">'axios'</span>
+
+<span class="c-purple">const</span> <span class="c-blue">api</span> = axios.create({
+  baseURL: <span class="c-yellow">import.meta.env.VITE_API_URL</span>,
+  timeout: <span class="c-orange">10000</span>,
+  withCredentials: <span class="c-orange">true</span>,
+})
+
+api.interceptors.request.use(config => {
+  <span class="c-purple">const</span> token = getCSRFToken()
+  <span class="c-purple">if</span> (token) config.headers[<span class="c-yellow">'X-CSRF-Token'</span>] = token
+  <span class="c-purple">return</span> config
+})
+
+api.interceptors.response.use(
+  res => res,
+  err => {
+    <span class="c-purple">if</span> (err.response?.status === <span class="c-orange">401</span>) logout()
+    <span class="c-purple">return</span> Promise.reject(err)
+  }
+)
+
+<span class="c-purple">export default</span> api</code></pre>
+
+  <h3>// Pattern 2 — Modules par ressource</h3>
+  <pre><code><span class="c-muted">// services/users.js</span>
+<span class="c-purple">export const</span> usersService = {
+  getAll:  (params)   => api.get(<span class="c-yellow">'/users'</span>, { params }),
+  getById: (id)       => api.get(<span class="c-yellow">`/users/${id}`</span>),
+  create:  (data)     => api.post(<span class="c-yellow">'/users'</span>, data),
+  update:  (id, data) => api.patch(<span class="c-yellow">`/users/${id}`</span>, data),
+  remove:  (id)       => api.delete(<span class="c-yellow">`/users/${id}`</span>),
+}</code></pre>
+
+  <h3>// Pattern 3 — Retry + timeout</h3>
+  <pre><code><span class="c-purple">async function</span> <span class="c-blue">fetchWithRetry</span>(url, opts = {}, retries = <span class="c-orange">3</span>) {
+  <span class="c-purple">for</span> (<span class="c-purple">let</span> i = <span class="c-orange">0</span>; i < retries; i++) {
+    <span class="c-purple">try</span> {
+      <span class="c-purple">const</span> res = <span class="c-purple">await</span> fetch(url, { ...opts, signal: AbortSignal.timeout(<span class="c-orange">5000</span>) })
+      <span class="c-purple">if</span> (!res.ok) <span class="c-purple">throw new</span> Error(<span class="c-yellow">`HTTP ${res.status}`</span>)
+      <span class="c-purple">return await</span> res.json()
+    } <span class="c-purple">catch</span> (e) {
+      <span class="c-purple">if</span> (i === retries - <span class="c-orange">1</span>) <span class="c-purple">throw</span> e
+      <span class="c-purple">await</span> sleep(<span class="c-orange">500</span> * (i + <span class="c-orange">1</span>))
+    }
+  }
+}</code></pre>
+
+  <h3>// Bonnes pratiques</h3>
+  <div class="card accent-left" style="margin-bottom:0.6rem"><strong>1. Centraliser la config</strong> — baseURL, headers par défaut, timeout dans un seul endroit.</div>
+  <div class="card accent-left" style="margin-bottom:0.6rem"><strong>2. Intercepteurs globaux</strong> — auth token, refresh token, gestion 401/403 au même endroit.</div>
+  <div class="card accent-left" style="margin-bottom:0.6rem"><strong>3. Modules par ressource</strong> — un fichier <span class="ic">users.service.js</span> par entité, pas de fetch éparpillé.</div>
+  <div class="card accent-left" style="margin-bottom:0.6rem"><strong>4. Toujours un timeout</strong> — sans timeout, une requête bloquée pend indéfiniment.</div>
+  <div class="card accent-left"><strong>5. Distinguer 4xx et 5xx</strong> — 4xx = bug côté client à corriger. 5xx = alerter + retry possible.</div>
+</div>
+
+</main>
+
+<script>
+function show(id, btn) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'))
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'))
+  document.getElementById(id).classList.add('active')
+  btn.classList.add('active')
+}
+</script>
+</body>
+</html>
