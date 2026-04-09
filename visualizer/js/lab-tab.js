@@ -549,7 +549,7 @@ export function initLab() {
       } catch {
         /* ignore */
       }
-      applyBodyTemplate(t, m === 'fill_empty' ? 'fill_empty' : 'replace');
+      applyBodyTemplate(t, ['fill_empty', 'inject_urlencoded'].includes(m) ? m : 'replace');
       closeBodyModal();
     });
     const emptyBtn = document.createElement('button');
