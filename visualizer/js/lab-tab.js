@@ -14,6 +14,15 @@ import {
   saveUserTemplates,
   scoreTemplate,
 } from './lab-header-templates.js';
+import {
+  BODY_CATEGORIES,
+  builtinBodyTemplates,
+  exportUserBodyTemplatesJson,
+  filterBodyTemplates,
+  loadUserBodyTemplates,
+  saveUserBodyTemplates,
+  scoreBodyTemplate,
+} from './lab-body-templates.js';
 
 function escapeHtml(s) {
   const div = document.createElement('div');
@@ -133,6 +142,20 @@ export function initLab() {
   const headersRecEl = document.getElementById('lab-headers-rec');
   const headersAllEl = document.getElementById('lab-headers-all');
   const headersExportEl = document.getElementById('lab-headers-export');
+  const packImportEl = document.getElementById('lab-pack-import');
+  const packExportEl = document.getElementById('lab-pack-export');
+  const bodyOpenEl = document.getElementById('lab-body-open');
+  const bodySaveEl = document.getElementById('lab-body-save');
+  const bodyModalEl = document.getElementById('lab-body-modal');
+  const bodyBackdropEl = document.getElementById('lab-body-backdrop');
+  const bodyCloseEl = document.getElementById('lab-body-close');
+  const bodyQEl = document.getElementById('lab-body-q');
+  const bodyApplyEl = document.getElementById('lab-body-apply');
+  const bodyChipsEl = document.getElementById('lab-body-chips');
+  const bodyRecEl = document.getElementById('lab-body-rec');
+  const bodyAllEl = document.getElementById('lab-body-all');
+  const bodyImportEl = document.getElementById('lab-body-import');
+  const bodyExportEl = document.getElementById('lab-body-export');
   const extractedEl = document.getElementById('lab-extracted');
   const followRedirectsEl = document.getElementById('lab-http-follow-redirects');
   const sessionEl = document.getElementById('lab-http-session');
@@ -160,6 +183,7 @@ export function initLab() {
 
   // --- Header templates (HTTP) ---
   let headerCat = '';
+  let bodyCat = '';
 
   function openHeadersModal() {
     if (!headersModalEl) return;
@@ -183,10 +207,38 @@ export function initLab() {
     headersModalEl.setAttribute('aria-hidden', 'true');
   }
 
+  function openBodyModal() {
+    if (!bodyModalEl) return;
+    bodyModalEl.classList.add('open');
+    bodyModalEl.setAttribute('aria-hidden', 'false');
+    try {
+      const savedCat = window.localStorage.getItem('labBodyCategory') || '';
+      bodyCat = savedCat;
+      const savedApply = window.localStorage.getItem('labBodyApply') || '';
+      if (bodyApplyEl && (savedApply === 'replace' || savedApply === 'fill_empty')) bodyApplyEl.value = savedApply;
+    } catch {
+      /* ignore */
+    }
+    renderBodyLibrary();
+    setTimeout(() => bodyQEl?.focus(), 0);
+  }
+
+  function closeBodyModal() {
+    if (!bodyModalEl) return;
+    bodyModalEl.classList.remove('open');
+    bodyModalEl.setAttribute('aria-hidden', 'true');
+  }
+
   function getAllHeaderTemplates() {
     const builtins = builtinTemplates();
     const users = loadUserTemplates();
     // Évite collisions id en préfixant côté builtins déjà "b-".
+    return [...users, ...builtins];
+  }
+
+  function getAllBodyTemplates() {
+    const builtins = builtinBodyTemplates();
+    const users = loadUserBodyTemplates();
     return [...users, ...builtins];
   }
 
@@ -225,6 +277,20 @@ export function initLab() {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
+  function mergeContentTypeHint(hint) {
+    const ct = String(hint || '').trim();
+    if (!ct) return;
+    const hEl = document.getElementById('lab-http-headers');
+    if (!hEl) return;
+    let cur = {};
+    const parsed = parseHeadersTextarea(hEl.value);
+    if (parsed && typeof parsed === 'object') cur = parsed;
+    if (!cur['Content-Type']) {
+      cur['Content-Type'] = ct;
+      hEl.value = JSON.stringify(cur, null, 2);
+    }
+  }
+
   function applyHeaderTemplate(t, mode) {
     const hEl = document.getElementById('lab-http-headers');
     if (!hEl) return;
@@ -235,6 +301,19 @@ export function initLab() {
     const next =
       mode === 'replace' ? { ...(t.headers || {}) } : mergeHeadersPreserveExisting(curObj, t.headers || {});
     hEl.value = JSON.stringify(next, null, 2);
+  }
+
+  function applyBodyTemplate(t, mode) {
+    const bEl = document.getElementById('lab-http-body');
+    if (!bEl) return;
+    const cur = String(bEl.value ?? '');
+    const body = String(t.body ?? '');
+    if (mode === 'fill_empty') {
+      if (!cur.trim()) bEl.value = body;
+    } else {
+      bEl.value = body;
+    }
+    if (t.content_type_hint) mergeContentTypeHint(t.content_type_hint);
   }
 
   function renderTemplateItem(t, isUser) {
@@ -332,12 +411,132 @@ export function initLab() {
     }
   }
 
+  function renderBodyChips() {
+    if (!bodyChipsEl) return;
+    bodyChipsEl.innerHTML = '';
+    const mk = (id, label) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = `lab-chip${bodyCat === id ? ' on' : ''}`;
+      b.textContent = label;
+      b.addEventListener('click', () => {
+        bodyCat = bodyCat === id ? '' : id;
+        try {
+          window.localStorage.setItem('labBodyCategory', bodyCat);
+        } catch {
+          /* ignore */
+        }
+        renderBodyLibrary();
+      });
+      return b;
+    };
+    bodyChipsEl.appendChild(mk('', 'Tous'));
+    BODY_CATEGORIES.forEach((c) => bodyChipsEl.appendChild(mk(c.id, c.label)));
+  }
+
+  function renderBodyItem(t, isUser) {
+    const wrap = document.createElement('div');
+    wrap.className = 'lab-hitem';
+    const name = document.createElement('div');
+    name.className = 'nm';
+    name.textContent = t.name || 'template';
+
+    const desc = document.createElement('div');
+    desc.className = 'ds';
+    const meta = [];
+    if (t.body_type) meta.push(String(t.body_type));
+    if (t.content_type_hint) meta.push(String(t.content_type_hint));
+    if (Array.isArray(t.tags) && t.tags.length) meta.push(t.tags.join(', '));
+    desc.textContent = t.notes || meta.join(' — ') || '';
+
+    const acts = document.createElement('div');
+    acts.className = 'acts';
+    const applyBtn = document.createElement('button');
+    applyBtn.type = 'button';
+    applyBtn.className = 'btn tiny pri';
+    applyBtn.textContent = 'Appliquer';
+    applyBtn.addEventListener('click', () => {
+      const m = String(bodyApplyEl?.value || 'replace');
+      try {
+        window.localStorage.setItem('labBodyApply', m);
+      } catch {
+        /* ignore */
+      }
+      applyBodyTemplate(t, m === 'fill_empty' ? 'fill_empty' : 'replace');
+      closeBodyModal();
+    });
+    const emptyBtn = document.createElement('button');
+    emptyBtn.type = 'button';
+    emptyBtn.className = 'btn tiny';
+    emptyBtn.textContent = 'Champs vides';
+    emptyBtn.addEventListener('click', () => {
+      applyBodyTemplate(t, 'fill_empty');
+      closeBodyModal();
+    });
+    acts.appendChild(applyBtn);
+    acts.appendChild(emptyBtn);
+
+    if (isUser) {
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'btn tiny';
+      delBtn.textContent = 'Supprimer';
+      delBtn.addEventListener('click', () => {
+        const cur = loadUserBodyTemplates().filter((x) => x.id !== t.id);
+        saveUserBodyTemplates(cur);
+        renderBodyLibrary();
+      });
+      acts.appendChild(delBtn);
+    }
+
+    const r1 = document.createElement('div');
+    r1.className = 'r1';
+    const left = document.createElement('div');
+    left.appendChild(name);
+    if (desc.textContent) left.appendChild(desc);
+    r1.appendChild(left);
+    r1.appendChild(acts);
+
+    const pre = document.createElement('pre');
+    const bodyPreview = String(t.body ?? '');
+    pre.textContent = bodyPreview.length > 2000 ? `${bodyPreview.slice(0, 2000)}…` : bodyPreview;
+
+    wrap.appendChild(r1);
+    wrap.appendChild(pre);
+    return wrap;
+  }
+
+  function renderBodyLibrary() {
+    renderBodyChips();
+    const q = String(bodyQEl?.value || '');
+    const all = getAllBodyTemplates();
+    const filtered = filterBodyTemplates(all, q, bodyCat);
+    const users = new Set(loadUserBodyTemplates().map((t) => t.id));
+
+    const scored = filtered
+      .map((t) => ({ t, s: scoreBodyTemplate(t, q, bodyCat) }))
+      .sort((a, b) => b.s - a.s);
+    const rec = scored.slice(0, 5).map((x) => x.t);
+
+    if (bodyRecEl) {
+      bodyRecEl.innerHTML = '';
+      if (!rec.length) bodyRecEl.textContent = '—';
+      else rec.forEach((t) => bodyRecEl.appendChild(renderBodyItem(t, users.has(t.id))));
+    }
+    if (bodyAllEl) {
+      bodyAllEl.innerHTML = '';
+      if (!filtered.length) bodyAllEl.textContent = '—';
+      else filtered.forEach((t) => bodyAllEl.appendChild(renderBodyItem(t, users.has(t.id))));
+    }
+  }
+
   headersOpenEl?.addEventListener('click', openHeadersModal);
   headersBackdropEl?.addEventListener('click', closeHeadersModal);
   headersCloseEl?.addEventListener('click', closeHeadersModal);
   document.addEventListener('keydown', (e) => {
     const onLab = document.getElementById('panel-lab')?.classList.contains('active');
     if (e.key === 'Escape' && onLab && headersModalEl?.classList.contains('open')) closeHeadersModal();
+    if (e.key === 'Escape' && onLab && bodyModalEl?.classList.contains('open')) closeBodyModal();
   });
 
   headersQEl?.addEventListener('input', () => renderHeadersLibrary());
@@ -349,8 +548,191 @@ export function initLab() {
     }
   });
 
+  // pack import/export (headers + body)
+  function readJsonFile(file, cb) {
+    const r = new FileReader();
+    r.onload = () => {
+      try {
+        cb(JSON.parse(String(r.result || 'null')));
+      } catch {
+        cb(null);
+      }
+    };
+    r.readAsText(file);
+  }
+
+  function normalizeHeadersTemplates(obj) {
+    const arr =
+      (obj && Array.isArray(obj.templates) && obj.templates) ||
+      (obj && Array.isArray(obj.headers) && obj.headers) ||
+      (Array.isArray(obj) ? obj : []);
+    return arr
+      .filter((t) => t && typeof t === 'object')
+      .map((t) => ({
+        id: String(t.id || ''),
+        name: String(t.name || 'template'),
+        category: String(t.category || 'custom'),
+        tags: Array.isArray(t.tags) ? t.tags.map((x) => String(x)) : [],
+        headers:
+          (t.headers && typeof t.headers === 'object' ? t.headers : (t.data && typeof t.data === 'object' ? t.data : {})),
+        notes: t.notes != null ? String(t.notes) : '',
+        createdAt: Number(t.createdAt || Date.now()),
+        updatedAt: Number(t.updatedAt || Date.now()),
+      }))
+      .filter((t) => t.id && t.name);
+  }
+
+  function normalizeBodyTemplates(obj) {
+    const arr =
+      (obj && Array.isArray(obj.templates) && obj.templates) ||
+      (obj && Array.isArray(obj.payloads) && obj.payloads) ||
+      (Array.isArray(obj) ? obj : []);
+    return arr
+      .filter((t) => t && typeof t === 'object')
+      .map((t) => ({
+        id: String(t.id || ''),
+        name: String(t.name || 'template'),
+        category: String(t.category || 'custom'),
+        tags: Array.isArray(t.tags) ? t.tags.map((x) => String(x)) : [],
+        body_type: String(t.body_type || 'raw'),
+        content_type_hint: t.content_type_hint != null ? String(t.content_type_hint) : '',
+        body: String(t.body ?? ''),
+        notes: t.notes != null ? String(t.notes) : '',
+        createdAt: Number(t.createdAt || Date.now()),
+        updatedAt: Number(t.updatedAt || Date.now()),
+      }))
+      .filter((t) => t.id && t.name);
+  }
+
+  function mergeById(existing, incoming) {
+    const byId = new Map();
+    existing.forEach((t) => byId.set(t.id, t));
+    incoming.forEach((t) => byId.set(t.id, t));
+    return Array.from(byId.values());
+  }
+
+  function importPackObject(pack) {
+    if (!pack || typeof pack !== 'object') return false;
+
+    // Accept top-level legacy keys too
+    const headersObj = pack.headers || pack.header || pack.headers_templates || pack.headersTemplates || pack;
+    const bodyObj = pack.body || pack.payloads || pack.body_templates || pack.bodyTemplates || pack;
+
+    const hdrIncoming = normalizeHeadersTemplates(headersObj);
+    const bodyIncoming = normalizeBodyTemplates(bodyObj);
+
+    if (!hdrIncoming.length && !bodyIncoming.length) return false;
+
+    if (hdrIncoming.length) {
+      const cur = loadUserTemplates();
+      saveUserTemplates(mergeById(cur, hdrIncoming));
+    }
+    if (bodyIncoming.length) {
+      const curB = loadUserBodyTemplates();
+      saveUserBodyTemplates(mergeById(curB, bodyIncoming));
+    }
+    return true;
+  }
+
+  function pickFile(accept, onPick) {
+    const inp = document.createElement('input');
+    inp.type = 'file';
+    inp.accept = accept;
+    inp.style.display = 'none';
+    inp.addEventListener('change', () => {
+      const f = inp.files && inp.files[0];
+      if (f) onPick(f);
+      inp.remove();
+    });
+    document.body.appendChild(inp);
+    inp.click();
+  }
+
+  packImportEl?.addEventListener('click', () => {
+    pickFile('application/json,.json', (f) => {
+      readJsonFile(f, (obj) => {
+        const ok = importPackObject(obj);
+        if (ok) {
+          renderHeadersLibrary();
+          renderBodyLibrary();
+          if (out) out.innerHTML = '<span style="color:var(--a3);font-size:.65rem">✅ Import pack.json OK</span>';
+        } else if (out) {
+          out.innerHTML = '<span style="color:var(--a2);font-size:.65rem">Import: format JSON non reconnu.</span>';
+        }
+      });
+    });
+  });
+
+  packExportEl?.addEventListener('click', () => {
+    const pack = {
+      version: 1,
+      headers: { templates: loadUserTemplates() },
+      body: { templates: loadUserBodyTemplates() },
+      pairs: { pairs: [] },
+    };
+    dl('lab-pack.json', JSON.stringify(pack, null, 2));
+  });
+
   headersExportEl?.addEventListener('click', () => {
     dl('lab-http-headers-templates.json', exportUserTemplatesJson());
+  });
+
+  // Body modal wiring
+  bodyOpenEl?.addEventListener('click', openBodyModal);
+  bodyBackdropEl?.addEventListener('click', closeBodyModal);
+  bodyCloseEl?.addEventListener('click', closeBodyModal);
+  bodyQEl?.addEventListener('input', () => renderBodyLibrary());
+  bodyApplyEl?.addEventListener('change', () => {
+    try {
+      window.localStorage.setItem('labBodyApply', String(bodyApplyEl.value || 'replace'));
+    } catch {
+      /* ignore */
+    }
+  });
+  bodyExportEl?.addEventListener('click', () => {
+    dl('lab-http-body-templates.json', exportUserBodyTemplatesJson());
+  });
+
+  bodyImportEl?.addEventListener('click', () => {
+    pickFile('application/json,.json', (f) => {
+      readJsonFile(f, (obj) => {
+        const ok = importPackObject(obj);
+        if (ok) {
+          renderHeadersLibrary();
+          renderBodyLibrary();
+          if (out) out.innerHTML = '<span style="color:var(--a3);font-size:.65rem">✅ Import pack.json OK</span>';
+        } else if (out) {
+          out.innerHTML = '<span style="color:var(--a2);font-size:.65rem">Import: format JSON non reconnu.</span>';
+        }
+      });
+    });
+  });
+
+  bodySaveEl?.addEventListener('click', () => {
+    const bEl = document.getElementById('lab-http-body');
+    if (!bEl) return;
+    const name = window.prompt('Nom du modèle de body ?', 'Mon body');
+    if (!name) return;
+    const tagsRaw = window.prompt('Tags (séparés par des virgules) ?', '');
+    const tags = tagsRaw ? tagsRaw.split(',').map((x) => x.trim()).filter(Boolean) : [];
+    const hint = window.prompt('content_type_hint (optionnel) ?', '');
+    const now = Date.now();
+    const t = {
+      id: newId(),
+      name: String(name).trim() || 'body',
+      category: bodyCat || 'custom',
+      tags,
+      body_type: 'raw',
+      content_type_hint: hint ? String(hint).trim() : '',
+      body: String(bEl.value ?? ''),
+      notes: '',
+      createdAt: now,
+      updatedAt: now,
+    };
+    const cur = loadUserBodyTemplates();
+    cur.unshift(t);
+    saveUserBodyTemplates(cur);
+    if (out) out.innerHTML = `<span style="color:var(--a3);font-size:.65rem">✅ Body enregistré: <code>${escapeHtml(t.name)}</code></span>`;
   });
 
   headersSaveEl?.addEventListener('click', () => {

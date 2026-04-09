@@ -317,6 +317,30 @@ tr:hover td{background:rgba(0,212,255,.03)}
 #panel-lab .lab-hitem .meta{margin-top:6px;color:var(--mu);font-size:.62rem}
 #panel-lab .lab-headers-footer{padding:10px 14px;border-top:1px solid rgba(26,58,92,.55);display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
 #panel-lab .lab-headers-footer .hint{color:var(--mu);font-size:.62rem}
+#panel-lab .lab-headers-footer .btns{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#panel-lab .lab-body-modal{position:fixed;inset:0;z-index:220;display:none;align-items:center;justify-content:center;padding:16px}
+#panel-lab .lab-body-modal.open{display:flex}
+#panel-lab .lab-body-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.65)}
+#panel-lab .lab-body-box{
+  position:relative;max-width:min(820px,96vw);width:100%;max-height:86vh;
+  border-radius:12px;border:1px solid var(--b);background:var(--s2);
+  box-shadow:0 16px 52px rgba(0,0,0,.62),0 0 30px rgba(0,212,255,.08);
+  display:flex;flex-direction:column;overflow:hidden
+}
+#panel-lab .lab-body-title{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-bottom:1px solid rgba(26,58,92,.55)}
+#panel-lab .lab-body-title .t{font-family:'Orbitron',monospace;color:var(--a);font-size:.82rem;letter-spacing:2px}
+#panel-lab .lab-body-title .x{background:none;border:none;color:var(--mu);cursor:pointer;font-size:1.2rem;line-height:1;padding:4px}
+#panel-lab .lab-body-title .x:hover{color:var(--a)}
+#panel-lab .lab-body-body{padding:12px 14px;overflow:auto;min-height:0}
+#panel-lab .lab-body-top{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px}
+#panel-lab .lab-body-top input[type="text"]{min-width:min(320px,100%);flex:1}
+#panel-lab .lab-body-footer{padding:10px 14px;border-top:1px solid rgba(26,58,92,.55);display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+#panel-lab .lab-body-footer .hint{color:var(--mu);font-size:.62rem}
+#panel-lab .lab-body-footer .btns{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+@media(max-width:520px){
+  #panel-lab .lab-body-box{max-height:92vh}
+  #panel-lab .lab-body-body{padding:12px}
+}
 @media(max-width:520px){
   #panel-lab .lab-headers-box{max-height:92vh}
   #panel-lab .lab-headers-body{padding:12px}
@@ -628,7 +652,13 @@ tr:hover td{background:rgba(0,212,255,.03)}
       </span>
     </div>
     <textarea id="lab-http-headers" placeholder='{ "Accept": "application/json" }' rows="4"></textarea>
-    <div class="lab-sub">Corps (optionnel)</div>
+    <div class="lab-sub row">
+      <span>Corps (optionnel)</span>
+      <span class="lab-sub-actions">
+        <button type="button" class="btn tiny" id="lab-body-open" title="Choisir un modèle de corps (payload)">+ Body</button>
+        <button type="button" class="btn tiny" id="lab-body-save" title="Enregistrer le corps actuel (localStorage)">💾 Enregistrer</button>
+      </span>
+    </div>
     <textarea id="lab-http-body" placeholder="{}"></textarea>
     <div class="lab-row">
       <button type="button" class="btn pri" id="lab-send-http" disabled>Envoyer HTTP</button>
@@ -661,7 +691,44 @@ tr:hover td{background:rgba(0,212,255,.03)}
       </div>
       <div class="lab-headers-footer">
         <div class="hint">Stockage local (navigateur). Astuce: garde “Fusion” pour ne pas écraser tes headers existants.</div>
-        <button type="button" class="btn" id="lab-headers-export" title="Exporter tes modèles (JSON)">⬇ Export</button>
+        <div class="btns">
+          <button type="button" class="btn" id="lab-pack-import" title="Importer un pack.json (headers + body)">⬆ Import</button>
+          <button type="button" class="btn" id="lab-pack-export" title="Exporter tes modèles (pack.json)">⬇ Export</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Popin Templates de corps (HTTP) -->
+  <div class="lab-body-modal" id="lab-body-modal" aria-hidden="true">
+    <div class="lab-body-backdrop" id="lab-body-backdrop"></div>
+    <div class="lab-body-box" role="dialog" aria-labelledby="lab-body-title">
+      <div class="lab-body-title">
+        <div class="t" id="lab-body-title">BODY — TEMPLATES</div>
+        <button type="button" class="x" id="lab-body-close" aria-label="Fermer">×</button>
+      </div>
+      <div class="lab-body-body">
+        <div class="lab-body-top">
+          <input type="text" id="lab-body-q" placeholder="Rechercher (json, form, auth, …)" />
+          <select id="lab-body-apply" title="Comment appliquer le modèle de corps">
+            <option value="replace">Remplacer</option>
+            <option value="fill_empty">Champs vides</option>
+          </select>
+        </div>
+        <div class="lab-chips" id="lab-body-chips"></div>
+        <div class="stitle" style="margin-top:10px">RECOMMANDÉS</div>
+        <div class="lab-hlist" id="lab-body-rec"></div>
+        <details style="margin-top:12px">
+          <summary style="cursor:pointer;color:var(--mu);font-size:.68rem">Tous les modèles</summary>
+          <div style="margin-top:10px" class="lab-hlist" id="lab-body-all"></div>
+        </details>
+      </div>
+      <div class="lab-body-footer">
+        <div class="hint">Astuce: un modèle peut proposer un <code>Content-Type</code> (hint). Il sera fusionné sans écraser le tien.</div>
+        <div class="btns">
+          <button type="button" class="btn" id="lab-body-import" title="Importer un pack.json (headers + body)">⬆ Import</button>
+          <button type="button" class="btn" id="lab-body-export" title="Exporter tes modèles de body (JSON)">⬇ Export</button>
+        </div>
       </div>
     </div>
   </div>
