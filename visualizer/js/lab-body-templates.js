@@ -22,6 +22,10 @@ export const BODY_CATEGORIES = [
   { id: 'generic', label: 'Generic' },
   { id: 'json', label: 'JSON' },
   { id: 'form', label: 'Form' },
+  { id: 'ssti', label: 'SSTI' },
+  { id: 'ssrf', label: 'SSRF' },
+  { id: 'sqli', label: 'SQLi' },
+  { id: 'bypass-403', label: '403 Bypass' },
   { id: 'custom', label: 'Custom' },
 ];
 

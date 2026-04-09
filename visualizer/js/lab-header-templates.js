@@ -23,6 +23,9 @@ export const CATEGORIES = [
   { id: 'auth', label: 'Auth' },
   { id: 'csrf', label: 'CSRF' },
   { id: 'graphql', label: 'GraphQL' },
+  { id: 'ssrf', label: 'SSRF' },
+  { id: 'sqli', label: 'SQLi' },
+  { id: 'bypass-403', label: '403 Bypass' },
   { id: 'minimal', label: 'Minimal' },
   { id: 'custom', label: 'Custom' },
 ];
