@@ -151,6 +151,7 @@ export function initLab() {
   const bodyCloseEl = document.getElementById('lab-body-close');
   const bodyQEl = document.getElementById('lab-body-q');
   const bodyApplyEl = document.getElementById('lab-body-apply');
+  const bodyInjectKeyEl = document.getElementById('lab-body-inject-key');
   const bodyChipsEl = document.getElementById('lab-body-chips');
   const bodyRecEl = document.getElementById('lab-body-rec');
   const bodyAllEl = document.getElementById('lab-body-all');
@@ -220,6 +221,7 @@ export function initLab() {
       /* ignore */
     }
     renderBodyLibrary();
+    refreshBodyInjectKeyOptions();
     setTimeout(() => bodyQEl?.focus(), 0);
   }
 
@@ -277,6 +279,34 @@ export function initLab() {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
+  function refreshBodyInjectKeyOptions() {
+    if (!bodyInjectKeyEl) return;
+    const bEl = document.getElementById('lab-http-body');
+    const cur = String(bEl?.value ?? '');
+    bodyInjectKeyEl.innerHTML = '<option value="__ALL_EMPTY__">Toutes les clés vides</option>';
+    try {
+      const p = new URLSearchParams(cur);
+      const seen = new Set();
+      p.forEach((_, k) => {
+        if (seen.has(k)) return;
+        seen.add(k);
+        const opt = document.createElement('option');
+        opt.value = k;
+        opt.textContent = k;
+        bodyInjectKeyEl.appendChild(opt);
+      });
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function refreshBodyInjectUi() {
+    const mode = String(bodyApplyEl?.value || 'replace');
+    const on = mode === 'inject_urlencoded';
+    if (bodyInjectKeyEl) bodyInjectKeyEl.hidden = !on;
+    if (on) refreshBodyInjectKeyOptions();
+  }
+
   function mergeContentTypeHint(hint) {
     const ct = String(hint || '').trim();
     if (!ct) return;
@@ -314,10 +344,12 @@ export function initLab() {
       try {
         const p = new URLSearchParams(cur);
         let changed = false;
+        const target = String(bodyInjectKeyEl?.value || '__ALL_EMPTY__');
         /** @type {[string,string][]} */
         const outEntries = [];
         p.forEach((v, k) => {
-          if (v === '') {
+          const isTarget = target === '__ALL_EMPTY__' ? true : k === target;
+          if (isTarget && v === '') {
             outEntries.push([k, body]);
             changed = true;
           } else {
@@ -713,6 +745,10 @@ export function initLab() {
     } catch {
       /* ignore */
     }
+    refreshBodyInjectUi();
+  });
+  bodyInjectKeyEl?.addEventListener('change', () => {
+    // pas de persistance pour rester simple
   });
   bodyExportEl?.addEventListener('click', () => {
     dl('lab-http-body-templates.json', exportUserBodyTemplatesJson());
@@ -759,6 +795,15 @@ export function initLab() {
     saveUserBodyTemplates(cur);
     if (out) out.innerHTML = `<span style="color:var(--a3);font-size:.65rem">✅ Body enregistré: <code>${escapeHtml(t.name)}</code></span>`;
   });
+
+  // Met à jour la liste des clés injectables si le body change
+  document.getElementById('lab-http-body')?.addEventListener('input', () => {
+    if (!bodyInjectKeyEl || bodyInjectKeyEl.hidden) return;
+    refreshBodyInjectKeyOptions();
+  });
+
+  // État initial (au cas où "inject_urlencoded" est mémorisé)
+  refreshBodyInjectUi();
 
   headersSaveEl?.addEventListener('click', () => {
     const hEl = document.getElementById('lab-http-headers');
